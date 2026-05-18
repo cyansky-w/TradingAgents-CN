@@ -7,6 +7,8 @@ import { ElMessage } from 'element-plus'
 import NProgress from 'nprogress'
 import 'nprogress/nprogress.css'
 
+const BasicLayout = () => import('@/layouts/BasicLayout.vue')
+
 // 配置NProgress
 NProgress.configure({
   showSpinner: false,
@@ -31,7 +33,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/dashboard',
     name: 'Dashboard',
-    component: () => import('@/layouts/BasicLayout.vue'),
+    component: BasicLayout,
     meta: {
       title: '仪表板',
       icon: 'Dashboard',
@@ -53,7 +55,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/analysis',
     name: 'Analysis',
-    component: () => import('@/layouts/BasicLayout.vue'),
+    component: BasicLayout,
     redirect: '/analysis/single',
     children: [
       {
@@ -72,7 +74,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/screening',
     name: 'StockScreening',
-    component: () => import('@/layouts/BasicLayout.vue'),
+    component: BasicLayout,
     meta: {
       title: '股票筛选',
       icon: 'Search',
@@ -95,7 +97,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/favorites',
     name: 'Favorites',
-    component: () => import('@/layouts/BasicLayout.vue'),
+    component: BasicLayout,
     meta: {
       title: '我的自选股',
       icon: 'Star',
@@ -117,7 +119,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/learning',
     name: 'Learning',
-    component: () => import('@/layouts/BasicLayout.vue'),
+    component: BasicLayout,
     meta: {
       title: '学习中心',
       icon: 'Reading',
@@ -157,7 +159,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/stocks',
     name: 'Stocks',
-    component: () => import('@/layouts/BasicLayout.vue'),
+    component: BasicLayout,
     meta: {
       title: '股票详情',
       icon: 'TrendCharts',
@@ -184,7 +186,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/tasks',
     name: 'TaskCenter',
-    component: () => import('@/layouts/BasicLayout.vue'),
+    component: BasicLayout,
     meta: {
       title: '任务中心',
       icon: 'List',
@@ -205,7 +207,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/reports',
     name: 'Reports',
-    component: () => import('@/layouts/BasicLayout.vue'),
+    component: BasicLayout,
     meta: {
       title: '分析报告',
       icon: 'Document',
@@ -245,7 +247,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/settings',
     name: 'Settings',
-    component: () => import('@/layouts/BasicLayout.vue'),
+    component: BasicLayout,
     meta: {
       title: '设置',
       icon: 'Setting',
@@ -351,18 +353,29 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/about',
     name: 'About',
-    component: () => import('@/views/About/index.vue'),
+    component: BasicLayout,
     meta: {
       title: '关于',
       icon: 'InfoFilled',
       requiresAuth: false, // 关于页面不需要认证
       transition: 'fade'
-    }
+    },
+    children: [
+      {
+        path: '',
+        name: 'AboutHome',
+        component: () => import('@/views/About/index.vue'),
+        meta: {
+          title: '关于',
+          requiresAuth: false
+        }
+      }
+    ]
   },
   {
     path: '/paper',
     name: 'PaperTrading',
-    component: () => import('@/layouts/BasicLayout.vue'),
+    component: BasicLayout,
     meta: {
       title: '模拟交易',
       icon: 'CreditCard',
@@ -378,6 +391,55 @@ const routes: RouteRecordRaw[] = [
           title: '模拟交易',
           requiresAuth: true
         }
+      }
+    ]
+  },
+
+  {
+    path: '/real-trading',
+      name: 'RealTrading',
+      component: BasicLayout,
+      meta: {
+        title: '实盘交易',
+        icon: 'TrendCharts',
+        requiresAuth: true,
+        transition: 'slide-up'
+      },
+      children: [
+        {
+          path: '',
+          name: 'RealTradingHome',
+          component: () => import('@/views/RealTrading/index.vue'),
+          meta: {
+            title: '实盘交易',
+            requiresAuth: true
+          }
+        }
+      ]
+    },
+
+    {
+    path: '/chat',
+    name: 'Chat',
+    component: BasicLayout,
+    meta: {
+      title: 'AI 助手',
+      icon: 'ChatDotRound',
+      requiresAuth: true,
+      transition: 'fade'
+    },
+    children: [
+      {
+        path: '',
+        name: 'ChatHome',
+        component: () => import('@/views/Chat/index.vue'),
+        meta: { title: 'AI 助手', requiresAuth: true }
+      },
+      {
+        path: ':id',
+        name: 'ChatConversation',
+        component: () => import('@/views/Chat/index.vue'),
+        meta: { title: '对话', requiresAuth: true, hideInMenu: true }
       }
     ]
   },

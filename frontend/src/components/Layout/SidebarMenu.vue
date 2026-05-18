@@ -47,8 +47,18 @@
       <template #title>模拟交易</template>
     </el-menu-item>
 
+    <el-menu-item index="/real-trading">
+      <el-icon><TrendCharts /></el-icon>
+      <template #title>实盘交易</template>
+    </el-menu-item>
 
-    <!-- 分析报告已移至“股票分析”子菜单，保留注释便于追踪 -->
+    <el-menu-item index="/chat">
+      <el-icon><ChatDotRound /></el-icon>
+      <template #title>AI 助手</template>
+    </el-menu-item>
+
+
+    <!-- 分析报告已移至”股票分析”子菜单，保留注释便于追踪 -->
     <!--
     <el-menu-item index="/reports">
       <el-icon><Document /></el-icon>
@@ -112,7 +122,8 @@ import {
   /* Document 移除：不再使用顶级分析报告菜单图标 */
   Setting,
   InfoFilled,
-  CreditCard
+  CreditCard,
+  ChatDotRound
 } from '@element-plus/icons-vue'
 
 const route = useRoute()

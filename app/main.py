@@ -26,7 +26,7 @@ import asyncio
 from pathlib import Path
 
 from app.core.config import settings
-from app.core.database import init_db, close_db
+from app.core.database import init_db, close_db, get_redis_client
 from app.core.logging_config import setup_logging
 from app.routers import auth_db as auth, analysis, screening, queue, sse, health, favorites, config, reports, database, operation_logs, tags, tushare_init, akshare_init, baostock_init, historical_data, multi_period_sync, financial_data, news_data, social_media, internal_messages, usage_statistics, model_capabilities, cache, logs
 from app.routers import sync as sync_router, multi_source_sync
@@ -255,6 +255,41 @@ async def lifespan(app: FastAPI):
 
     # 显示配置摘要
     await _print_config_summary(logger)
+
+    # 初始化 AI Chat 模块
+    if getattr(settings, "CHAT_ENABLED", True):
+        try:
+            from app.chat.memory_manager import MemoryManager
+            from app.chat.service import init_chat_service
+
+            chat_memory = MemoryManager(get_redis_client())
+
+            if settings.HINDSIGHT_ENABLED and settings.HINDSIGHT_API_URL:
+                try:
+                    from app.chat.memory_manager import HindsightClient
+                    hindsight = HindsightClient(
+                        base_url=settings.HINDSIGHT_API_URL,
+                        api_key=settings.HINDSIGHT_API_KEY,
+                    )
+                    chat_memory.set_hindsight(hindsight)
+                    logger.info(f"🧠 Hindsight memory service connected: {settings.HINDSIGHT_API_URL}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Hindsight init skipped: {e}")
+
+            await init_chat_service(chat_memory)
+            logger.info("💬 AI Chat module initialized")
+
+            # Register built-in chat tools
+            try:
+                from app.chat.tool_registry import tool_registry
+                from app.chat.builtin_tools import register_builtin_tools
+                register_builtin_tools(tool_registry)
+                logger.info(f"🔧 Chat tools registered: {len(tool_registry.get_all())} tools")
+            except Exception as e:
+                logger.warning(f"⚠️ Tool registration failed: {e}")
+
+        except Exception as e:
+            logger.warning(f"⚠️ Chat module init failed: {e}")
 
     logger.info("TradingAgents FastAPI backend started")
 
@@ -719,6 +754,8 @@ app.include_router(sse.router, prefix="/api/stream", tags=["streaming"])
 app.include_router(sync_router.router)
 app.include_router(multi_source_sync.router)
 app.include_router(paper_router.router, prefix="/api", tags=["paper"])
+from app.routers import real_trades as real_trades_router
+app.include_router(real_trades_router.router, prefix="/api", tags=["real-trades"])
 app.include_router(tushare_init.router, prefix="/api", tags=["tushare-init"])
 app.include_router(akshare_init.router, prefix="/api", tags=["akshare-init"])
 app.include_router(baostock_init.router, prefix="/api", tags=["baostock-init"])
@@ -728,6 +765,10 @@ app.include_router(financial_data.router, tags=["financial-data"])
 app.include_router(news_data.router, tags=["news-data"])
 app.include_router(social_media.router, tags=["social-media"])
 app.include_router(internal_messages.router, tags=["internal-messages"])
+
+# AI Chat module
+from app.chat.router import router as chat_router
+app.include_router(chat_router)
 
 
 @app.get("/")
