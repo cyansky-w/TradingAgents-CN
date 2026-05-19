@@ -330,6 +330,30 @@ class Settings(BaseSettings):
         """是否为生产环境"""
         return not self.DEBUG
 
+    # ==================== AI Chat 配置 ====================
+
+    # Chat feature settings
+    CHAT_ENABLED: bool = Field(default=True, description="Enable AI chat feature")
+    CHAT_DEFAULT_MODEL: str = Field(default="", description="Default chat model (empty=use system default)")
+    CHAT_MAX_CONTEXT_MESSAGES: int = Field(default=20, ge=1, le=100, description="Max messages in chat context window")
+    CHAT_STREAM_TIMEOUT_SECONDS: int = Field(default=300, ge=30, le=1800, description="Chat SSE stream timeout in seconds")
+
+    # Chat SSE config
+    CHAT_SSE_POLL_TIMEOUT_SECONDS: float = Field(default=1.0, description="Chat SSE poll timeout")
+    CHAT_SSE_HEARTBEAT_INTERVAL_SECONDS: int = Field(default=15, description="Chat SSE heartbeat interval")
+    CHAT_SSE_MAX_IDLE_SECONDS: int = Field(default=600, description="Chat SSE max idle time")
+
+    # Chat Redis buffer
+    CHAT_REDIS_BUFFER_TTL: int = Field(default=86400, description="Chat Redis buffer TTL in seconds (24h)")
+
+    # ==================== Hindsight 记忆服务配置（可选）====================
+
+    HINDSIGHT_ENABLED: bool = Field(default=False, description="Enable Hindsight long-term memory service")
+    HINDSIGHT_API_URL: str = Field(default="http://localhost:8888", description="Hindsight API base URL")
+    HINDSIGHT_API_KEY: str = Field(default="", description="Hindsight API key (if required)")
+    HINDSIGHT_RECALL_TOP_K: int = Field(default=5, ge=1, le=20, description="Number of memories to recall per query")
+    HINDSIGHT_REFLECTION_INTERVAL: int = Field(default=10, ge=1, le=100, description="Reflect after N message exchanges")
+
     # Ignore any extra environment variables present in .env or process env
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
