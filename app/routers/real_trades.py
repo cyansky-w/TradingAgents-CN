@@ -409,7 +409,7 @@ async def get_dashboard(
     ]
 
     return ok({
-        "total_equity": round(total_cost + total_market_value - unrealized_pnl + realized_pnl, 2) if False else None,  # 简化
+        "total_equity": None,  # 留待后续版本完善（需整合账户初始资金）
         "total_cost": round(total_cost, 2),
         "total_pnl": round(total_pnl, 2),
         "realized_pnl": round(realized_pnl, 2),

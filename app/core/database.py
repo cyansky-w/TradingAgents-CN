@@ -364,6 +364,24 @@ async def create_database_indexes(db):
 
         logger.info("✅ 数据库索引创建完成")
 
+        # Chat collections indexes
+        conversations = db["conversations"]
+        await conversations.create_index([("user_id", 1), ("updated_at", -1)])
+        await conversations.create_index([("user_id", 1), ("is_archived", 1)])
+
+        chat_messages = db["chat_messages"]
+        await chat_messages.create_index([("conversation_id", 1), ("created_at", 1)])
+        await chat_messages.create_index([("user_id", 1), ("created_at", -1)])
+
+        # real_trades indexes
+        real_trades = db["real_trades"]
+        await real_trades.create_index([("user_id", 1), ("trade_date", -1)])
+        await real_trades.create_index([("user_id", 1), ("code", 1)])
+        await real_trades.create_index([("user_id", 1), ("side", 1)])
+        await real_trades.create_index([("user_id", 1), ("tags", 1)])
+
+        logger.info("✅ 数据库索引创建完成")
+
     except Exception as e:
         logger.warning(f"⚠️ 创建索引失败: {e}")
 

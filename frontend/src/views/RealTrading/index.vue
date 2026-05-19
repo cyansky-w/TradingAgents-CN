@@ -11,13 +11,19 @@
         </el-card>
         <el-card shadow="hover" class="stat-card">
           <div class="stat-label">已实现盈亏</div>
-          <div class="stat-value" :style="{ color: dash.realized_pnl >= 0 ? '#67C23A' : '#F56C6C' }">
+          <div
+            class="stat-value"
+            :style="{ color: dash.realized_pnl >= 0 ? '#67C23A' : '#F56C6C' }"
+          >
             ¥{{ fmtAmount(dash.realized_pnl) }}
           </div>
         </el-card>
         <el-card shadow="hover" class="stat-card">
           <div class="stat-label">未实现盈亏</div>
-          <div class="stat-value" :style="{ color: dash.unrealized_pnl >= 0 ? '#67C23A' : '#F56C6C' }">
+          <div
+            class="stat-value"
+            :style="{ color: dash.unrealized_pnl >= 0 ? '#67C23A' : '#F56C6C' }"
+          >
             ¥{{ fmtAmount(dash.unrealized_pnl) }}
           </div>
         </el-card>
@@ -39,14 +45,22 @@
         <el-col :span="12">
           <el-card shadow="hover">
             <template #header><div class="card-hd">收益率曲线</div></template>
-            <v-chart :option="pnlChartOption" style="height: 260px" v-if="dash.pnl_curve.length > 0" />
+            <v-chart
+              :option="pnlChartOption"
+              style="height: 260px"
+              v-if="dash.pnl_curve.length > 0"
+            />
             <el-empty v-else description="暂无数据" :image-size="80" />
           </el-card>
         </el-col>
         <el-col :span="12">
           <el-card shadow="hover">
             <template #header><div class="card-hd">持仓分布</div></template>
-            <v-chart :option="sectorChartOption" style="height: 260px" v-if="dash.sector_distribution.length > 0" />
+            <v-chart
+              :option="sectorChartOption"
+              style="height: 260px"
+              v-if="dash.sector_distribution.length > 0"
+            />
             <el-empty v-else description="暂无数据" :image-size="80" />
           </el-card>
         </el-col>
@@ -84,16 +98,24 @@
         </el-table-column>
         <el-table-column label="数量" width="80" prop="quantity" />
         <el-table-column label="成本价" width="100">
-          <template #default="{ row }">{{ curSymbol(row.currency) }}{{ fmtPrice(row.avg_cost) }}</template>
+          <template #default="{ row }"
+            >{{ curSymbol(row.currency) }}{{ fmtPrice(row.avg_cost) }}</template
+          >
         </el-table-column>
         <el-table-column label="成本总价" width="110">
-          <template #default="{ row }">{{ curSymbol(row.currency) }}{{ fmtAmount(row.total_cost) }}</template>
+          <template #default="{ row }"
+            >{{ curSymbol(row.currency) }}{{ fmtAmount(row.total_cost) }}</template
+          >
         </el-table-column>
         <el-table-column label="现价" width="100">
-          <template #default="{ row }">{{ curSymbol(row.currency) }}{{ fmtPrice(row.last_price) }}</template>
+          <template #default="{ row }"
+            >{{ curSymbol(row.currency) }}{{ fmtPrice(row.last_price) }}</template
+          >
         </el-table-column>
         <el-table-column label="市值" width="110">
-          <template #default="{ row }">{{ curSymbol(row.currency) }}{{ fmtAmount(row.market_value) }}</template>
+          <template #default="{ row }"
+            >{{ curSymbol(row.currency) }}{{ fmtAmount(row.market_value) }}</template
+          >
         </el-table-column>
         <el-table-column label="浮盈" width="120">
           <template #default="{ row }">
@@ -110,26 +132,47 @@
           </template>
         </el-table-column>
         <el-table-column label="占比%" width="80">
-          <template #default="{ row }">{{ row.weight_percent != null ? fmtAmount(row.weight_percent) + '%' : '-' }}</template>
+          <template #default="{ row }">{{
+            row.weight_percent != null ? fmtAmount(row.weight_percent) + '%' : '-'
+          }}</template>
         </el-table-column>
         <el-table-column label="操作" width="180">
           <template #default="{ row }">
-            <el-button size="small" type="primary" link @click="goStockDetail(row.code)">详情</el-button>
-            <el-button size="small" type="success" link @click="goAnalysis(row.code)">分析</el-button>
+            <el-button size="small" type="primary" link @click="goStockDetail(row.code)"
+              >详情</el-button
+            >
+            <el-button size="small" type="success" link @click="goAnalysis(row.code)"
+              >分析</el-button
+            >
           </template>
         </el-table-column>
       </el-table>
-      <el-empty v-if="!loadingPositions && positions.length === 0" description="暂无持仓" :image-size="100" />
+      <el-empty
+        v-if="!loadingPositions && positions.length === 0"
+        description="暂无持仓"
+        :image-size="100"
+      />
     </el-card>
 
-    <!-- ==================== 添加交易弹窗 ==================== -->
-    <el-dialog v-model="addDialogVisible" title="新增交易记录" width="520px" @opened="onAddDialogOpened">
+    <!-- ==================== 添加/编辑交易弹窗 ==================== -->
+    <el-dialog
+      v-model="addDialogVisible"
+      :title="editingId ? '编辑交易记录' : '新增交易记录'"
+      width="520px"
+      @opened="onAddDialogOpened"
+    >
       <el-form :model="form" label-width="90px">
         <el-form-item label="股票代码" required>
-          <el-input v-model="form.code" placeholder="A股:600519 | 港股:0700 | 美股:AAPL" @input="detectMarket" />
+          <el-input
+            v-model="form.code"
+            placeholder="A股:600519 | 港股:0700 | 美股:AAPL"
+            @input="detectMarket"
+          />
           <div v-if="detectedMarket" style="margin-top: 4px">
             <el-tag v-if="detectedMarket === 'CN'" type="success" size="small">A股 (CNY)</el-tag>
-            <el-tag v-else-if="detectedMarket === 'HK'" type="warning" size="small">港股 (HKD)</el-tag>
+            <el-tag v-else-if="detectedMarket === 'HK'" type="warning" size="small"
+              >港股 (HKD)</el-tag
+            >
             <el-tag v-else-if="detectedMarket === 'US'" type="info" size="small">美股 (USD)</el-tag>
             <span style="margin-left: 8px; font-size: 12px; color: #909399">
               {{ detectedMarket === 'CN' ? 'T+1结算' : 'T+0结算' }}
@@ -143,12 +186,24 @@
           </el-radio-group>
         </el-form-item>
         <el-form-item label="交易日期" required>
-          <el-date-picker v-model="form.trade_date" type="datetime" placeholder="选择时间" format="YYYY-MM-DD HH:mm" value-format="YYYY-MM-DDTHH:mm:ss" style="width: 100%" />
+          <el-date-picker
+            v-model="form.trade_date"
+            type="datetime"
+            placeholder="选择时间"
+            format="YYYY-MM-DD HH:mm"
+            value-format="YYYY-MM-DDTHH:mm:ss"
+            style="width: 100%"
+          />
         </el-form-item>
         <el-row :gutter="12">
           <el-col :span="12">
             <el-form-item label="成交单价" required>
-              <el-input-number v-model="form.price" :min="0.01" :precision="2" style="width: 100%" />
+              <el-input-number
+                v-model="form.price"
+                :min="0.01"
+                :precision="2"
+                style="width: 100%"
+              />
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -165,29 +220,47 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="手续费">
-              <el-input-number v-model="form.commission" :min="0" :precision="2" style="width: 100%" />
+              <el-input-number
+                v-model="form.commission"
+                :min="0"
+                :precision="2"
+                style="width: 100%"
+              />
             </el-form-item>
           </el-col>
         </el-row>
         <el-form-item label="交易原因" required>
-          <el-input v-model="form.reason" type="textarea" :rows="2" placeholder="记录交易原因，便于复盘" />
+          <el-input
+            v-model="form.reason"
+            type="textarea"
+            :rows="2"
+            placeholder="记录交易原因，便于复盘"
+          />
         </el-form-item>
-        <el-row :gutter="12">
-          <el-col :span="12">
-            <el-form-item label="标签">
-              <el-select v-model="form.tags" multiple filterable allow-create placeholder="输入后回车" style="width: 100%" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="备注">
-              <el-input v-model="form.notes" placeholder="额外信息" />
-            </el-form-item>
-          </el-col>
-        </el-row>
+        <el-form-item label="标签">
+          <el-select
+            v-model="form.tags"
+            multiple
+            filterable
+            allow-create
+            placeholder="输入后回车"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input
+            v-model="form.notes"
+            type="textarea"
+            :rows="2"
+            placeholder="止损计划、后续跟踪等"
+          />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="addDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitAddRecord" :loading="submitting">确认添加</el-button>
+        <el-button type="primary" @click="submitAddRecord" :loading="submitting">{{
+          editingId ? '确认修改' : '确认添加'
+        }}</el-button>
       </template>
     </el-dialog>
 
@@ -195,13 +268,32 @@
     <el-dialog v-model="recordsDialogVisible" title="交易记录" width="1000px">
       <!-- 筛选栏 -->
       <div class="records-filter">
-        <el-input v-model="recordsFilter.code" placeholder="标的代码" clearable style="width: 120px" />
-        <el-date-picker v-model="recordsFilter.dateRange" type="daterange" range-separator="~" start-placeholder="起始" end-placeholder="结束" format="YYYY-MM-DD" value-format="YYYY-MM-DD" style="width: 240px" />
+        <el-input
+          v-model="recordsFilter.code"
+          placeholder="标的代码"
+          clearable
+          style="width: 120px"
+        />
+        <el-date-picker
+          v-model="recordsFilter.dateRange"
+          type="daterange"
+          range-separator="~"
+          start-placeholder="起始"
+          end-placeholder="结束"
+          format="YYYY-MM-DD"
+          value-format="YYYY-MM-DD"
+          style="width: 240px"
+        />
         <el-select v-model="recordsFilter.side" placeholder="方向" clearable style="width: 90px">
           <el-option label="买入" value="buy" />
           <el-option label="卖出" value="sell" />
         </el-select>
-        <el-input v-model="recordsFilter.tags" placeholder="标签(逗号分隔)" clearable style="width: 150px" />
+        <el-input
+          v-model="recordsFilter.tags"
+          placeholder="标签(逗号分隔)"
+          clearable
+          style="width: 150px"
+        />
         <el-select v-model="recordsFilter.pnl" placeholder="盈亏" clearable style="width: 90px">
           <el-option label="盈利" value="profit" />
           <el-option label="亏损" value="loss" />
@@ -210,7 +302,13 @@
         <el-button :icon="RefreshLeft" @click="resetRecordsFilter">重置</el-button>
       </div>
 
-      <el-table :data="records" v-loading="loadingRecords" size="small" stripe style="margin-top: 12px">
+      <el-table
+        :data="records"
+        v-loading="loadingRecords"
+        size="small"
+        stripe
+        style="margin-top: 12px"
+      >
         <el-table-column label="时间" width="160">
           <template #default="{ row }">{{ formatDateTime(row.trade_date) }}</template>
         </el-table-column>
@@ -230,15 +328,22 @@
           </template>
         </el-table-column>
         <el-table-column label="价格" width="90">
-          <template #default="{ row }">{{ curSymbol(row.currency) }}{{ fmtPrice(row.price) }}</template>
+          <template #default="{ row }"
+            >{{ curSymbol(row.currency) }}{{ fmtPrice(row.price) }}</template
+          >
         </el-table-column>
         <el-table-column label="数量" width="80" prop="quantity" />
         <el-table-column label="金额" width="110">
-          <template #default="{ row }">{{ curSymbol(row.currency) }}{{ fmtAmount(row.amount) }}</template>
+          <template #default="{ row }"
+            >{{ curSymbol(row.currency) }}{{ fmtAmount(row.amount) }}</template
+          >
         </el-table-column>
         <el-table-column label="盈亏" width="110">
           <template #default="{ row }">
-            <span v-if="row.side === 'sell' && row.pnl != null" :style="{ color: row.pnl >= 0 ? '#67C23A' : '#F56C6C' }">
+            <span
+              v-if="row.side === 'sell' && row.pnl != null"
+              :style="{ color: row.pnl >= 0 ? '#67C23A' : '#F56C6C' }"
+            >
               {{ curSymbol(row.currency) }}{{ fmtAmount(row.pnl) }}
             </span>
             <span v-else style="color: #909399">-</span>
@@ -249,11 +354,16 @@
         </el-table-column>
         <el-table-column label="标签" width="120">
           <template #default="{ row }">
-            <el-tag v-for="tag in row.tags" :key="tag" size="small" style="margin: 1px 2px">{{ tag }}</el-tag>
+            <el-tag v-for="tag in row.tags" :key="tag" size="small" style="margin: 1px 2px">{{
+              tag
+            }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="80">
+        <el-table-column label="操作" width="130">
           <template #default="{ row }">
+            <el-button size="small" type="primary" link @click="openEditDialog(row)"
+              >编辑</el-button
+            >
             <el-button size="small" type="danger" link @click="deleteRecord(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -282,51 +392,103 @@ import VChart from 'vue-echarts'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { LineChart, PieChart } from 'echarts/charts'
-import { TitleComponent, TooltipComponent, LegendComponent, GridComponent } from 'echarts/components'
-import { realTradesApi, type RealPositionItem, type RealTradeRecord, type DashboardData } from '@/api/realTrades'
+import {
+  TitleComponent,
+  TooltipComponent,
+  LegendComponent,
+  GridComponent
+} from 'echarts/components'
+import {
+  realTradesApi,
+  type RealPositionItem,
+  type RealTradeRecord,
+  type DashboardData
+} from '@/api/realTrades'
 import { formatDateTime } from '@/utils/datetime'
 
-use([CanvasRenderer, LineChart, PieChart, TitleComponent, TooltipComponent, LegendComponent, GridComponent])
+use([
+  CanvasRenderer,
+  LineChart,
+  PieChart,
+  TitleComponent,
+  TooltipComponent,
+  LegendComponent,
+  GridComponent
+])
 
 const router = useRouter()
 
 // ---- 仪表盘 ----
 const dash = reactive<DashboardData>({
-  total_cost: 0, total_pnl: 0, realized_pnl: 0, unrealized_pnl: 0,
-  win_rate: 0, profit_loss_ratio: 0, holding_count: 0, total_trade_count: 0,
-  pnl_curve: [], sector_distribution: [],
+  total_cost: 0,
+  total_pnl: 0,
+  realized_pnl: 0,
+  unrealized_pnl: 0,
+  win_rate: 0,
+  profit_loss_ratio: 0,
+  holding_count: 0,
+  total_trade_count: 0,
+  pnl_curve: [],
+  sector_distribution: []
 })
 
 const pnlChartOption = computed(() => ({
   tooltip: { trigger: 'axis' as const },
   grid: { left: 60, right: 20, top: 20, bottom: 30 },
-  xAxis: { type: 'category' as const, data: dash.pnl_curve.map(i => i.date), axisLabel: { rotate: 30, fontSize: 10 } },
-  yAxis: { type: 'value' as const, axisLabel: { formatter: (v: number) => '¥' + (v / 1000).toFixed(0) + 'k' } },
-  series: [{
-    type: 'line', data: dash.pnl_curve.map(i => i.cumulative_pnl),
-    smooth: true, lineStyle: { color: '#67C23A' },
-    itemStyle: { color: '#67C23A' },
-    areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
-      colorStops: [{ offset: 0, color: 'rgba(103,194,58,0.25)' }, { offset: 1, color: 'rgba(103,194,58,0.02)' }] } },
-  }],
+  xAxis: {
+    type: 'category' as const,
+    data: dash.pnl_curve.map(i => i.date),
+    axisLabel: { rotate: 30, fontSize: 10 }
+  },
+  yAxis: {
+    type: 'value' as const,
+    axisLabel: { formatter: (v: number) => '¥' + (v / 1000).toFixed(0) + 'k' }
+  },
+  series: [
+    {
+      type: 'line',
+      data: dash.pnl_curve.map(i => i.cumulative_pnl),
+      smooth: true,
+      lineStyle: { color: '#67C23A' },
+      itemStyle: { color: '#67C23A' },
+      areaStyle: {
+        color: {
+          type: 'linear',
+          x: 0,
+          y: 0,
+          x2: 0,
+          y2: 1,
+          colorStops: [
+            { offset: 0, color: 'rgba(103,194,58,0.25)' },
+            { offset: 1, color: 'rgba(103,194,58,0.02)' }
+          ]
+        }
+      }
+    }
+  ]
 }))
 
 const sectorChartOption = computed(() => ({
   tooltip: { trigger: 'item' as const, formatter: '{b}: {c} ({d}%)' },
-  series: [{
-    type: 'pie', radius: ['40%', '70%'], center: ['50%', '50%'],
-    data: dash.sector_distribution.map(i => ({ name: i.name || i.code, value: i.market_value })),
-    label: { formatter: '{b}\n{d}%', fontSize: 11 },
-  }],
+  series: [
+    {
+      type: 'pie',
+      radius: ['40%', '70%'],
+      center: ['50%', '50%'],
+      data: dash.sector_distribution.map(i => ({ name: i.name || i.code, value: i.market_value })),
+      label: { formatter: '{b}\n{d}%', fontSize: 11 }
+    }
+  ]
 }))
 
 // ---- 持仓 ----
 const positions = ref<RealPositionItem[]>([])
 const loadingPositions = ref(false)
 
-// ---- 添加交易表单 ----
+// ---- 添加/编辑交易表单 ----
 const addDialogVisible = ref(false)
 const submitting = ref(false)
+const editingId = ref<string | null>(null)
 const detectedMarket = ref('')
 
 const nowStr = () => {
@@ -344,7 +506,7 @@ const form = reactive({
   trade_date: nowStr(),
   reason: '',
   tags: [] as string[],
-  notes: '',
+  notes: ''
 })
 
 const estimatedAmount = computed(() => {
@@ -354,17 +516,52 @@ const estimatedAmount = computed(() => {
 
 function detectMarket() {
   const code = form.code.trim().toUpperCase()
-  if (!code) { detectedMarket.value = ''; return }
-  if (/^[A-Z]+$/.test(code)) { detectedMarket.value = 'US'; return }
-  if (/^\d{4,5}$/.test(code) || code.endsWith('.HK')) { detectedMarket.value = 'HK'; return }
-  if (/^\d{6}$/.test(code)) { detectedMarket.value = 'CN'; return }
+  if (!code) {
+    detectedMarket.value = ''
+    return
+  }
+  if (/^[A-Z]+$/.test(code)) {
+    detectedMarket.value = 'US'
+    return
+  }
+  if (/^\d{4,5}$/.test(code) || code.endsWith('.HK')) {
+    detectedMarket.value = 'HK'
+    return
+  }
+  if (/^\d{6}$/.test(code)) {
+    detectedMarket.value = 'CN'
+    return
+  }
   detectedMarket.value = 'CN'
 }
 
 function openAddDialog() {
-  form.code = ''; form.side = 'buy'; form.price = 0; form.quantity = 100
-  form.commission = 0; form.trade_date = nowStr(); form.reason = ''
-  form.tags = []; form.notes = ''; detectedMarket.value = ''
+  editingId.value = null
+  form.code = ''
+  form.side = 'buy'
+  form.price = 0
+  form.quantity = 100
+  form.commission = 0
+  form.trade_date = nowStr()
+  form.reason = ''
+  form.tags = []
+  form.notes = ''
+  detectedMarket.value = ''
+  addDialogVisible.value = true
+}
+
+async function openEditDialog(row: RealTradeRecord) {
+  editingId.value = row.id
+  form.code = row.code
+  form.side = row.side
+  form.price = row.price
+  form.quantity = row.quantity
+  form.commission = row.commission
+  form.trade_date = row.trade_date
+  form.reason = row.reason
+  form.tags = [...row.tags]
+  form.notes = row.notes || ''
+  detectMarket()
   addDialogVisible.value = true
 }
 
@@ -374,22 +571,39 @@ function onAddDialogOpened() {
 
 async function submitAddRecord() {
   if (!form.code || !form.price || !form.quantity || !form.reason) {
-    ElMessage.warning('请填写必填项'); return
+    ElMessage.warning('请填写必填项')
+    return
   }
   try {
     submitting.value = true
-    const res = await realTradesApi.createRecord({
-      code: form.code, side: form.side, price: form.price, quantity: form.quantity,
-      commission: form.commission || 0, trade_date: form.trade_date,
-      reason: form.reason, tags: form.tags, notes: form.notes || null,
-    })
-    if (res.success) {
-      ElMessage.success('添加成功')
-      addDialogVisible.value = false
-      await refreshAll()
+    const payload = {
+      code: form.code,
+      side: form.side,
+      price: form.price,
+      quantity: form.quantity,
+      commission: form.commission || 0,
+      trade_date: form.trade_date,
+      reason: form.reason,
+      tags: form.tags,
+      notes: form.notes || null
+    }
+    if (editingId.value) {
+      const res = await realTradesApi.updateRecord(editingId.value, payload)
+      if (res.success) {
+        ElMessage.success('修改成功')
+        addDialogVisible.value = false
+        await refreshAll()
+      }
+    } else {
+      const res = await realTradesApi.createRecord(payload)
+      if (res.success) {
+        ElMessage.success('添加成功')
+        addDialogVisible.value = false
+        await refreshAll()
+      }
     }
   } catch (e: any) {
-    ElMessage.error(e?.message || '添加失败')
+    ElMessage.error(e?.message || '操作失败')
   } finally {
     submitting.value = false
   }
@@ -404,15 +618,20 @@ const recordsPage = ref(1)
 const recordsPageSize = ref(20)
 
 const recordsFilter = reactive({
-  code: '', side: '', tags: '', pnl: '',
-  dateRange: null as string[] | null,
+  code: '',
+  side: '',
+  tags: '',
+  pnl: '',
+  dateRange: null as string[] | null
 })
 
 async function searchRecords() {
   try {
     loadingRecords.value = true
     const params: any = {
-      page: recordsPage.value, page_size: recordsPageSize.value, sort: 'desc',
+      page: recordsPage.value,
+      page_size: recordsPageSize.value,
+      sort: 'desc'
     }
     if (recordsFilter.code) params.code = recordsFilter.code
     if (recordsFilter.side) params.side = recordsFilter.side
@@ -435,8 +654,11 @@ async function searchRecords() {
 }
 
 function resetRecordsFilter() {
-  recordsFilter.code = ''; recordsFilter.side = ''; recordsFilter.tags = ''
-  recordsFilter.pnl = ''; recordsFilter.dateRange = null
+  recordsFilter.code = ''
+  recordsFilter.side = ''
+  recordsFilter.tags = ''
+  recordsFilter.pnl = ''
+  recordsFilter.dateRange = null
   recordsPage.value = 1
   searchRecords()
 }
@@ -449,14 +671,20 @@ function openRecordsDialog() {
 
 async function deleteRecord(row: RealTradeRecord) {
   try {
-    await ElMessageBox.confirm(`确认删除 ${row.code} ${row.side === 'buy' ? '买入' : '卖出'} 记录？`, '删除确认', { type: 'warning' })
+    await ElMessageBox.confirm(
+      `确认删除 ${row.code} ${row.side === 'buy' ? '买入' : '卖出'} 记录？`,
+      '删除确认',
+      { type: 'warning' }
+    )
     const res = await realTradesApi.deleteRecord(row.id)
     if (res.success) {
       ElMessage.success('已删除')
       await searchRecords()
       await refreshAll()
     }
-  } catch { /* cancelled */ }
+  } catch {
+    /* cancelled */
+  }
 }
 
 // ---- 公共 ----
@@ -506,28 +734,73 @@ async function fetchPositions() {
 }
 
 async function refreshAll() {
-  await Promise.all([fetchDashboard(), fetchPositions()])
+  const tasks = [fetchDashboard(), fetchPositions()]
+  if (recordsDialogVisible.value) tasks.push(searchRecords())
+  await Promise.all(tasks)
 }
 
-onMounted(() => { refreshAll() })
+onMounted(() => {
+  refreshAll()
+})
 </script>
 
 <style scoped>
-.real-trading { padding: 16px; }
+.real-trading {
+  padding: 16px;
+}
 
-.stat-cards { display: flex; gap: 12px; flex-wrap: wrap; }
-.stat-card { flex: 1; min-width: 140px; text-align: center; }
-.stat-label { font-size: 13px; color: #909399; margin-bottom: 6px; }
-.stat-value { font-size: 22px; font-weight: 700; }
+.stat-cards {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.stat-card {
+  flex: 1;
+  min-width: 140px;
+  text-align: center;
+}
+.stat-label {
+  font-size: 13px;
+  color: #909399;
+  margin-bottom: 6px;
+}
+.stat-value {
+  font-size: 22px;
+  font-weight: 700;
+}
 
-.card-hd { font-weight: 600; }
+.card-hd {
+  font-weight: 600;
+}
 
-.action-bar { display: flex; align-items: center; justify-content: space-between; margin: 16px 0 12px; }
-.action-bar-title { font-weight: 600; font-size: 15px; }
-.action-bar-btns { display: flex; gap: 8px; }
+.action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 16px 0 12px;
+}
+.action-bar-title {
+  font-weight: 600;
+  font-size: 15px;
+}
+.action-bar-btns {
+  display: flex;
+  gap: 8px;
+}
 
-.positions-section { margin-bottom: 16px; }
+.positions-section {
+  margin-bottom: 16px;
+}
 
-.records-filter { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.records-pagination { display: flex; justify-content: flex-end; margin-top: 12px; }
+.records-filter {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.records-pagination {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
 </style>

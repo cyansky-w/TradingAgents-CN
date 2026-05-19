@@ -29,7 +29,7 @@ class UpdateTradeRequest(BaseModel):
     quantity: Optional[int] = Field(None, gt=0)
     commission: Optional[float] = Field(None, ge=0)
     trade_date: Optional[datetime] = None
-    reason: Optional[str] = None
+    reason: Optional[str] = Field(None, min_length=1)
     tags: Optional[List[str]] = None
     notes: Optional[str] = None
 
@@ -69,7 +69,7 @@ class TradeRecord(BaseModel):
 
 
 class DashboardData(BaseModel):
-    total_equity: float
+    total_equity: Optional[float] = None
     total_cost: float
     total_pnl: float
     realized_pnl: float
