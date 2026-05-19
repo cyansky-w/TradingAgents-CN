@@ -3,7 +3,7 @@ from typing import Any, Optional
 
 from langchain_openai import ChatOpenAI
 
-from .base_client import BaseLLMClient, normalize_content
+from .base_client import BaseLLMClient, normalize_content, _strip_reasoning
 from .validators import validate_model
 
 
@@ -12,6 +12,9 @@ class NormalizedChatOpenAI(ChatOpenAI):
 
     def invoke(self, input, config=None, **kwargs):
         return normalize_content(super().invoke(input, config, **kwargs))
+
+    async def ainvoke(self, input, config=None, **kwargs):
+        return normalize_content(await super().ainvoke(input, config, **kwargs))
 
 
 _PASSTHROUGH_KWARGS = (
@@ -22,6 +25,8 @@ _PASSTHROUGH_KWARGS = (
     "callbacks",
     "http_client",
     "http_async_client",
+    "model_kwargs",
+    "extra_body",
 )
 
 _PROVIDER_CONFIG = {
