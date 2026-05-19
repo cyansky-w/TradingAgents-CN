@@ -69,7 +69,7 @@ services:
     image: tradingagents-frontend:v1.0.0-preview
     container_name: tradingagents-frontend
     ports:
-      - "3000:80"
+      - "8080:80"
     environment:
       TZ: "Asia/Shanghai"
       # 后端API地址
@@ -80,7 +80,7 @@ services:
     networks:
       - tradingagents-network
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -205,4 +205,3 @@ networks:
   tradingagents-network:
     driver: bridge
     name: tradingagents-network
-
