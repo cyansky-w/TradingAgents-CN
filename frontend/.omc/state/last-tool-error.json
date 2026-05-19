@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"curl -s https://registry.ai-elements-vue.com/all.json 2>&1 | python -c \\\"\\nimport sys,json\\nd=json.load(sys.stdin)\\n# Check top-level keys\\nprint('Top-level keys:', list(d.keys()))\\n# Chec...",
+  "error": "Exit code 1\n  File \"<string>\", line 1\r\n    ||  goto :error\r\nIndentationError: unexpected indent",
+  "timestamp": "2026-05-18T07:08:45.129Z",
+  "retry_count": 1
+}
