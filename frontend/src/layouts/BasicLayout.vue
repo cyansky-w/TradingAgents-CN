@@ -53,7 +53,7 @@
       </header>
 
       <!-- 页面内容 -->
-      <main class="main-content">
+      <main class="main-content" :style="{ height: mainContentHeight }">
         <div class="content-wrapper">
           <router-view v-slot="{ Component, route }">
             <transition
@@ -89,6 +89,7 @@ import Breadcrumb from '@/components/Layout/Breadcrumb.vue'
 import HeaderActions from '@/components/Layout/HeaderActions.vue'
 import AppFooter from '@/components/Layout/AppFooter.vue'
 import { Expand, Fold } from '@element-plus/icons-vue'
+import { ElBacktop } from 'element-plus'
 
 const appStore = useAppStore()
 const route = useRoute()
@@ -112,11 +113,26 @@ const handleMainClick = () => {
   }
 }
 
+function setMainContentHeight() {
+  nextTick(() => {
+    const headerHeight = document.querySelector('.header')?.clientHeight || 60
+    const footerHeight = document.querySelector('.footer')?.clientHeight || 60
+    mainContentHeight.value =  `calc(100vh - ${headerHeight}px - ${footerHeight}px - 2px)`
+  })
+}
+
+// 动态计算主内容区最小高度
+const mainContentHeight = ref('')
+
+// 初始化时设置一次
+setMainContentHeight()
+
 // 监听窗口大小变化：在小屏幕上自动折叠侧边栏
 watch(width, (newWidth) => {
   if (newWidth < 768 && !appStore.sidebarCollapsed) {
     appStore.setSidebarCollapsed(true)
   }
+  setMainContentHeight()
 })
 
 // 路由变化时，移动端收起侧边栏
@@ -185,6 +201,7 @@ watch(() => route.fullPath, () => {
   .sidebar-nav {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 8px 0;
   }
 
@@ -235,18 +252,17 @@ watch(() => route.fullPath, () => {
 }
 
 .main-content {
-  flex: 1;
-  padding: 24px;
-  min-height: calc(100vh - 60px - 60px); // 减去header和footer高度
+  // padding: 24px;
 
   .content-wrapper {
-    max-width: 1400px;
-    margin: 0 auto;
+    height: 100%;
+    // max-width: 1400px;
+    // margin: 0 auto;
   }
 }
 
 .footer {
-  height: 60px;
+  min-height: 60px;
   background-color: var(--el-bg-color);
   border-top: 1px solid var(--el-border-color-light);
   display: flex;

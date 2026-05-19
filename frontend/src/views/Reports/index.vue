@@ -491,6 +491,7 @@ onMounted(() => {
 
 <style lang="scss" scoped>
 .reports {
+  padding: 24px;
   .page-header {
     margin-bottom: 24px;
 

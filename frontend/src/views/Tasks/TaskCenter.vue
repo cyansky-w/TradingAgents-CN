@@ -526,6 +526,7 @@ const formatTime = (t:string) => t ? formatDateTime(t) : '-'
 
 <style scoped lang="scss">
 .task-center {
+  padding: 24px;
   .page-header { margin-bottom: 24px; }
   .page-title { display:flex; align-items:center; gap:8px; font-size:24px; font-weight:600; margin:0 0 8px 0; }
   .page-description { color: var(--el-text-color-regular); margin:0; }
