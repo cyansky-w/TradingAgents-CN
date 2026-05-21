@@ -445,6 +445,51 @@ const routes: RouteRecordRaw[] = [
   },
 
   {
+    path: '/tools',
+    name: 'ToolManagement',
+    component: BasicLayout,
+    meta: {
+      title: '工具管理',
+      icon: 'SetUp',
+      requiresAuth: true,
+      transition: 'fade'
+    },
+    children: [
+      {
+        path: '',
+        name: 'ToolManagementHome',
+        component: () => import('@/views/ToolManagement/index.vue'),
+        meta: {
+          title: '工具管理',
+          requiresAuth: true
+        }
+      }
+    ]
+  },
+
+  {
+    path: '/prompts',
+    name: 'PromptManagement',
+    component: BasicLayout,
+    meta: {
+      title: '提示词管理',
+      icon: 'Document',
+      requiresAuth: true,
+      transition: 'fade'
+    },
+    children: [
+      {
+        path: '',
+        name: 'PromptManagementHome',
+        component: () => import('@/views/PromptManagement/index.vue'),
+        meta: {
+          title: '提示词管理',
+          requiresAuth: true
+        }
+      }
+    ]
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
     component: () => import('@/views/Error/404.vue'),

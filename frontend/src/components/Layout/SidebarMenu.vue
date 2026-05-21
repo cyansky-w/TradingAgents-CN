@@ -101,6 +101,21 @@
       </el-sub-menu>
     </el-sub-menu>
 
+    <el-sub-menu index="/management-center">
+      <template #title>
+        <el-icon><SetUp /></el-icon>
+        <span>管理中心</span>
+      </template>
+      <el-menu-item index="/tools">
+        <el-icon><SetUp /></el-icon>
+        <template #title>工具管理</template>
+      </el-menu-item>
+      <el-menu-item index="/prompts">
+        <el-icon><Document /></el-icon>
+        <template #title>提示词管理</template>
+      </el-menu-item>
+    </el-sub-menu>
+
     <el-menu-item index="/about">
       <el-icon><InfoFilled /></el-icon>
       <template #title>关于</template>
@@ -123,7 +138,9 @@ import {
   Setting,
   InfoFilled,
   CreditCard,
-  ChatDotRound
+  ChatDotRound,
+  SetUp,
+  Document
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
