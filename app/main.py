@@ -29,6 +29,8 @@ from app.core.config import settings
 from app.core.database import init_db, close_db, get_redis_client
 from app.core.logging_config import setup_logging
 from app.routers import auth_db as auth, analysis, screening, queue, sse, health, favorites, config, reports, database, operation_logs, tags, tushare_init, akshare_init, baostock_init, historical_data, multi_period_sync, financial_data, news_data, social_media, internal_messages, usage_statistics, model_capabilities, cache, logs
+from app.routers import tools as tools_router
+from app.routers import prompts as prompts_router
 from app.routers import sync as sync_router, multi_source_sync
 from app.routers import stocks as stocks_router
 from app.routers import stock_data as stock_data_router
@@ -765,6 +767,8 @@ app.include_router(financial_data.router, tags=["financial-data"])
 app.include_router(news_data.router, tags=["news-data"])
 app.include_router(social_media.router, tags=["social-media"])
 app.include_router(internal_messages.router, tags=["internal-messages"])
+app.include_router(tools_router.router, prefix="/api", tags=["工具管理"])
+app.include_router(prompts_router.router, prefix="/api", tags=["提示词管理"])
 
 # AI Chat module
 from app.chat.router import router as chat_router
