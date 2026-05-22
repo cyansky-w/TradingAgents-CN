@@ -161,7 +161,7 @@ export const promptsApi = {
   }
 }
 
-export const VARIABLE_REGEX = /\{\{(\w+)\}\}/g
+export const VARIABLE_REGEX = /\{\{\s*([A-Za-z_][\w.-]*)\s*\}\}/g
 
 export function extractVariables(blocks: PromptBlock[]): string[] {
   const set = new Set<string>()

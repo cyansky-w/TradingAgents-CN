@@ -27,6 +27,8 @@ export interface Tool {
   tags: string[]
   enabled: boolean
   is_system: boolean
+  calls_llm: boolean
+  estimated_tokens: number
   health_status: string
   last_health_check?: string
   health_check_url?: string

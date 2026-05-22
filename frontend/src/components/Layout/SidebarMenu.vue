@@ -106,6 +106,10 @@
         <el-icon><SetUp /></el-icon>
         <span>管理中心</span>
       </template>
+      <el-menu-item index="/agents">
+        <el-icon><UserFilled /></el-icon>
+        <template #title>Agent 管理</template>
+      </el-menu-item>
       <el-menu-item index="/tools">
         <el-icon><SetUp /></el-icon>
         <template #title>工具管理</template>
@@ -140,7 +144,8 @@ import {
   CreditCard,
   ChatDotRound,
   SetUp,
-  Document
+  Document,
+  UserFilled
 } from '@element-plus/icons-vue'
 
 const route = useRoute()

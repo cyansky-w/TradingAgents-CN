@@ -445,6 +445,29 @@ const routes: RouteRecordRaw[] = [
   },
 
   {
+    path: '/agents',
+    name: 'AgentManagement',
+    component: BasicLayout,
+    meta: {
+      title: 'Agent 管理',
+      icon: 'UserFilled',
+      requiresAuth: true,
+      transition: 'fade'
+    },
+    children: [
+      {
+        path: '',
+        name: 'AgentManagementHome',
+        component: () => import('@/views/AgentManagement/index.vue'),
+        meta: {
+          title: 'Agent 管理',
+          requiresAuth: true
+        }
+      }
+    ]
+  },
+
+  {
     path: '/tools',
     name: 'ToolManagement',
     component: BasicLayout,

@@ -1,16 +1,42 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { ElMessage, ElButton, ElPopconfirm } from 'element-plus'
 import { useChatStore } from '@/stores/chat'
-import { ElButton, ElPopconfirm } from 'element-plus'
+import { agentsApi } from '@/api/agents'
+import type { Agent } from '@/api/agents'
 import { Plus, Delete } from '@element-plus/icons-vue'
 
 const chatStore = useChatStore()
 
 const conversations = computed(() => chatStore.sortedConversations)
 const activeId = computed(() => chatStore.activeConversationId)
+const chatAgents = ref<Agent[]>([])
+const selectedAgentId = ref('')
+const agentsLoading = ref(false)
+
+onMounted(async () => {
+  await loadChatAgents()
+})
+
+async function loadChatAgents() {
+  agentsLoading.value = true
+  try {
+    const res = await agentsApi.list({ enabled: true, is_chat: true, page: 1, page_size: 100 })
+    if (res.success) {
+      chatAgents.value = res.data.items
+    }
+  } catch (error) {
+    console.error('Failed to load chat agents:', error)
+    ElMessage.error('加载 Agent 失败')
+  } finally {
+    agentsLoading.value = false
+  }
+}
 
 async function handleNewChat() {
-  await chatStore.createConversation()
+  await chatStore.createConversation({
+    agent_id: selectedAgentId.value || undefined,
+  })
 }
 
 function handleSelect(id: string) {
@@ -25,9 +51,26 @@ async function handleDelete(id: string) {
 <template>
   <div class="flex flex-col h-full border-r border-border bg-background">
     <!-- Header -->
-    <div class="flex items-center justify-between p-4 border-b border-border">
-      <h2 class="font-semibold text-sm">对话列表</h2>
-      <ElButton :icon="Plus" size="small" type="primary" circle @click="handleNewChat" />
+    <div class="p-4 border-b border-border space-y-3">
+      <div class="flex items-center justify-between">
+        <h2 class="font-semibold text-sm">对话列表</h2>
+        <ElButton :icon="Plus" size="small" type="primary" circle @click="handleNewChat" />
+      </div>
+      <el-select
+        v-model="selectedAgentId"
+        clearable
+        filterable
+        placeholder="选择 Agent"
+        class="w-full"
+        :loading="agentsLoading"
+      >
+        <el-option
+          v-for="agent in chatAgents"
+          :key="agent.id"
+          :label="agent.name"
+          :value="agent.id"
+        />
+      </el-select>
     </div>
 
     <!-- Conversations -->

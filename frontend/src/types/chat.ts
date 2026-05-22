@@ -9,6 +9,7 @@ export interface Conversation {
   created_at: string
   updated_at: string
   is_archived: boolean
+  agent_id?: string | null
 }
 
 export interface ChatMessage {
@@ -49,6 +50,7 @@ export interface ConversationCreate {
   title?: string
   model_provider?: string
   model_name?: string
+  agent_id?: string
 }
 
 export interface ConversationUpdate {

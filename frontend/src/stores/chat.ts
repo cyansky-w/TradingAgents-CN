@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ElMessage } from 'element-plus'
 import { chatApi, streamChat } from '@/api/chat'
-import type { Conversation, ChatMessage, ToolInfo } from '@/types/chat'
+import type { Conversation, ConversationCreate, ChatMessage, ToolInfo } from '@/types/chat'
 import type { ApiResponse } from '@/api/request'
 
 function unwrap<T>(res: any): T {
@@ -57,9 +57,10 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
-    async createConversation(title?: string) {
+    async createConversation(payload?: string | ConversationCreate) {
       try {
-        const res: any = await chatApi.createConversation({ title })
+        const request = typeof payload === 'string' ? { title: payload } : (payload || {})
+        const res: any = await chatApi.createConversation(request)
         const data = unwrap<Conversation>(res)
         if (data && data.id) {
           this.conversations.unshift(data)

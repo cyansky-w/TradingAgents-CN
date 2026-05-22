@@ -384,10 +384,13 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Loading, Plus, Refresh } from '@element-plus/icons-vue'
 import Sortable from 'sortablejs'
+import { useRoute } from 'vue-router'
 import { promptsApi, extractVariables } from '@/api/prompts'
 import type { DerivedVariablesResult, Prompt, PromptBlock, PromptCreateDto, PromptType, RenderResult } from '@/api/prompts'
 import { toolsApi } from '@/api/tools'
 import type { Tool } from '@/api/tools'
+
+const route = useRoute()
 
 const prompts = ref<Prompt[]>([])
 const total = ref(0)
@@ -398,6 +401,7 @@ const listScrollbar = ref()
 const allTags = ref<string[]>([])
 const selectedPrompt = ref<Prompt | null>(null)
 const editing = ref(false)
+const pendingRoutePromptId = ref('')
 
 const searchText = ref('')
 const filterType = ref<PromptType | ''>('')
@@ -467,6 +471,37 @@ function variableTemplate(name: string) {
   return `{{${name}}}`
 }
 
+function getRoutePromptId(): string {
+  const value = route.query.prompt_id
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+async function syncPromptSelectionFromRoute() {
+  const promptId = pendingRoutePromptId.value || getRoutePromptId()
+  if (!promptId) return
+
+  const existing = prompts.value.find(prompt => prompt.id === promptId)
+  if (existing) {
+    pendingRoutePromptId.value = ''
+    selectPrompt(existing)
+    return
+  }
+
+  try {
+    const res = await promptsApi.get(promptId)
+    if (!res.success) return
+    const prompt = res.data
+    if (!prompts.value.some(item => item.id === prompt.id)) {
+      prompts.value = [prompt, ...prompts.value]
+      total.value = Math.max(total.value, prompts.value.length)
+    }
+    pendingRoutePromptId.value = ''
+    selectPrompt(prompt)
+  } catch {
+    // ignore invalid route prompt id
+  }
+}
+
 async function loadPrompts(append = false) {
   if (listLoading.value) return
   if (!append) currentPage.value = 1
@@ -483,7 +518,10 @@ async function loadPrompts(append = false) {
     if (res.success) {
       prompts.value = append ? [...prompts.value, ...res.data.items] : res.data.items
       total.value = res.data.total
-      if (!selectedPrompt.value && prompts.value.length > 0) {
+      if (getRoutePromptId()) {
+        pendingRoutePromptId.value = getRoutePromptId()
+        await syncPromptSelectionFromRoute()
+      } else if (!selectedPrompt.value && prompts.value.length > 0) {
         selectPrompt(prompts.value[0])
       }
     }
@@ -932,8 +970,18 @@ async function handleRender() {
 }
 
 watch(() => editForm.bind_tools, deriveVariables, { deep: true })
+watch(
+  () => route.query.prompt_id,
+  async () => {
+    pendingRoutePromptId.value = getRoutePromptId()
+    if (pendingRoutePromptId.value) {
+      await syncPromptSelectionFromRoute()
+    }
+  }
+)
 
 onMounted(() => {
+  pendingRoutePromptId.value = getRoutePromptId()
   loadPrompts()
   loadTags()
   loadAllTools()
