@@ -115,6 +115,10 @@
                   <el-input v-if="editing" v-model="editForm.description" type="textarea" :rows="2" />
                   <span v-else>{{ selectedAgent.description || '-' }}</span>
                 </el-form-item>
+                <el-form-item label="消息模板">
+                  <el-input v-if="editing" v-model="editForm.message_template" type="textarea" :rows="3" placeholder="Agent 调用时的用户消息模板，支持 {{变量名}} 语法" />
+                  <span v-else class="mono">{{ selectedAgent.message_template || '-' }}</span>
+                </el-form-item>
                 <el-form-item label="聊天助手">
                   <el-switch v-if="editing" v-model="editForm.is_chat" />
                   <span v-else>{{ selectedAgent.is_chat ? '是' : '否' }}</span>
@@ -359,6 +363,14 @@
         <el-form-item label="聊天助手">
           <el-switch v-model="createForm.is_chat" />
         </el-form-item>
+        <el-form-item label="消息模板">
+          <el-input
+            v-model="createForm.message_template"
+            type="textarea"
+            :rows="3"
+            placeholder="Agent 调用时的用户消息模板，支持 {{变量名}} 语法，聊天助手可留空"
+          />
+        </el-form-item>
         <el-form-item label="模型配置">
           <div class="create-model-section">
             <el-switch v-model="createUseDefaultModel" active-text="使用系统默认" />
@@ -429,8 +441,13 @@
         v-model="testMessage"
         type="textarea"
         :rows="4"
-        placeholder="请输入测试消息，例如：分析 000001 今天的走势"
+        :placeholder="selectedAgent?.message_template
+          ? 'Agent 已配置消息模板，可留空使用模板，或输入内容覆盖'
+          : '请输入测试消息，例如：分析 000001 今天的走势'"
       />
+      <div v-if="selectedAgent?.message_template" class="text-muted" style="margin-top: 4px; font-size: 12px;">
+        当前模板：{{ selectedAgent.message_template }}
+      </div>
       <div class="test-actions">
         <el-button type="primary" @click="handleTestRun" :loading="testLoading">发送</el-button>
         <el-button @click="handleStopTestRun" :disabled="!testLoading">停止</el-button>
@@ -526,6 +543,7 @@ const editForm = reactive({
   name: '',
   description: '',
   prompt_id: '',
+  message_template: '',
   model_config: { provider: '', model: '', temperature: 0.7, max_tokens: 4096 },
   parameters: { max_tool_calls: 10, timeout: 300, retry_on_failure: false },
   tags: [] as string[],
@@ -537,6 +555,7 @@ const createForm = reactive<AgentCreateDto>({
   name: '',
   description: '',
   prompt_id: '',
+  message_template: '',
   model_config: { provider: '', model: '', temperature: 0.7, max_tokens: 4096 },
   parameters: { max_tool_calls: 10, timeout: 300, retry_on_failure: false },
   tags: [],
@@ -750,6 +769,7 @@ function fillEditForm(agent: Agent) {
   editForm.name = agent.name
   editForm.description = agent.description
   editForm.prompt_id = agent.prompt_id
+  editForm.message_template = agent.message_template || ''
   editForm.parameters = { ...agent.parameters }
   editForm.tags = [...agent.tags]
   editForm.is_chat = agent.is_chat
@@ -793,6 +813,7 @@ function showCreateDialog() {
   createForm.name = ''
   createForm.description = ''
   createForm.prompt_id = ''
+  createForm.message_template = ''
   createForm.tags = []
   createForm.is_chat = false
   createForm.enabled = true
@@ -850,6 +871,7 @@ async function handleSave() {
       name: editForm.name,
       description: editForm.description,
       prompt_id: editForm.prompt_id,
+      message_template: editForm.message_template,
       model_config: useDefaultModel.value ? null : editForm.model_config,
       parameters: editForm.parameters,
       tags: editForm.tags,
@@ -1037,7 +1059,8 @@ function showTestDialog() {
 }
 
 async function handleTestRun() {
-  if (!selectedAgent.value || !testMessage.value.trim()) return
+  if (!selectedAgent.value) return
+  if (!testMessage.value.trim() && !selectedAgent.value.message_template) return
   handleStopTestRun()
   testLoading.value = true
   clearTestOutput()
@@ -1052,7 +1075,7 @@ async function handleTestRun() {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {})
       },
-      body: JSON.stringify({ message: testMessage.value, variables: {} }),
+      body: JSON.stringify({ message: testMessage.value || '', variables: {} }),
       signal: controller.signal
     })
     if (!response.ok) throw new Error(`HTTP ${response.status}`)

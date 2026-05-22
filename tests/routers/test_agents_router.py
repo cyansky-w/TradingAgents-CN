@@ -33,7 +33,7 @@ class _FakeAgentService:
     async def get_agent(self, agent_id):
         if agent_id == "missing":
             return None
-        return {"id": agent_id, "code": "market_analyst", "name": "市场分析师"}
+        return {"id": agent_id, "code": "market_analyst", "name": "市场分析师", "message_template": ""}
 
     async def get_agent_by_code(self, code):
         return None
@@ -98,6 +98,7 @@ def test_create_agent_uses_public_model_config_contract(client, fake_service):
         "code": "market_analyst",
         "name": "市场分析师",
         "prompt_id": "507f1f77bcf86cd799439011",
+        "message_template": "请分析 {{ticker}}。",
         "model_config": {
             "provider": "deepseek",
             "model": "deepseek-chat",
@@ -128,6 +129,7 @@ def test_create_agent(client):
         "code": "market_analyst",
         "name": "市场分析师",
         "prompt_id": "507f1f77bcf86cd799439011",
+        "message_template": "请分析 {{ticker}}。",
     })
 
     assert response.status_code == 200
@@ -210,6 +212,7 @@ def test_test_run_agent_streams_tokens(client, monkeypatch, fake_service):
         agent_name = "市场分析师"
         system_prompt = "你是市场分析师。"
         messages_placeholder = "对话历史"
+        message_template = ""
         tools = []
 
         class _Params:
@@ -255,6 +258,7 @@ def test_test_run_passes_recursion_limit_for_tool_agents(client, monkeypatch, fa
         agent_name = "市场分析师"
         system_prompt = "你是市场分析师。"
         messages_placeholder = "对话历史"
+        message_template = ""
         tools = [object()]
 
         class _Params:
@@ -289,7 +293,7 @@ def test_test_run_passes_recursion_limit_for_tool_agents(client, monkeypatch, fa
     assert captured["config"] == {"recursion_limit": 3}
 
 
-def test_test_run_requires_message(client):
+def test_test_run_requires_message(client, fake_service):
     response = client.post("/api/agents/agent-1/test-run", json={})
 
     assert response.status_code == 400

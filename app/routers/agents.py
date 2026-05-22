@@ -185,9 +185,16 @@ async def _agent_test_run_events(agent_id: str, payload: dict):
         from langchain_core.messages import HumanMessage, SystemMessage
 
         spec = await agent_service.build_agent(agent_id, payload.get("variables") or {})
+        # 用 message_template 渲染变量，若无模板则回退到 payload message
+        user_text = payload.get("message", "")
+        if spec.message_template:
+            user_text = spec.message_template
+            variables = payload.get("variables") or {}
+            for key, val in variables.items():
+                user_text = user_text.replace("{{" + key + "}}", str(val))
         messages = [
             SystemMessage(content=spec.system_prompt),
-            HumanMessage(content=payload.get("message", "")),
+            HumanMessage(content=user_text),
         ]
 
         async def _stream_events():
@@ -277,8 +284,14 @@ async def test_run_agent(
     payload: dict = Body(...),
     current_user: dict = Depends(get_current_user),
 ):
+    # message 在有 message_template 时非必填
     if not payload.get("message"):
-        raise HTTPException(status_code=400, detail="缺少 message 字段")
+        try:
+            agent = await agent_service.get_agent(agent_id)
+            if not agent or not agent.get("message_template"):
+                raise HTTPException(status_code=400, detail="缺少 message 字段")
+        except HTTPException:
+            raise
     return StreamingResponse(
         _agent_test_run_events(agent_id, payload),
         media_type="text/event-stream",

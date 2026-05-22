@@ -30,6 +30,7 @@ class AgentCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     description: str = ""
     prompt_id: str
+    message_template: str = Field(default="", description="Agent 调用时的用户消息模板")
     model_config_agent: Optional[AgentModelConfig] = Field(default=None, alias="model_config")
     parameters: AgentParameters = Field(default_factory=AgentParameters)
     tags: List[str] = []
@@ -43,6 +44,7 @@ class AgentUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=100)
     description: Optional[str] = None
     prompt_id: Optional[str] = None
+    message_template: Optional[str] = None
     model_config_agent: Optional[AgentModelConfig] = Field(default=None, alias="model_config")
     parameters: Optional[AgentParameters] = None
     tags: Optional[List[str]] = None

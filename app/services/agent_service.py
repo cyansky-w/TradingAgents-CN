@@ -36,6 +36,7 @@ class AgentSpec:
     agent_name: str
     system_prompt: str
     messages_placeholder: Optional[str]
+    message_template: str
     tools: List[Any]
     llm: Any
     parameters: AgentParameters
@@ -91,6 +92,7 @@ class AgentService:
             "name": doc.get("name", ""),
             "description": doc.get("description", ""),
             "prompt_id": str(doc.get("prompt_id", "")),
+            "message_template": doc.get("message_template", ""),
             "model_config": self._resolved_model_config(doc),
             "parameters": doc.get(
                 "parameters",
@@ -214,6 +216,7 @@ class AgentService:
             "name": name,
             "description": data.get("description", ""),
             "prompt_id": prompt["_id"],
+            "message_template": data.get("message_template", ""),
             "model_config_agent": data.get("model_config_agent"),
             "parameters": data.get(
                 "parameters",
@@ -244,7 +247,7 @@ class AgentService:
             raise ValueError("Agent 不存在")
 
         update_fields: Dict[str, Any] = {}
-        for key in ("name", "description", "model_config_agent", "parameters", "tags", "is_chat", "enabled"):
+        for key in ("name", "description", "message_template", "model_config_agent", "parameters", "tags", "is_chat", "enabled"):
             if key in data:
                 update_fields[key] = data[key]
 
@@ -415,6 +418,7 @@ class AgentService:
             agent_name=doc.get("name", ""),
             system_prompt=system_prompt,
             messages_placeholder=messages_placeholder,
+            message_template=doc.get("message_template", ""),
             tools=tools,
             llm=llm,
             parameters=parameters,

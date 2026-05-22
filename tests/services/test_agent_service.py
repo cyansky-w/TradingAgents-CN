@@ -25,12 +25,14 @@ def test_agent_create_accepts_minimal_valid_payload():
         code="market_analyst",
         name="市场分析师",
         prompt_id="507f1f77bcf86cd799439011",
+        message_template="请分析 {{ticker}}。",
     )
 
     assert payload.code == "market_analyst"
     assert payload.name == "市场分析师"
     assert payload.description == ""
     assert payload.prompt_id == "507f1f77bcf86cd799439011"
+    assert payload.message_template == "请分析 {{ticker}}。"
     assert payload.model_config_agent is None
     assert payload.parameters.max_tool_calls == 10
     assert payload.parameters.timeout == 300
@@ -42,7 +44,7 @@ def test_agent_create_accepts_minimal_valid_payload():
 
 def test_agent_create_rejects_invalid_code():
     with pytest.raises(ValidationError):
-        AgentCreate(code="Market-Analyst", name="市场分析师", prompt_id="507f1f77bcf86cd799439011")
+        AgentCreate(code="Market-Analyst", name="市场分析师", prompt_id="507f1f77bcf86cd799439011", message_template="测试")
 
 
 def test_agent_parameters_validate_ranges():
@@ -75,6 +77,7 @@ def test_agent_create_accepts_model_config_alias():
         code="market_analyst",
         name="市场分析师",
         prompt_id="507f1f77bcf86cd799439011",
+        message_template="请分析 {{ticker}}。",
         model_config={"provider": "deepseek", "model": "deepseek-chat"},
     )
 
@@ -283,6 +286,7 @@ def test_get_agent_by_name_returns_formatted_agent():
         "name": "智能助手",
         "description": "通用聊天助手",
         "prompt_id": str(prompt_id),
+        "message_template": "",
         "model_config": {"provider": "deepseek", "model": "deepseek-chat"},
         "parameters": {"max_tool_calls": 10, "timeout": 300, "retry_on_failure": False},
         "tags": ["聊天"],

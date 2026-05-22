@@ -20,6 +20,7 @@ export interface Agent {
   name: string
   description: string
   prompt_id: string
+  message_template: string
   model_config?: AgentModelConfig | null
   parameters: AgentParameters
   tags: string[]
@@ -53,6 +54,7 @@ export interface AgentCreateDto {
   name: string
   description?: string
   prompt_id: string
+  message_template?: string
   model_config?: AgentModelConfig | null
   parameters?: Partial<AgentParameters>
   tags?: string[]
@@ -64,6 +66,7 @@ export interface AgentUpdateDto {
   name?: string
   description?: string
   prompt_id?: string
+  message_template?: string
   model_config?: AgentModelConfig | null
   parameters?: Partial<AgentParameters>
   tags?: string[]
