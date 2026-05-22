@@ -39,6 +39,28 @@ def create_msg_delete():
     return delete_messages
 
 
+def _format_market_overview(results: list, curr_date: str, source: str) -> str:
+    amt_divisor = 1e7 if source == "Tushare" else 1e8
+    lines = [f"# 中国股市概览 - {curr_date}\n"]
+    lines.append("| 指数 | 收盘 | 涨跌幅 | 最高 | 最低 | 成交额(亿) |")
+    lines.append("|------|------|--------|------|------|-----------|")
+    for r in results:
+        try:
+            amt = float(r["amount"]) / amt_divisor if r["amount"] else 0
+        except (ValueError, TypeError):
+            amt = 0
+        try:
+            pct = float(r["pct_chg"])
+        except (ValueError, TypeError):
+            pct = 0
+        pct_str = f"+{pct:.2f}%" if pct >= 0 else f"{pct:.2f}%"
+        lines.append(
+            f"| {r['name']} | {r['close']} | {pct_str} | {r['high']} | {r['low']} | {amt:.0f} |"
+        )
+    lines.append(f"\n数据来源: {source} | 更新时间: {curr_date}")
+    return "\n".join(lines)
+
+
 class Toolkit:
     _config = DEFAULT_CONFIG.copy()
 
@@ -208,33 +230,91 @@ class Toolkit:
         Returns:
             str: 包含主要指数实时行情的市场概览报告
         """
+        indices_tushare = [
+            ("000001.SH", "上证指数"),
+            ("399001.SZ", "深证成指"),
+            ("399006.SZ", "创业板指"),
+            ("000688.SH", "科创50"),
+        ]
+        indices_baostock = [
+            ("sh.000001", "上证指数"),
+            ("sz.399001", "深证成指"),
+            ("sz.399006", "创业板指"),
+            ("sh.000688", "科创50"),
+        ]
+
+        # --- 优先 Tushare ---
         try:
-            # 使用Tushare获取主要指数数据
-            from tradingagents.dataflows.providers.china.tushare import get_tushare_adapter
-
-            adapter = get_tushare_adapter()
-
-
-            # 使用Tushare获取主要指数信息
-            # 这里可以扩展为获取具体的指数数据
-            return f"""# 中国股市概览 - {curr_date}
-
-## 📊 主要指数
-- 上证指数: 数据获取中...
-- 深证成指: 数据获取中...
-- 创业板指: 数据获取中...
-- 科创50: 数据获取中...
-
-## 💡 说明
-市场概览功能正在从TDX迁移到Tushare，完整功能即将推出。
-当前可以使用股票数据获取功能分析个股。
-
-数据来源: Tushare专业数据源
-更新时间: {curr_date}
-"""
-
+            import tushare as ts
+            from tradingagents.dataflows.providers.china.tushare import TushareProvider
+            provider = TushareProvider()
+            token = provider._get_token_from_database()
+            if token:
+                pro = ts.pro_api(token)
+                trade_date = curr_date.replace("-", "")
+                results = []
+                for ts_code, name in indices_tushare:
+                    df = pro.index_daily(ts_code=ts_code, start_date=trade_date, end_date=trade_date)
+                    if df is not None and not df.empty:
+                        row = df.iloc[0]
+                        results.append({
+                            "name": name,
+                            "close": row["close"],
+                            "pct_chg": row["pct_chg"],
+                            "high": row["high"],
+                            "low": row["low"],
+                            "amount": row["amount"],
+                        })
+                if results:
+                    return _format_market_overview(results, curr_date, "Tushare")
         except Exception as e:
-            return f"中国市场概览获取失败: {str(e)}。正在从TDX迁移到Tushare数据源。"
+            logger.warning(f"Tushare market overview failed: {e}")
+
+        # --- 回退 BaoStock ---
+        try:
+            import baostock as bs
+            from datetime import datetime, timedelta
+
+            start_dt = datetime.strptime(curr_date, "%Y-%m-%d") - timedelta(days=15)
+            start_date = start_dt.strftime("%Y-%m-%d")
+
+            lg = bs.login()
+            if lg.error_code != "0":
+                return f"BaoStock 登录失败: {lg.error_msg}"
+
+            results = []
+            for code, name in indices_baostock:
+                rs = bs.query_history_k_data_plus(
+                    code,
+                    "date,open,high,low,close,volume,amount,pctChg",
+                    start_date=start_date,
+                    end_date=curr_date,
+                    frequency="d",
+                    adjustflag="3",
+                )
+                if rs is None or rs.error_code != "0":
+                    continue
+                rows = []
+                while rs.next():
+                    rows.append(rs.get_row_data())
+                if rows:
+                    latest = rows[-1]
+                    results.append({
+                        "name": name,
+                        "close": latest[4],
+                        "pct_chg": latest[7],
+                        "high": latest[2],
+                        "low": latest[3],
+                        "amount": latest[6],
+                    })
+
+            bs.logout()
+
+            if results:
+                return _format_market_overview(results, curr_date, "BaoStock")
+            return f"未获取到指数数据，可能是非交易日 (日期: {curr_date})"
+        except Exception as e:
+            return f"中国市场概览获取失败: {str(e)}"
 
     @staticmethod
     @tool
