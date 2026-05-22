@@ -57,13 +57,13 @@ class _FakeToolsCollection:
         return True
 
     def _values(self, value, path):
-        if not path:
-            return [value]
         if isinstance(value, list):
             values = []
             for item in value:
                 values.extend(self._values(item, path))
             return values
+        if not path:
+            return [value]
         if not isinstance(value, dict):
             return []
         return self._values(value.get(path[0]), path[1:])
@@ -116,3 +116,37 @@ def test_list_tools_search_treats_regex_metacharacters_as_literal_text():
 
     assert total == 0
     assert tools == []
+
+
+def test_format_doc_includes_calls_llm_metadata():
+    service = ToolService()
+    doc = {
+        "_id": "tool-1",
+        "code": "get_stock_news_openai",
+        "name": "get_stock_news_openai",
+        "description": "AI news",
+        "type": "builtin",
+        "calls_llm": True,
+        "estimated_tokens": 2000,
+    }
+
+    formatted = service._format_doc(doc)
+
+    assert formatted["calls_llm"] is True
+    assert formatted["estimated_tokens"] == 2000
+
+
+def test_format_doc_defaults_calls_llm_metadata_when_missing():
+    service = ToolService()
+    doc = {
+        "_id": "tool-2",
+        "code": "calculator",
+        "name": "calculator",
+        "description": "math",
+        "type": "builtin",
+    }
+
+    formatted = service._format_doc(doc)
+
+    assert formatted["calls_llm"] is False
+    assert formatted["estimated_tokens"] == 0
