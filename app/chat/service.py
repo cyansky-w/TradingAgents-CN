@@ -5,6 +5,7 @@ Handles conversation CRUD, message persistence, LLM invocation with streaming,
 tool calling via LangChain agents, and memory management.
 """
 
+import asyncio
 import json
 import logging
 from datetime import datetime, timezone
@@ -52,12 +53,16 @@ class ChatService:
     async def create_conversation(
         self, user_id: str, data: ConversationCreate
     ) -> Conversation:
+        metadata: Dict[str, Any] = {}
+        if data.agent_id:
+            metadata["agent_id"] = data.agent_id
         conv = Conversation(
             user_id=user_id,
             title=data.title or "New Chat",
             model_provider=data.model_provider,
             model_name=data.model_name,
             system_prompt=data.system_prompt,
+            metadata=metadata,
         )
         await self.conversations_col.insert_one(conv.model_dump())
         logger.info(f"Created conversation {conv.id} for user {user_id}")
@@ -81,6 +86,7 @@ class ChatService:
                 created_at=_iso(doc.get("created_at")),
                 updated_at=_iso(doc.get("updated_at")),
                 is_archived=doc.get("is_archived", False),
+                agent_id=(doc.get("metadata") or {}).get("agent_id"),
             ))
         return results
 
@@ -168,32 +174,78 @@ class ChatService:
         )
         await self.save_message(user_msg)
 
+        conv = await self.get_conversation(user_id, data.conversation_id)
+        agent_id = (conv.metadata or {}).get("agent_id") if conv else None
+        agent_spec = None
+        if agent_id:
+            try:
+                from app.services.agent_service import agent_service
+                agent_spec = await agent_service.build_agent(agent_id)
+            except Exception as build_err:
+                logger.warning(f"Failed to build agent {agent_id}, fallback to default: {build_err}")
+                agent_spec = None
+
         # Build context
         buffer = await self.memory.get_buffer(user_id, data.conversation_id)
+        system_prompt = agent_spec.system_prompt if agent_spec else await self._get_system_prompt(data.conversation_id)
         langchain_messages = _build_langchain_messages(
-            buffer, data.message, await self._get_system_prompt(data.conversation_id)
+            buffer, data.message, system_prompt
         )
 
-        # Get LLM
-        provider, model, api_key, base_url, _ = await get_chat_llm_config()
-        llm = await create_chat_llm(provider, model, streaming=False)
+        response = None
+        if agent_spec:
+            timeout = getattr(agent_spec.parameters, "timeout", None)
+            if agent_spec.tools:
+                from langgraph.prebuilt import create_react_agent
 
-        # Invoke
-        from langchain_core.messages import HumanMessage, SystemMessage
-        response = await llm.ainvoke([
-            SystemMessage(content=langchain_messages[0].content),
-            *[HumanMessage(content=m.content) if m.type == "human" else m
-              for m in langchain_messages[1:]],
-        ])
+                agent = create_react_agent(agent_spec.llm, agent_spec.tools)
+                async def _ainvoke_agent():
+                    return await agent.ainvoke(
+                        {"messages": langchain_messages},
+                        config={"recursion_limit": agent_spec.parameters.max_tool_calls},
+                    )
 
+                response = await _await_with_optional_timeout(_ainvoke_agent(), timeout)
+            else:
+                from langchain_core.messages import HumanMessage, SystemMessage
+
+                invoke_messages = [
+                    SystemMessage(content=langchain_messages[0].content),
+                    *[HumanMessage(content=m.content) if m.type == "human" else m
+                      for m in langchain_messages[1:]],
+                ]
+                response = await _await_with_optional_timeout(
+                    agent_spec.llm.ainvoke(invoke_messages), timeout
+                )
+        else:
+            # Get LLM
+            provider, model, api_key, base_url, _ = await get_chat_llm_config()
+            llm = await create_chat_llm(provider, model, streaming=False)
+
+            # Invoke
+            from langchain_core.messages import HumanMessage, SystemMessage
+            response = await llm.ainvoke([
+                SystemMessage(content=langchain_messages[0].content),
+                *[HumanMessage(content=m.content) if m.type == "human" else m
+                  for m in langchain_messages[1:]],
+            ])
+
+        response_content = _extract_message_content(response)
         assistant_msg = ChatMessage(
             conversation_id=data.conversation_id,
             user_id=user_id,
             role="assistant",
-            content=response.content,
+            content=response_content,
             token_usage=_extract_usage(response),
         )
         await self.save_message(assistant_msg)
+
+        if agent_id and agent_spec:
+            try:
+                from app.services.agent_service import agent_service
+                await agent_service.record_usage(agent_id)
+            except Exception as usage_err:
+                logger.warning(f"Failed to record agent usage {agent_id}: {usage_err}")
 
         return MessageResponse(
             id=assistant_msg.id,
@@ -230,9 +282,22 @@ class ChatService:
             if conv and conv.message_count <= 2:
                 await self.auto_title(user_id, conversation_id, message)
 
+            agent_id = (conv.metadata or {}).get("agent_id") if conv else None
+            agent_spec = None
+            if agent_id:
+                try:
+                    from app.services.agent_service import agent_service
+                    agent_spec = await agent_service.build_agent(agent_id)
+                except Exception as build_err:
+                    logger.warning(f"Failed to build agent {agent_id}, fallback to default: {build_err}")
+                    agent_spec = None
+
             # Build message context
             buffer = await self.memory.get_buffer(user_id, conversation_id)
-            system_prompt = await self._get_system_prompt(conversation_id)
+            if agent_spec:
+                system_prompt = agent_spec.system_prompt
+            else:
+                system_prompt = await self._get_system_prompt(conversation_id)
 
             # Recall long-term memory
             ltm_snippets = await self.memory.recall_long_term(user_id, message)
@@ -245,80 +310,108 @@ class ChatService:
                 buffer, message, system_prompt
             )
 
-            # Build tool list from registry
-            tools = tool_registry.get_all() if not tool_registry.empty else None
-
-            # Create streaming LLM. Disable thinking mode when tools are active
-            # because LangChain drops reasoning_content from API responses, causing
-            # DeepSeek to reject follow-up calls with "reasoning_content must be
-            # passed back to the API" (400).
-            llm = await create_chat_llm(
-                streaming=True,
-                temperature=0.7,
-                max_tokens=4096,
-                extra_body={"thinking": {"type": "disabled"}} if tools else None,
-            )
+            # Build tool list and LLM (Agent-driven if agent_id present)
+            if agent_spec:
+                tools = agent_spec.tools or None
+                llm = agent_spec.llm
+            else:
+                tools = tool_registry.get_all() if not tool_registry.empty else None
+                # DeepSeek 工具调用场景需禁用 thinking，避免 reasoning_content 400 错误
+                # 其他模型不发送此参数
+                default_provider, _, _, _, _ = await get_chat_llm_config()
+                _ds_extra = (
+                    {"thinking": {"type": "disabled"}}
+                    if (tools and default_provider and "deepseek" in default_provider.lower())
+                    else None
+                )
+                llm = await create_chat_llm(
+                    streaming=True,
+                    temperature=0.7,
+                    max_tokens=4096,
+                    extra_body=_ds_extra,
+                )
 
             # Stream
             full_content = ""
-            if tools:
-                # Agent-based streaming (tools available)
-                from langgraph.prebuilt import create_react_agent
-                from langchain_core.messages import AIMessage, ToolMessage
 
-                agent = create_react_agent(llm, tools)
-                async for chunk in agent.astream(
-                    {"messages": langchain_messages},
-                    stream_mode="messages",
-                ):
-                    # stream_mode="messages" yields (ai_message_chunk, metadata) tuples
-                    if not isinstance(chunk, tuple) or len(chunk) < 1:
-                        continue
+            async def _stream_events():
+                nonlocal full_content
 
-                    msg_chunk = chunk[0]
+                if tools:
+                    # Agent-based streaming (tools available)
+                    from langgraph.prebuilt import create_react_agent
+                    from langchain_core.messages import AIMessage, ToolMessage
 
-                    # Emit tool_call events for AIMessage chunks with tool_calls
-                    if isinstance(msg_chunk, AIMessage) and getattr(msg_chunk, "tool_calls", None):
-                        for tc in msg_chunk.tool_calls:
-                            tc_name = tc.get("name", "")
-                            if not tc_name:
-                                continue
+                    agent = create_react_agent(llm, tools)
+                    stream_config = None
+                    if agent_spec:
+                        stream_config = {"recursion_limit": agent_spec.parameters.max_tool_calls}
+
+                    async for chunk in agent.astream(
+                        {"messages": langchain_messages},
+                        stream_mode="messages",
+                        config=stream_config,
+                    ):
+                        # stream_mode="messages" yields (ai_message_chunk, metadata) tuples
+                        if not isinstance(chunk, tuple) or len(chunk) < 1:
+                            continue
+
+                        msg_chunk = chunk[0]
+
+                        # Emit tool_call events for AIMessage chunks with tool_calls
+                        if isinstance(msg_chunk, AIMessage) and getattr(msg_chunk, "tool_calls", None):
+                            for tc in msg_chunk.tool_calls:
+                                tc_name = tc.get("name", "")
+                                if not tc_name:
+                                    continue
+                                yield {
+                                    "event": "tool_call",
+                                    "data": {
+                                        "name": tc_name,
+                                        "args": tc.get("args", {}),
+                                        "id": tc.get("id", ""),
+                                    },
+                                }
+
+                        # Emit tool_result events for ToolMessage
+                        if isinstance(msg_chunk, ToolMessage):
+                            tc_name = getattr(msg_chunk, "name", "")
+                            tc_content = str(getattr(msg_chunk, "content", ""))
                             yield {
-                                "event": "tool_call",
+                                "event": "tool_result",
                                 "data": {
-                                    "name": tc_name,
-                                    "args": tc.get("args", {}),
-                                    "id": tc.get("id", ""),
+                                    "name": tc_name or "unknown",
+                                    "content": tc_content,
+                                    "tool_call_id": getattr(msg_chunk, "tool_call_id", ""),
                                 },
                             }
+                            # Include tool result in full content
+                            if tc_content:
+                                full_content += tc_content
 
-                    # Emit tool_result events for ToolMessage
-                    if isinstance(msg_chunk, ToolMessage):
-                        tc_name = getattr(msg_chunk, "name", "")
-                        tc_content = str(getattr(msg_chunk, "content", ""))
-                        yield {
-                            "event": "tool_result",
-                            "data": {
-                                "name": tc_name or "unknown",
-                                "content": tc_content,
-                                "tool_call_id": getattr(msg_chunk, "tool_call_id", ""),
-                            },
-                        }
-                        # Include tool result in full content
-                        if tc_content:
-                            full_content += tc_content
+                        content = getattr(msg_chunk, "content", "")
+                        if content and isinstance(content, str):
+                            full_content += content
+                            yield {"event": "token", "data": {"token": content, "content": content}}
+                else:
+                    # Direct chat streaming (no tools)
+                    async for chunk in llm.astream(langchain_messages):
+                        content = chunk.content if hasattr(chunk, "content") else str(chunk)
+                        if content:
+                            full_content += content
+                            yield {"event": "token", "data": {"token": content, "content": content}}
 
-                    content = getattr(msg_chunk, "content", "")
-                    if content and isinstance(content, str):
-                        full_content += content
-                        yield {"event": "token", "data": {"token": content, "content": content}}
+            timeout = getattr(agent_spec.parameters, "timeout", None) if agent_spec else None
+            if timeout:
+                try:
+                    async for event in _iterate_with_optional_timeout(_stream_events(), timeout):
+                        yield event
+                except TimeoutError:
+                    yield {"event": "error", "data": {"error": f"Agent execution timed out after {timeout} seconds"}}
+                    return
             else:
-                # Direct chat streaming (no tools)
-                async for chunk in llm.astream(langchain_messages):
-                    content = chunk.content if hasattr(chunk, "content") else str(chunk)
-                    if content:
-                        full_content += content
-                        yield {"event": "token", "data": {"token": content, "content": content}}
+                async for event in _stream_events():
+                    yield event
 
             # Save assistant message
             assistant_msg = ChatMessage(
@@ -328,6 +421,13 @@ class ChatService:
                 content=full_content,
             )
             await self.save_message(assistant_msg)
+
+            if agent_id and agent_spec:
+                try:
+                    from app.services.agent_service import agent_service
+                    await agent_service.record_usage(agent_id)
+                except Exception as usage_err:
+                    logger.warning(f"Failed to record agent usage {agent_id}: {usage_err}")
 
             # Persist to long-term memory (every N messages, check on even exchanges)
             if conv and conv.message_count % settings.HINDSIGHT_REFLECTION_INTERVAL == 0:
@@ -389,9 +489,51 @@ def _iso(dt) -> str:
     return dt.isoformat()
 
 
+async def _await_with_optional_timeout(coro, timeout: Optional[float]):
+    if timeout:
+        return await asyncio.wait_for(coro, timeout=timeout)
+    return await coro
+
+
+async def _iterate_with_optional_timeout(generator, timeout: Optional[float]):
+    if not timeout:
+        async for item in generator:
+            yield item
+        return
+
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+
+    while True:
+        remaining = deadline - loop.time()
+        if remaining <= 0:
+            raise asyncio.TimeoutError
+        try:
+            item = await asyncio.wait_for(generator.__anext__(), timeout=remaining)
+        except StopAsyncIteration:
+            return
+        yield item
+
+
+def _extract_message_content(response) -> str:
+    if isinstance(response, dict):
+        messages = response.get("messages") or []
+        if messages:
+            last_message = messages[-1]
+            content = getattr(last_message, "content", "")
+            return content if isinstance(content, str) else str(content)
+        return ""
+    content = getattr(response, "content", "")
+    return content if isinstance(content, str) else str(content)
+
+
 def _extract_usage(response) -> Optional[dict]:
     """Extract token usage from LangChain response."""
     try:
+        if isinstance(response, dict):
+            messages = response.get("messages") or []
+            if messages:
+                response = messages[-1]
         if hasattr(response, "response_metadata"):
             meta = response.response_metadata
             if "token_usage" in meta:

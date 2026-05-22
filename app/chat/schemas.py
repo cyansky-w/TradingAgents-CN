@@ -13,6 +13,7 @@ class ConversationCreate(BaseModel):
     model_provider: str = ""
     model_name: str = ""
     system_prompt: str = ""
+    agent_id: Optional[str] = None
 
 
 class ConversationUpdate(BaseModel):
@@ -29,6 +30,7 @@ class ConversationResponse(BaseModel):
     created_at: str
     updated_at: str
     is_archived: bool
+    agent_id: Optional[str] = None
 
 
 # ── Messages ──────────────────────────────────────────────────

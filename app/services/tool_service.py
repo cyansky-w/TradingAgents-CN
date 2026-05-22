@@ -65,6 +65,8 @@ class ToolService:
             "tags": doc.get("tags", []),
             "enabled": doc.get("enabled", True),
             "is_system": doc.get("is_system", False),
+            "calls_llm": doc.get("calls_llm", False),
+            "estimated_tokens": doc.get("estimated_tokens", 0),
             "health_status": doc.get("health_status", "unknown"),
             "last_health_check": _iso(doc.get("last_health_check")),
             "health_check_url": doc.get("health_check_url"),

@@ -100,7 +100,7 @@ async def create_chat_llm(
         )
         llm = client.get_llm()
         llm.streaming = streaming
-        logger.info(f"Creating chat LLM via OpenAIClient: model={model}, base_url={base_url or 'default'}")
+        logger.info(f"Creating chat LLM via OpenAIClient: model={model}, base_url={base_url or 'default'}, extra_body={extra_body}")
         return llm
 
     elif prov_type == "google":

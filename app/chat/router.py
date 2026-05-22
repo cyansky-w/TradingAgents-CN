@@ -66,6 +66,7 @@ async def create_conversation(
         created_at=conv.created_at.isoformat() if hasattr(conv.created_at, "isoformat") else str(conv.created_at),
         updated_at=conv.updated_at.isoformat() if hasattr(conv.updated_at, "isoformat") else str(conv.updated_at),
         is_archived=conv.is_archived,
+        agent_id=(conv.metadata or {}).get("agent_id"),
     )
 
 
@@ -88,6 +89,7 @@ async def get_conversation(
         created_at=conv.created_at.isoformat() if hasattr(conv.created_at, "isoformat") else str(conv.created_at),
         updated_at=conv.updated_at.isoformat() if hasattr(conv.updated_at, "isoformat") else str(conv.updated_at),
         is_archived=conv.is_archived,
+        agent_id=(conv.metadata or {}).get("agent_id"),
     )
 
 
