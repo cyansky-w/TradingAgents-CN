@@ -71,6 +71,8 @@ class ToolService:
             "last_health_check": _iso(doc.get("last_health_check")),
             "health_check_url": doc.get("health_check_url"),
             "agent_count": doc.get("agent_count", 0),
+            "workflow_id": doc.get("workflow_id"),
+            "output_format": doc.get("output_format", "summary"),
             "created_at": _iso(doc.get("created_at")),
             "updated_at": _iso(doc.get("updated_at")),
         }

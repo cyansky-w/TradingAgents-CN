@@ -28,6 +28,7 @@
               <el-option label="builtin" value="builtin" />
               <el-option label="rpc" value="rpc" />
               <el-option label="remote" value="remote" />
+              <el-option label="workflow" value="workflow" />
             </el-select>
             <el-select v-model="filterTag" placeholder="标签" clearable @change="loadTools()">
               <el-option v-for="tag in allTags" :key="tag" :label="tag" :value="tag" />
@@ -313,6 +314,7 @@
           <el-select v-model="registerForm.type">
             <el-option label="rpc" value="rpc" />
             <el-option label="remote" value="remote" />
+            <el-option label="workflow" value="workflow" />
           </el-select>
         </el-form-item>
         <el-form-item label="编码" required>
@@ -324,8 +326,19 @@
         <el-form-item label="描述" required>
           <el-input v-model="registerForm.description" type="textarea" :rows="2" />
         </el-form-item>
-        <el-form-item label="服务地址" required>
+        <el-form-item v-if="registerForm.type !== 'workflow'" label="服务地址" required>
           <el-input v-model="registerForm.endpoint_url" placeholder="http://..." />
+        </el-form-item>
+        <el-form-item v-if="registerForm.type === 'workflow'" label="绑定工作流" required>
+          <el-select v-model="registerForm.workflow_id" placeholder="选择工作流" filterable>
+            <el-option v-for="wf in workflowOptions" :key="wf.id" :label="wf.name" :value="wf.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="registerForm.type === 'workflow'" label="输出格式">
+          <el-select v-model="registerForm.output_format">
+            <el-option label="完整 JSON" value="full" />
+            <el-option label="摘要文本" value="summary" />
+          </el-select>
         </el-form-item>
         <el-form-item v-if="registerForm.type === 'remote'" label="请求方法">
           <el-select v-model="registerForm.endpoint_method">
@@ -410,6 +423,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, Delete, Loading } from '@element-plus/icons-vue'
 import { toolsApi } from '@/api/tools'
 import type { Tool, ToolParameter } from '@/api/tools'
+import { workflowsApi, type Workflow } from '@/api/workflows'
 
 const tools = ref<Tool[]>([])
 const total = ref(0)
@@ -418,6 +432,7 @@ const pageSize = 20
 const listLoading = ref(false)
 const listScrollbar = ref()
 const allTags = ref<string[]>([])
+const workflowOptions = ref<Workflow[]>([])
 const selectedTool = ref<Tool | null>(null)
 const editing = ref(false)
 
@@ -454,7 +469,7 @@ const displayHeaders = ref<{ key: string; value: string }[]>([])
 const registerVisible = ref(false)
 const registerHeaders = ref<{ key: string; value: string }[]>([])
 const registerForm = reactive({
-  type: 'rpc' as 'rpc' | 'remote',
+  type: 'rpc' as 'rpc' | 'remote' | 'workflow',
   code: '',
   name: '',
   description: '',
@@ -465,6 +480,8 @@ const registerForm = reactive({
   auth_config: {} as Record<string, string>,
   tags: [] as string[],
   health_check_url: '',
+  workflow_id: '',
+  output_format: 'summary' as 'full' | 'summary',
 })
 
 const displayParams = computed(() => {
@@ -480,6 +497,7 @@ const displayAuthType = computed(() => {
 function typeTagType(type: string) {
   if (type === 'builtin') return 'success'
   if (type === 'rpc') return 'warning'
+  if (type === 'workflow') return 'info'
   return 'primary'
 }
 
@@ -708,13 +726,24 @@ function showRegisterDialog() {
   registerForm.auth_config = {}
   registerForm.tags = []
   registerForm.health_check_url = ''
+  registerForm.workflow_id = ''
+  registerForm.output_format = 'summary'
   registerHeaders.value = []
   registerVisible.value = true
 }
 
 async function handleRegister() {
-  if (!registerForm.code || !registerForm.name || !registerForm.description || !registerForm.endpoint_url) {
+  const isWorkflow = registerForm.type === 'workflow'
+  if (!registerForm.code || !registerForm.name || !registerForm.description) {
     ElMessage.warning('请填写必填字段')
+    return
+  }
+  if (isWorkflow && !registerForm.workflow_id) {
+    ElMessage.warning('请选择绑定的工作流')
+    return
+  }
+  if (!isWorkflow && !registerForm.endpoint_url) {
+    ElMessage.warning('请填写服务地址')
     return
   }
   registerLoading.value = true
@@ -723,19 +752,25 @@ async function handleRegister() {
     for (const h of registerHeaders.value) {
       if (h.key) headers[h.key] = h.value
     }
-    const payload = {
+    const payload: any = {
       type: registerForm.type,
       code: registerForm.code,
       name: registerForm.name,
       description: registerForm.description,
-      endpoint_url: registerForm.endpoint_url,
-      endpoint_method: registerForm.type === 'remote' ? registerForm.endpoint_method as 'GET' | 'POST' | 'PUT' | 'DELETE' : undefined,
       timeout: registerForm.timeout,
-      auth_type: registerForm.auth_type as 'none' | 'api_key' | 'bearer' | 'basic',
-      auth_config: registerForm.auth_type !== 'none' ? registerForm.auth_config : undefined,
       tags: registerForm.tags,
-      health_check_url: registerForm.health_check_url || undefined,
-      headers: Object.keys(headers).length > 0 ? headers : undefined,
+      enabled: true,
+    }
+    if (isWorkflow) {
+      payload.workflow_id = registerForm.workflow_id
+      payload.output_format = registerForm.output_format
+    } else {
+      payload.endpoint_url = registerForm.endpoint_url
+      payload.endpoint_method = registerForm.type === 'remote' ? registerForm.endpoint_method : undefined
+      payload.auth_type = registerForm.auth_type
+      payload.auth_config = registerForm.auth_type !== 'none' ? registerForm.auth_config : undefined
+      payload.health_check_url = registerForm.health_check_url || undefined
+      payload.headers = Object.keys(headers).length > 0 ? headers : undefined
     }
     const res = await toolsApi.create(payload)
     if (res.success) {
@@ -754,6 +789,9 @@ async function handleRegister() {
 onMounted(() => {
   loadTools()
   loadTags()
+  workflowsApi.list({ page: 1, page_size: 100 }).then(res => {
+    if (res.success) workflowOptions.value = res.data.items
+  })
 })
 </script>
 

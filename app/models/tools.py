@@ -20,9 +20,11 @@ class ToolCreate(BaseModel):
     code: str = Field(min_length=1, max_length=60, pattern=r"^[a-z][a-z0-9_]*$")
     name: str = Field(min_length=1, max_length=100)
     description: str = Field(min_length=1)
-    type: Literal["builtin", "rpc", "remote"]
+    type: Literal["builtin", "rpc", "remote", "workflow"]
     handler: Optional[str] = None       # builtin 必填
     endpoint_url: Optional[str] = None  # rpc/remote 必填
+    workflow_id: Optional[str] = None   # workflow 必填
+    output_format: Optional[Literal["full", "summary"]] = None  # workflow 可选
     endpoint_method: Optional[Literal["GET", "POST", "PUT", "DELETE"]] = None
     headers: Optional[Dict[str, str]] = None
     auth_type: Optional[Literal["none", "api_key", "bearer", "basic"]] = None
@@ -45,7 +47,7 @@ class ToolUpdate(BaseModel):
 
 
 class ToolUpdateExtended(ToolUpdate):
-    """rpc/remote 工具额外可编辑的字段"""
+    """rpc/remote/workflow 工具额外可编辑的字段"""
     parameters: Optional[List[ToolParameter]] = None
     output_schema: Optional[Dict[str, Any]] = None
     endpoint_url: Optional[str] = None
@@ -54,3 +56,5 @@ class ToolUpdateExtended(ToolUpdate):
     auth_type: Optional[Literal["none", "api_key", "bearer", "basic"]] = None
     auth_config: Optional[Dict[str, str]] = None
     health_check_url: Optional[str] = None
+    workflow_id: Optional[str] = None
+    output_format: Optional[Literal["full", "summary"]] = None

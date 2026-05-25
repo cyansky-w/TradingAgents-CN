@@ -14,8 +14,10 @@ export interface Tool {
   code: string
   name: string
   description: string
-  type: 'builtin' | 'rpc' | 'remote'
+  type: 'builtin' | 'rpc' | 'remote' | 'workflow'
   handler?: string
+  workflow_id?: string
+  output_format?: 'full' | 'summary'
   endpoint_url?: string
   endpoint_method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
   headers?: Record<string, string>
@@ -57,8 +59,8 @@ export interface ToolCreateDto {
   code: string
   name: string
   description: string
-  type: 'rpc' | 'remote'
-  endpoint_url: string
+  type: 'rpc' | 'remote' | 'workflow'
+  endpoint_url?: string
   endpoint_method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
   headers?: Record<string, string>
   auth_type?: 'none' | 'api_key' | 'bearer' | 'basic'
@@ -69,6 +71,8 @@ export interface ToolCreateDto {
   tags?: string[]
   enabled?: boolean
   health_check_url?: string
+  workflow_id?: string
+  output_format?: 'full' | 'summary'
 }
 
 export interface ToolUpdateDto {

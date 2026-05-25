@@ -68,6 +68,9 @@ async def create_tool(payload: ToolCreate, current_user: dict = Depends(get_curr
         elif data["type"] in ("rpc", "remote"):
             if not data.get("endpoint_url"):
                 raise HTTPException(status_code=400, detail="rpc/remote 工具必须指定 endpoint_url")
+        elif data["type"] == "workflow":
+            if not data.get("workflow_id"):
+                raise HTTPException(status_code=400, detail="workflow 工具必须指定 workflow_id")
         existing_code = await tool_service.get_tool_by_code(data["code"])
         if existing_code:
             raise HTTPException(status_code=400, detail=f"工具编码 '{data['code']}' 已存在")
@@ -154,6 +157,14 @@ async def health_check_tool(tool_id: str, current_user: dict = Depends(get_curre
             status_str = "healthy" if is_healthy else "unhealthy"
             await tool_service.update_health_status(tool_id, status_str)
             return ok({"id": tool_id, "health_status": status_str, "details": f"Handler '{handler_name}' {'exists' if is_healthy else 'not found'} in HANDLER_MAP"})
+        elif tool_type == "workflow":
+            workflow_id = tool.get("workflow_id", "")
+            from app.workflows.service import workflow_service
+            wf = await workflow_service.get_workflow(workflow_id) if workflow_id else None
+            is_healthy = wf is not None
+            status_str = "healthy" if is_healthy else "unhealthy"
+            await tool_service.update_health_status(tool_id, status_str)
+            return ok({"id": tool_id, "health_status": status_str, "details": f"Workflow '{workflow_id}' {'exists' if is_healthy else 'not found'}"})
         else:
             await tool_service.update_health_status(tool_id, "unknown")
             return ok({"id": tool_id, "health_status": "unknown", "details": "Health check not implemented for rpc/remote yet"})

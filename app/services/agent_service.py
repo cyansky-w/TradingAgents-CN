@@ -344,16 +344,41 @@ class AgentService:
             if not tool_meta or not tool_meta.get("enabled", True):
                 logger.warning(f"build_agent: skip disabled/missing tool {code}")
                 continue
-            if tool_meta.get("type") != "builtin":
-                logger.warning(f"build_agent: skip non-builtin tool {code}")
-                continue
-            handler_name = tool_meta.get("handler")
-            handler = HANDLER_MAP.get(handler_name) if handler_name else None
-            if not handler:
-                logger.warning(f"build_agent: handler '{handler_name}' missing for tool {code}")
-                continue
-            tools.append(wrap_as_base_tool(handler, tool_meta, retry_on_failure=retry_on_failure))
+            tool_type = tool_meta.get("type")
+            if tool_type == "workflow":
+                tool_meta_wf = {**tool_meta, "handler": f"workflow:{tool_meta.get('workflow_id', '')}"}
+                tools.append(wrap_as_base_tool(self._make_workflow_invoker(tool_meta), tool_meta_wf, retry_on_failure=retry_on_failure))
+            elif tool_type == "builtin":
+                handler_name = tool_meta.get("handler")
+                handler = HANDLER_MAP.get(handler_name) if handler_name else None
+                if not handler:
+                    logger.warning(f"build_agent: handler '{handler_name}' missing for tool {code}")
+                    continue
+                tools.append(wrap_as_base_tool(handler, tool_meta, retry_on_failure=retry_on_failure))
+            else:
+                logger.warning(f"build_agent: skip unsupported tool type '{tool_type}' for {code}")
         return tools
+
+    @staticmethod
+    def _make_workflow_invoker(tool_meta: Dict[str, Any]):
+        import json
+        workflow_id = tool_meta.get("workflow_id", "")
+        output_format = tool_meta.get("output_format", "summary")
+
+        async def _invoke_workflow(**kwargs) -> str:
+            from app.workflows.engine import workflow_engine
+            result = await workflow_engine.run(
+                workflow_id=workflow_id,
+                input_data=kwargs,
+                trigger_type="tool",
+            )
+            output = result.get("output", {})
+            if output_format == "full":
+                return json.dumps(output, ensure_ascii=False) if not isinstance(output, str) else output
+            text = str(output)
+            return text[:4000] if len(text) > 4000 else text
+
+        return _invoke_workflow
 
     async def build_agent(
         self,
