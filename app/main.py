@@ -32,6 +32,7 @@ from app.routers import auth_db as auth, analysis, screening, queue, sse, health
 from app.routers import tools as tools_router
 from app.routers import prompts as prompts_router
 from app.routers import agents as agents_router
+from app.routers import workflows as workflows_router
 from app.routers import sync as sync_router, multi_source_sync
 from app.routers import stocks as stocks_router
 from app.routers import stock_data as stock_data_router
@@ -611,6 +612,16 @@ async def lifespan(app: FastAPI):
 
         # 设置调度器实例到服务中，以便API可以管理任务
         set_scheduler_instance(scheduler)
+
+        # 注册工作流 cron 定时任务
+        try:
+            from app.workflows.cron_scheduler import WorkflowCronScheduler
+            wf_cron = WorkflowCronScheduler(scheduler)
+            wf_count = await wf_cron.sync_all()
+            logger.info(f"🔄 工作流 Cron 调度同步完成: {wf_count} 个任务")
+        except Exception as wf_e:
+            logger.warning(f"工作流 Cron 同步失败（非致命）: {wf_e}")
+
         logger.info("✅ 调度器服务已初始化")
     except Exception as e:
         logger.error(f"❌ 调度器启动失败: {e}", exc_info=True)
@@ -769,6 +780,7 @@ app.include_router(news_data.router, tags=["news-data"])
 app.include_router(social_media.router, tags=["social-media"])
 app.include_router(internal_messages.router, tags=["internal-messages"])
 app.include_router(agents_router.router, prefix="/api", tags=["Agent 管理"])
+app.include_router(workflows_router.router, prefix="/api", tags=["工作流管理"])
 app.include_router(tools_router.router, prefix="/api", tags=["工具管理"])
 app.include_router(prompts_router.router, prefix="/api", tags=["提示词管理"])
 
