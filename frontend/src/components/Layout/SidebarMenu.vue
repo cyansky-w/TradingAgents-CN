@@ -114,6 +114,10 @@
         <el-icon><SetUp /></el-icon>
         <template #title>工具管理</template>
       </el-menu-item>
+      <el-menu-item index="/workflows">
+        <el-icon><Share /></el-icon>
+        <template #title>工作流管理</template>
+      </el-menu-item>
       <el-menu-item index="/prompts">
         <el-icon><Document /></el-icon>
         <template #title>提示词管理</template>
@@ -145,7 +149,8 @@ import {
   ChatDotRound,
   SetUp,
   Document,
-  UserFilled
+  UserFilled,
+  Share
 } from '@element-plus/icons-vue'
 
 const route = useRoute()

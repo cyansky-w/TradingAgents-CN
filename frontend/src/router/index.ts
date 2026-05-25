@@ -468,6 +468,47 @@ const routes: RouteRecordRaw[] = [
   },
 
   {
+    path: '/workflows',
+    name: 'WorkflowManagement',
+    component: BasicLayout,
+    meta: {
+      title: '工作流管理',
+      icon: 'Share',
+      requiresAuth: true,
+      transition: 'fade'
+    },
+    children: [
+      {
+        path: '',
+        name: 'WorkflowManagementHome',
+        component: () => import('@/views/WorkflowManagement/index.vue'),
+        meta: {
+          title: '工作流管理',
+          requiresAuth: true
+        }
+      },
+      {
+        path: ':id/edit',
+        name: 'WorkflowEditor',
+        component: () => import('@/views/WorkflowManagement/WorkflowEditor.vue'),
+        meta: {
+          title: '工作流编辑器',
+          requiresAuth: true
+        }
+      },
+      {
+        path: 'runs/:runId',
+        name: 'WorkflowRunDetail',
+        component: () => import('@/views/WorkflowManagement/runs/RunDetail.vue'),
+        meta: {
+          title: '运行详情',
+          requiresAuth: true
+        }
+      }
+    ]
+  },
+
+  {
     path: '/tools',
     name: 'ToolManagement',
     component: BasicLayout,
