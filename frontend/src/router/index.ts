@@ -400,7 +400,7 @@ const routes: RouteRecordRaw[] = [
       name: 'RealTrading',
       component: BasicLayout,
       meta: {
-        title: '实盘交易',
+        title: '实盘持仓',
         icon: 'TrendCharts',
         requiresAuth: true,
         transition: 'slide-up'
@@ -411,7 +411,7 @@ const routes: RouteRecordRaw[] = [
           name: 'RealTradingHome',
           component: () => import('@/views/RealTrading/index.vue'),
           meta: {
-            title: '实盘交易',
+            title: '实盘持仓',
             requiresAuth: true
           }
         }

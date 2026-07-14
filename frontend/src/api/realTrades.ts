@@ -40,6 +40,39 @@ export interface AssetRules {
   precision: number
 }
 
+export interface PortfolioPosition {
+  storage_key: string
+  market: Market
+  exchange: string
+  symbol: string
+  instrument_type: InstrumentType
+  position_side: PositionSide
+  quote_asset: string
+  quantity: DecimalString
+  average_entry_price?: DecimalString | null
+  mark_price?: DecimalString | null
+  market_value?: DecimalString | null
+  base_market_value?: DecimalString | null
+  base_unrealized_pnl?: DecimalString | null
+  weight_percent?: DecimalString | null
+  converted?: boolean
+  conversion_error?: string
+  quote_stale?: boolean
+}
+
+export interface PortfolioDashboard {
+  base_currency: BaseCurrency
+  total_market_value: DecimalString
+  total_cost: DecimalString
+  realized_pnl: DecimalString
+  unrealized_pnl: DecimalString
+  total_pnl: DecimalString
+  holding_count: number
+  total_trade_count: number
+  excluded: Array<Record<string, unknown>>
+  pnl_curve: Array<{ date: string; cumulative_pnl: DecimalString }>
+}
+
 export interface RealTradeRecord {
   id: string
   code: string
@@ -149,10 +182,10 @@ export const realTradesApi = {
     return ApiClient.get<PaginatedRecords>('/api/real-trades/records', params)
   },
   async getPositions(base_currency: BaseCurrency = 'CNY') {
-    return ApiClient.get<{ items: RealPositionItem[]; total_market_value: number }>('/api/real-trades/positions', { base_currency })
+    return ApiClient.get<{ items: PortfolioPosition[]; total_market_value: DecimalString; excluded: Array<Record<string, unknown>> }>('/api/real-trades/positions', { base_currency })
   },
   async getDashboard(days = 90, base_currency: BaseCurrency = 'CNY') {
-    return ApiClient.get<DashboardData>('/api/real-trades/dashboard', { days, base_currency })
+    return ApiClient.get<PortfolioDashboard>('/api/real-trades/dashboard', { days, base_currency })
   },
   async getAssetRules(params: { market: Market; exchange: string; symbol: string; instrument_type: InstrumentType }) {
     return ApiClient.get<AssetRules>('/api/real-trades/asset-rules', params)

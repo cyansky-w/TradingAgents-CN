@@ -49,7 +49,7 @@
 
     <el-menu-item index="/real-trading">
       <el-icon><TrendCharts /></el-icon>
-      <template #title>实盘交易</template>
+      <template #title>实盘持仓</template>
     </el-menu-item>
 
     <el-menu-item index="/chat">
