@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
 import AutoImport from 'unplugin-auto-import/vite'
@@ -7,6 +7,11 @@ import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    include: ['src/**/*.test.ts']
+  },
   plugins: [
     vue(),
     AutoImport({
