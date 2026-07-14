@@ -3,6 +3,7 @@ from decimal import Decimal
 
 import pytest
 from bson import ObjectId
+from pymongo.errors import DuplicateKeyError
 
 from app.services.portfolio.ledger_service import (
     LedgerService,
@@ -56,6 +57,14 @@ class FakeCursor:
         return self.documents if length is None else self.documents[:length]
 
 
+class RacingIdempotencyCollection(FakeCollection):
+    async def insert_one(self, document):
+        winner = deepcopy(document)
+        winner["_id"] = ObjectId()
+        self.documents.append(winner)
+        raise DuplicateKeyError("duplicate idempotency key")
+
+
 def matches(document, query):
     return all(document.get(key) == value for key, value in query.items())
 
@@ -88,6 +97,19 @@ async def test_duplicate_idempotency_key_returns_existing_record(ledger_service,
     first = await ledger_service.create_record("u1", payload)
     second = await ledger_service.create_record("u1", payload)
     assert second["_id"] == first["_id"]
+    assert await records.count_documents({"user_id": "u1"}) == 1
+
+
+@pytest.mark.asyncio
+async def test_idempotency_race_returns_concurrent_winner():
+    records = RacingIdempotencyCollection()
+    ledger = LedgerService(records=records, audit=FakeCollection())
+
+    result = await ledger.create_record(
+        "u1", trade_payload(idempotency_key="import-row-race")
+    )
+
+    assert result["idempotency_key"] == "import-row-race"
     assert await records.count_documents({"user_id": "u1"}) == 1
 
 

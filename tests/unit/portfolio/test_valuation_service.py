@@ -39,3 +39,31 @@ async def test_unconverted_position_is_excluded_from_weight(monkeypatch):
     assert result.positions[0]["weight_percent"] == "100"
     assert result.positions[0]["base_unrealized_pnl"] == "70"
     assert result.excluded[0]["storage_key"].endswith("ALT/BTC:crypto_spot")
+
+
+@pytest.mark.asyncio
+async def test_unknown_cost_position_keeps_market_value_without_pnl():
+    service = ValuationService()
+    result = await service.value_positions(
+        [
+            {
+                "storage_key": "CRYPTO:binance:BTC/USDT:crypto_spot",
+                "quote_asset": "USDT",
+                "market_value": "100",
+                "cost_value": None,
+                "realized_pnl": None,
+                "unrealized_pnl": None,
+            }
+        ],
+        "USDT",
+    )
+
+    assert result.excluded == []
+    assert result.total_market_value == "100"
+    assert result.total_cost == "0"
+    assert result.total_unrealized_pnl == "0"
+    assert result.positions[0]["base_market_value"] == "100"
+    assert result.positions[0]["base_cost_value"] is None
+    assert result.positions[0]["base_realized_pnl"] is None
+    assert result.positions[0]["base_unrealized_pnl"] is None
+    assert result.positions[0]["weight_percent"] == "100"

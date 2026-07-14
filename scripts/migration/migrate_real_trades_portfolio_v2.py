@@ -2,13 +2,18 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
+import sys
 from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
 
 from pymongo import MongoClient
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from app.core.config import settings
 from app.services.portfolio.position_calculator import PositionCalculator, PositionError
 
 
@@ -41,6 +46,8 @@ def convert_legacy_record(document):
     market = str(document.get("market") or "CN").upper()
     symbol = str(document.get("symbol") or document.get("code") or "").upper()
     exchange = document.get("exchange")
+    if market == "CRYPTO":
+        raise ValueError("unsupported_crypto_spot_migration")
     if market == "CN":
         exchange = "SSE" if symbol.startswith(("5", "6", "9")) else "SZSE"
     elif market == "HK":
@@ -53,9 +60,9 @@ def convert_legacy_record(document):
         "schema_version": 2,
         "record_type": "trade",
         "market": market,
-        "exchange": str(exchange).upper() if market != "CRYPTO" else str(exchange).lower(),
+        "exchange": str(exchange).upper(),
         "symbol": symbol,
-        "instrument_type": "equity" if market != "CRYPTO" else "crypto_spot",
+        "instrument_type": "equity",
         "quote_asset": document.get("quote_asset") or document.get("currency"),
         "position_side": "long",
         "position_action": "open" if side == "buy" else "close",
@@ -109,11 +116,8 @@ def main():
     if args.input:
         documents = json.loads(Path(args.input).read_text(encoding="utf-8"))
     else:
-        mongo_url = os.environ.get("TRADINGAGENTS_MONGODB_URL") or os.environ.get("MONGODB_URL")
-        if not mongo_url:
-            raise SystemExit("TRADINGAGENTS_MONGODB_URL is required without --input")
-        client = MongoClient(mongo_url)
-        database = client.get_default_database()
+        client = MongoClient(settings.MONGO_URI)
+        database = client[settings.MONGO_DB]
         collection = database["real_trades"]
         documents = list(collection.find({}))
     report = migrate_documents(documents)

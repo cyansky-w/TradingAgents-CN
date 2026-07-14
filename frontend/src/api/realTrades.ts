@@ -2,7 +2,7 @@ import { ApiClient } from './request'
 
 export type DecimalString = string
 export type Market = 'CN' | 'HK' | 'US' | 'CRYPTO'
-export type InstrumentType = 'equity' | 'crypto_spot' | 'crypto_linear_perpetual'
+export type InstrumentType = 'equity' | 'crypto_linear_perpetual'
 export type PositionSide = 'long' | 'short'
 export type PositionAction = 'open' | 'close'
 export type RecordType = 'trade' | 'opening_position' | 'transfer_in' | 'transfer_out'
@@ -84,6 +84,11 @@ export interface RealTradeRecord {
   quantity: number
   amount: number
   commission: number
+  fee_amount?: DecimalString
+  fee_currency?: string
+  base_fee_amount?: DecimalString | null
+  base_fee_currency?: BaseCurrency | null
+  fee_conversion_error?: string | null
   trade_date: string
   reason: string
   tags: string[]
@@ -156,6 +161,7 @@ export interface RecordsParams {
   page?: number
   page_size?: number
   sort?: string
+  base_currency?: BaseCurrency
 }
 
 export interface PaginatedRecords {

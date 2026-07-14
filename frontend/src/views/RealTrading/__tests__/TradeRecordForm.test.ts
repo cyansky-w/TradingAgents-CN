@@ -54,6 +54,23 @@ describe('TradeRecordForm', () => {
     expect((input.element as HTMLInputElement).value).toBe('0.00125')
   })
 
+  it('offers only USDT perpetuals for the crypto market', async () => {
+    const wrapper = mountForm({ market: 'CRYPTO', exchange: 'binance', instrument_type: 'crypto_spot' as any, quote_asset: 'USDT' })
+    await flushPromises()
+
+    expect(wrapper.find('option[value="crypto_spot"]').exists()).toBe(false)
+    expect((wrapper.get('[data-testid="instrument-type"]').element as HTMLSelectElement).value).toBe('crypto_linear_perpetual')
+  })
+
+  it('removes transfer records when switching to crypto perpetuals', async () => {
+    const wrapper = mountForm({ market: 'CRYPTO', exchange: 'binance', record_type: 'transfer_in', instrument_type: 'crypto_linear_perpetual', quote_asset: 'USDT' })
+    await flushPromises()
+
+    expect(wrapper.find('option[value="transfer_in"]').exists()).toBe(false)
+    expect((wrapper.get('[data-testid="record-type"]').element as HTMLSelectElement).value).toBe('trade')
+    expect(wrapper.find('[data-testid="position-action"]').exists()).toBe(true)
+  })
+
   it('hides position action for transfer records', async () => {
     const wrapper = mountForm({ record_type: 'transfer_in' })
     await flushPromises()

@@ -1,4 +1,5 @@
 import re
+from datetime import datetime
 from decimal import Decimal
 from typing import Any, Dict, Optional
 
@@ -53,6 +54,24 @@ def get_quote_gateway():
     return QuoteGateway(db=get_mongo_db())
 
 
+def get_fx_service():
+    return FxService(db=get_mongo_db())
+
+
+async def _validate_exchange_quantity(model, gateway):
+    if model.market.value != "CRYPTO":
+        return
+    rules = await gateway.get_asset_rules(
+        model.market.value,
+        model.exchange,
+        model.symbol,
+        model.instrument_type.value,
+    )
+    error = rules.validate(model.quantity)
+    if error:
+        raise ValueError(error)
+
+
 def _legacy_to_v2(payload: Dict[str, Any]) -> Dict[str, Any]:
     if "symbol" in payload:
         return payload
@@ -92,16 +111,94 @@ def _record_response(document):
     return item
 
 
+async def _record_response_with_fee_conversion(document, base_currency, fx):
+    item = _record_response(document)
+    item.update({
+        "base_fee_amount": None,
+        "base_fee_currency": None,
+        "fee_conversion_error": None,
+    })
+    fee_amount = document.get("fee_amount")
+    fee_currency = str(document.get("fee_currency") or "").upper()
+    quote_asset = str(document.get("quote_asset") or "").upper()
+    if not fee_amount or not fee_currency or fee_currency == quote_asset:
+        return item
+
+    item["base_fee_currency"] = base_currency
+    try:
+        trade_time = document.get("trade_time")
+        if not isinstance(trade_time, datetime):
+            trade_time = datetime.fromisoformat(str(trade_time).replace("Z", "+00:00"))
+        converted = await fx.convert(
+            Decimal(str(fee_amount)), fee_currency, base_currency, trade_time
+        )
+        item["base_fee_amount"] = str(converted)
+    except Exception as exc:
+        item["fee_conversion_error"] = str(exc)
+    return item
+
+
 @router.post("/record", status_code=status.HTTP_201_CREATED)
-async def create_record(payload: Dict[str, Any], current_user=Depends(get_current_user), ledger=Depends(get_ledger_service)):
+async def create_record(payload: Dict[str, Any], current_user=Depends(get_current_user), ledger=Depends(get_ledger_service), gateway=Depends(get_quote_gateway)):
     try:
         model = CreateLedgerRecordRequest.model_validate(_legacy_to_v2(payload))
+        await _validate_exchange_quantity(model, gateway)
         document = await ledger.create_record(current_user["id"], model.model_dump(mode="json", exclude_none=True))
         return ok({"record": _record_response(document)})
     except ValidationError as exc:
         raise HTTPException(422, detail=str(exc)) from exc
+    except (LookupError, ValueError) as exc:
+        raise HTTPException(422, detail=str(exc)) from exc
     except PositionConflict as exc:
         raise HTTPException(409, detail={"message": str(exc), "available_quantity": str(exc.available_quantity)}) from exc
+
+
+@router.post("/imports")
+async def import_records(payload: Dict[str, Any], current_user=Depends(get_current_user), ledger=Depends(get_ledger_service), gateway=Depends(get_quote_gateway)):
+    items = payload.get("items")
+    if not isinstance(items, list):
+        raise HTTPException(422, detail="items must be a list")
+
+    results = []
+    counts = {"success": 0, "duplicate": 0, "error": 0}
+    for index, item in enumerate(items):
+        try:
+            if not isinstance(item, dict):
+                raise ValueError("import row must be an object")
+            idempotency_key = str(item.get("idempotency_key") or "").strip()
+            if not idempotency_key:
+                raise ValueError("idempotency_key is required")
+            normalized_item = {**item, "idempotency_key": idempotency_key}
+            model = CreateLedgerRecordRequest.model_validate(
+                _legacy_to_v2(normalized_item)
+            )
+            await _validate_exchange_quantity(model, gateway)
+            document, created = await ledger.create_record_with_status(
+                current_user["id"],
+                model.model_dump(mode="json", exclude_none=True),
+            )
+            status_name = "success" if created else "duplicate"
+            counts[status_name] += 1
+            results.append({
+                "index": index,
+                "status": status_name,
+                "idempotency_key": idempotency_key,
+                "record": _record_response(document),
+            })
+        except (ValidationError, PositionConflict, ValueError, KeyError) as exc:
+            counts["error"] += 1
+            results.append({
+                "index": index,
+                "status": "error",
+                "idempotency_key": (
+                    str(item.get("idempotency_key") or "").strip()
+                    if isinstance(item, dict)
+                    else None
+                ),
+                "error": str(exc),
+            })
+
+    return ok({"results": results, "counts": counts})
 
 
 @router.get("/positions")
@@ -138,7 +235,7 @@ async def get_record(record_id: str, current_user=Depends(get_current_user), led
 
 
 @router.put("/record/{record_id}")
-async def update_record(record_id: str, payload: Dict[str, Any], current_user=Depends(get_current_user), ledger=Depends(get_ledger_service)):
+async def update_record(record_id: str, payload: Dict[str, Any], current_user=Depends(get_current_user), ledger=Depends(get_ledger_service), gateway=Depends(get_quote_gateway)):
     if not ObjectId.is_valid(record_id):
         raise HTTPException(422, detail="invalid record id")
     existing = await ledger.get_record(current_user["id"], record_id)
@@ -151,9 +248,12 @@ async def update_record(record_id: str, payload: Dict[str, Any], current_user=De
         merged[aliases.get(key, key)] = str(value) if key in {"price", "quantity", "commission"} else value
     try:
         model = CreateLedgerRecordRequest.model_validate(merged)
+        await _validate_exchange_quantity(model, gateway)
         document = await ledger.update_record(current_user["id"], record_id, model.model_dump(mode="json", exclude_none=True), version)
         return ok({"record": _record_response(document)})
     except ValidationError as exc:
+        raise HTTPException(422, detail=str(exc)) from exc
+    except (LookupError, ValueError) as exc:
         raise HTTPException(422, detail=str(exc)) from exc
     except VersionConflict as exc:
         raise HTTPException(409, detail={"message": str(exc), "current_version": exc.current_version}) from exc
@@ -175,10 +275,14 @@ async def delete_record(record_id: str, version: Optional[int] = None, current_u
 
 
 @router.get("/records")
-async def list_records(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=200), current_user=Depends(get_current_user), ledger=Depends(get_ledger_service)):
+async def list_records(base_currency: str = Query("CNY", pattern="^(CNY|USD|USDT)$"), page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=200), current_user=Depends(get_current_user), ledger=Depends(get_ledger_service), fx=Depends(get_fx_service)):
     documents = await ledger.list_records(current_user["id"])
     start = (page - 1) * page_size
-    return ok({"items": [_record_response(d) for d in documents[start:start + page_size]], "total": len(documents), "page": page, "page_size": page_size})
+    items = [
+        await _record_response_with_fee_conversion(document, base_currency, fx)
+        for document in documents[start:start + page_size]
+    ]
+    return ok({"items": items, "total": len(documents), "page": page, "page_size": page_size})
 
 
 @router.get("/asset-rules")

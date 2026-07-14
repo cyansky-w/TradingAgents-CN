@@ -5,8 +5,8 @@
         <select v-model="form.record_type" data-testid="record-type">
           <option value="trade">成交</option>
           <option value="opening_position">期初持仓</option>
-          <option value="transfer_in">转入</option>
-          <option value="transfer_out">转出</option>
+          <option v-if="form.market !== 'CRYPTO'" value="transfer_in">转入</option>
+          <option v-if="form.market !== 'CRYPTO'" value="transfer_out">转出</option>
         </select>
       </label>
       <label>市场
@@ -17,7 +17,6 @@
       </label>
       <label v-if="form.market === 'CRYPTO'">品种
         <select v-model="form.instrument_type" data-testid="instrument-type">
-          <option value="crypto_spot">现货</option>
           <option value="crypto_linear_perpetual">USDT 永续</option>
         </select>
       </label>
@@ -89,7 +88,7 @@ const quantityRule = reactive<AssetRules>({ quantity_type: 'integer', step: '100
 const isTransfer = computed(() => form.record_type === 'transfer_in' || form.record_type === 'transfer_out')
 const isPerpetual = computed(() => form.instrument_type === 'crypto_linear_perpetual')
 const supportsShort = computed(() => (form.market === 'HK' || form.market === 'US' || isPerpetual.value) && !isTransfer.value)
-const symbolPlaceholder = computed(() => form.market === 'CRYPTO' ? (isPerpetual.value ? 'BTC/USDT:USDT' : 'BTC/USDT') : '输入代码')
+const symbolPlaceholder = computed(() => form.market === 'CRYPTO' ? 'BTC/USDT:USDT' : '输入代码')
 const intentLabel = computed(() => `${form.position_side === 'short' ? '空头' : '多头'}${form.position_action === 'close' ? '平仓' : '开仓'}`)
 
 watch(() => props.initialValue, value => Object.assign(form, value), { deep: true })
@@ -97,10 +96,11 @@ watch([() => form.market, () => form.instrument_type, () => form.record_type], a
 watch([() => form.position_side, () => form.position_action], syncTradeSide, { immediate: true })
 
 function applyMarketRules() {
+  const switchingFromTransfer = form.market === 'CRYPTO' && isTransfer.value
   if (form.market === 'CN') Object.assign(form, { exchange: form.symbol?.startsWith('6') ? 'SSE' : 'SZSE', instrument_type: 'equity', quote_asset: 'CNY', position_side: 'long' })
   if (form.market === 'HK') Object.assign(form, { exchange: 'SEHK', instrument_type: 'equity', quote_asset: 'HKD' })
   if (form.market === 'US') Object.assign(form, { exchange: form.exchange || 'NASDAQ', instrument_type: 'equity', quote_asset: 'USD' })
-  if (form.market === 'CRYPTO') Object.assign(form, { exchange: form.exchange || 'binance', quote_asset: 'USDT' })
+  if (form.market === 'CRYPTO') Object.assign(form, { exchange: form.exchange || 'binance', instrument_type: 'crypto_linear_perpetual', quote_asset: 'USDT', record_type: switchingFromTransfer ? 'trade' : form.record_type, position_action: switchingFromTransfer ? 'open' : form.position_action })
   if (!supportsShort.value) form.position_side = 'long'
   if (isTransfer.value) { form.position_action = undefined; form.side = undefined }
   quantityRule.step = form.market === 'CN' ? '100' : '1'

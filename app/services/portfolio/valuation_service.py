@@ -48,9 +48,34 @@ class ValuationService:
             currency = str(item["quote_asset"])
             try:
                 market_value = await self._convert(item["market_value"], currency, base_currency, at)
-                cost_value = await self._convert(item.get("cost_value", "0"), currency, base_currency, at)
-                realized = await self._convert(item.get("realized_pnl", "0"), currency, base_currency, at)
-                unrealized = market_value - cost_value
+                realized = (
+                    await self._convert(
+                        item["realized_pnl"], currency, base_currency, at
+                    )
+                    if item.get("realized_pnl") is not None
+                    else None
+                )
+                if item.get("cost_value") is None or item.get("unrealized_pnl") is None:
+                    item.update({
+                        "converted": True,
+                        "cost_known": False,
+                        "base_currency": base_currency,
+                        "base_market_value": decimal_string(market_value),
+                        "base_cost_value": None,
+                        "base_realized_pnl": (
+                            decimal_string(realized) if realized is not None else None
+                        ),
+                        "base_unrealized_pnl": None,
+                    })
+                    included.append(item)
+                    total_market += market_value
+                    if realized is not None:
+                        total_realized += realized
+                    continue
+                cost_value = await self._convert(item["cost_value"], currency, base_currency, at)
+                unrealized = await self._convert(
+                    item["unrealized_pnl"], currency, base_currency, at
+                )
             except (LookupError, ValueError) as exc:
                 item["conversion_error"] = str(exc)
                 item["converted"] = False
@@ -59,16 +84,20 @@ class ValuationService:
 
             item.update({
                 "converted": True,
+                "cost_known": True,
                 "base_currency": base_currency,
                 "base_market_value": decimal_string(market_value),
                 "base_cost_value": decimal_string(cost_value),
-                "base_realized_pnl": decimal_string(realized),
+                "base_realized_pnl": (
+                    decimal_string(realized) if realized is not None else None
+                ),
                 "base_unrealized_pnl": decimal_string(unrealized),
             })
             included.append(item)
             total_market += market_value
             total_cost += cost_value
-            total_realized += realized
+            if realized is not None:
+                total_realized += realized
             total_unrealized += unrealized
 
         for item in included:

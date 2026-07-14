@@ -1,11 +1,12 @@
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 # Build a minimal app that mounts only the stocks router to avoid triggering app.main lifespan
 from app.routers import stocks as stocks_router
-from app.routers.auth import get_current_user
+from app.routers.auth_db import get_current_user
 
 
 def create_test_app():
@@ -58,10 +59,20 @@ def test_kline_invalid_period_returns_400(client):
 
 def test_news_ok_with_announcements_and_source(client):
     items = [
-        {"title": "公告样例", "source": "tushare", "time": "2024-09-02", "url": "http://x", "type": "announcement"},
-        {"title": "新闻样例", "source": "tushare", "time": "2024-09-02 10:00:00", "url": "http://y", "type": "news"},
+        {"title": "公告样例", "source": "tushare", "publish_time": "2024-09-02", "url": "http://x"},
+        {"title": "新闻样例", "source": "tushare", "publish_time": "2024-09-02 10:00:00", "url": "http://y"},
     ]
-    with patch("app.services.data_sources.manager.DataSourceManager.get_news_with_fallback", return_value=(items, "tushare")):
+    news_service = SimpleNamespace(query_news=AsyncMock(return_value=items))
+    with (
+        patch(
+            "app.services.news_data_service.get_news_data_service",
+            new=AsyncMock(return_value=news_service),
+        ),
+        patch(
+            "app.worker.akshare_sync_service.get_akshare_sync_service",
+            new=AsyncMock(return_value=SimpleNamespace()),
+        ),
+    ):
         resp = client.get("/api/stocks/000001/news", params={"days": 2, "limit": 2, "include_announcements": True})
         assert resp.status_code == 200
         body = resp.json()
@@ -71,6 +82,5 @@ def test_news_ok_with_announcements_and_source(client):
         assert data["days"] == 2
         assert data["limit"] == 2
         assert data["include_announcements"] is True
-        assert data["source"] == "tushare"
+        assert data["source"] == "database"
         assert isinstance(data["items"], list) and len(data["items"]) == 2
-

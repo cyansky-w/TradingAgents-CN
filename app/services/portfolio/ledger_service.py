@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 from bson import ObjectId
+from pymongo.errors import DuplicateKeyError
 
 from app.services.portfolio.position_calculator import PositionCalculator, PositionError
 from app.services.portfolio.types import decimal_string
@@ -42,11 +43,15 @@ class LedgerService:
         ]).to_list(length=None)
 
     async def create_record(self, user_id, payload):
+        document, _ = await self.create_record_with_status(user_id, payload)
+        return document
+
+    async def create_record_with_status(self, user_id, payload):
         key = payload.get("idempotency_key")
         if key:
             existing = await self.records.find_one({"user_id": user_id, "idempotency_key": key})
             if existing:
-                return existing
+                return existing, False
         now = datetime.now(timezone.utc).isoformat()
         doc = serialize_document(payload)
         doc.update({"user_id": user_id, "version": 1, "created_at": now, "updated_at": now})
@@ -54,9 +59,18 @@ class LedgerService:
             PositionCalculator.replay([*(await self._documents(user_id)), doc])
         except PositionError as exc:
             raise PositionConflict(str(exc), exc.available_quantity) from exc
-        result = await self.records.insert_one(doc)
+        try:
+            result = await self.records.insert_one(doc)
+        except DuplicateKeyError:
+            if key:
+                existing = await self.records.find_one(
+                    {"user_id": user_id, "idempotency_key": key}
+                )
+                if existing is not None:
+                    return existing, False
+            raise
         doc["_id"] = result.inserted_id
-        return doc
+        return doc, True
 
     async def update_record(self, user_id, record_id, payload, expected_version):
         object_id = ObjectId(record_id)
@@ -92,6 +106,11 @@ class LedgerService:
 
     async def get_record(self, user_id, record_id):
         return await self.records.find_one({"_id": ObjectId(record_id), "user_id": user_id})
+
+    async def get_by_idempotency_key(self, user_id, key):
+        return await self.records.find_one(
+            {"user_id": user_id, "idempotency_key": key}
+        )
 
     async def delete_record(self, user_id, record_id, expected_version=None):
         object_id = ObjectId(record_id)

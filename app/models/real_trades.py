@@ -8,6 +8,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field, model_validator
 from bson import ObjectId
 from app.models.user import PyObjectId
+from app.services.portfolio.asset_normalizer import AssetNormalizer
 from app.services.portfolio.types import (
     FeeType,
     InstrumentType,
@@ -51,6 +52,45 @@ class LedgerRecordBase(BaseModel):
 
     @model_validator(mode="after")
     def validate_record_semantics(self):
+        if (
+            self.market != Market.CRYPTO
+            and self.instrument_type != InstrumentType.EQUITY
+        ):
+            raise ValueError("non-crypto markets require equity instruments")
+
+        asset = AssetNormalizer.normalize(
+            self.market,
+            self.exchange,
+            self.symbol,
+            self.instrument_type,
+        )
+        self.market = asset.market
+        self.exchange = asset.exchange
+        self.symbol = asset.symbol
+        self.instrument_type = asset.instrument_type
+
+        if asset.market == Market.CRYPTO:
+            if asset.instrument_type != InstrumentType.CRYPTO_LINEAR_PERPETUAL:
+                raise ValueError("v1 supports USDT linear perpetuals only")
+            pair_quote = asset.symbol.split("/", 1)[1].split(":", 1)[0]
+            settlement = asset.symbol.rsplit(":", 1)[1]
+            if pair_quote != "USDT" or settlement != "USDT":
+                raise ValueError("v1 supports USDT linear perpetuals only")
+            expected_quote_asset = pair_quote
+        else:
+            expected_quote_asset = {
+                Market.CN: "CNY",
+                Market.HK: "HKD",
+                Market.US: "USD",
+            }[asset.market]
+        if self.quote_asset.upper() != expected_quote_asset:
+            raise ValueError(
+                f"quote_asset must be {expected_quote_asset} for {asset.symbol}"
+            )
+        self.quote_asset = expected_quote_asset
+        if self.fee_currency:
+            self.fee_currency = self.fee_currency.upper()
+
         if self.record_type == RecordType.TRADE:
             required = ("side", "position_action", "price")
             missing = [name for name in required if getattr(self, name) is None]
@@ -63,11 +103,15 @@ class LedgerRecordBase(BaseModel):
         if self.market == Market.CN and self.position_side == PositionSide.SHORT:
             raise ValueError("A-share short positions are not supported")
 
-        if (
-            self.instrument_type == InstrumentType.CRYPTO_SPOT
-            and self.position_side == PositionSide.SHORT
-        ):
-            raise ValueError("crypto spot short positions are not supported")
+        if self.instrument_type == InstrumentType.EQUITY:
+            quantity_error = AssetNormalizer.quantity_rules(
+                asset.market,
+                asset.exchange,
+                asset.symbol,
+                asset.instrument_type,
+            ).validate(self.quantity)
+            if quantity_error:
+                raise ValueError(quantity_error)
 
         if self.record_type in {RecordType.TRANSFER_IN, RecordType.TRANSFER_OUT}:
             if self.position_side != PositionSide.LONG:

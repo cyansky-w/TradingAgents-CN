@@ -7,7 +7,7 @@
 
 ## 1. Purpose
 
-Upgrade the existing real-trading module into a reliable real transaction ledger, position manager, and portfolio analysis system covering A-shares, Hong Kong stocks, US stocks, and cryptocurrency spot assets.
+Upgrade the existing real-trading module into a reliable real transaction ledger, position manager, and portfolio analysis system covering A-shares, Hong Kong stocks, US stocks, and USDT-margined linear cryptocurrency perpetuals.
 
 The first release uses manually entered or imported real fills. It does not connect to brokers or exchanges for order execution.
 
@@ -24,7 +24,7 @@ The first release uses manually entered or imported real fills. It does not conn
 - A-share board-lot validation.
 - Unit and precision handling for non-A-share assets.
 - Optional commission and fee accounting.
-- Cryptocurrency asset identity, quantity precision, quotes, and valuation.
+- USDT-margined linear cryptocurrency perpetual identity, quantity precision, quotes, and valuation.
 - User-selectable portfolio base currency, initially CNY, USD, and USDT.
 - Portfolio valuation, weights, and PnL in the selected base currency.
 
@@ -34,7 +34,7 @@ The first release uses manually entered or imported real fills. It does not conn
 - Broker or exchange order execution.
 - API key custody for trading accounts.
 - Open orders, cancellations, partial fills, or order routing.
-- A-share short selling and crypto spot short selling.
+- A-share short selling and all cryptocurrency spot trading.
 - Coin-margined futures, dated futures, options, and non-linear contracts.
 - Margin sufficiency checks, cross-versus-isolated risk behavior, liquidation, auto-deleveraging, and automatic stop loss.
 - Broker or exchange cash balances and complete account net-worth accounting.
@@ -82,7 +82,7 @@ Examples:
 (CN, SSE, 600519)
 (HK, SEHK, 00700)
 (US, NASDAQ, AAPL)
-(CRYPTO, binance, BTC/USDT)
+(CRYPTO, binance, BTC/USDT:USDT)
 ```
 
 #### Trade Ledger Service
@@ -120,7 +120,7 @@ Calculates market value, cost, realized PnL, unrealized PnL, total PnL, and posi
   "exchange": "SSE | SZSE | SEHK | NASDAQ | NYSE | binance | okx | ...",
   "symbol": "canonical symbol",
   "display_symbol": "user-facing symbol",
-  "instrument_type": "equity | crypto_spot | crypto_linear_perpetual",
+  "instrument_type": "equity | crypto_linear_perpetual",
   "base_asset": "optional, e.g. BTC",
   "quote_asset": "CNY | HKD | USD | USDT | BTC | ...",
   "name": "optional display name",
@@ -153,8 +153,8 @@ Field requirements depend on `record_type`:
 
 - `trade` requires side, position side, position action, price, quantity, gross amount, and trade time.
 - `opening_position` requires position side, entry price, quantity, and effective time; side and position action are omitted.
-- `transfer_in` and `transfer_out` are long-only equity or crypto-spot events. They require quantity and effective time, while price is optional cost-basis metadata. They do not apply to perpetual positions.
-- `gross_amount` is cash consideration for equities and crypto spot, but notional value for linear perpetual fills.
+- `transfer_in` and `transfer_out` are long-only equity events. They require quantity and effective time, while price is optional cost-basis metadata. They do not apply to perpetual positions.
+- `gross_amount` is cash consideration for equities, but notional value for linear perpetual fills.
 
 `margin_mode` is retained only as optional source metadata. It does not change first-release accounting. Leverage and initial margin are optional and are used only for display or margin-return calculations; they do not trigger liquidation or cap losses.
 
@@ -173,9 +173,9 @@ Field requirements depend on `record_type`:
 - A-shares: positive integer quantity and a multiple of 100.
 - Hong Kong stocks: positive integer quantity with a UI step of 1 for this release.
 - US stocks: positive integer quantity with a UI step of 1 for this release.
-- Cryptocurrency spot and linear perpetuals: positive decimal quantity, rounded or rejected according to exchange amount precision.
+- Cryptocurrency linear perpetuals: positive decimal quantity, rounded or rejected according to exchange amount precision.
 - The system does not use the term "board lot" outside A-shares in this release.
-- A-shares and crypto spot are long-only.
+- A-shares are long-only.
 - Hong Kong stocks, US stocks, and crypto linear perpetuals support separate long and short positions.
 - Closing more than the reconstructed quantity for the selected position side is rejected.
 
@@ -252,7 +252,7 @@ For USDT-margined linear perpetuals, quantity is expressed in base-asset units a
 
 Funding fees are optional ledger amounts. When supplied, they affect total realized PnL but do not change entry price or position quantity.
 
-Opening-position records establish quantity and average cost without realized PnL. Transfer-in records require an explicit cost basis if they should contribute to PnL; otherwise their cost basis is marked unknown. Transfer-out records reduce quantity without being classified as a profitable or losing trade.
+Opening-position records establish quantity and average cost without realized PnL. Equity transfer-in records require an explicit cost basis if they should contribute to PnL; otherwise their cost basis is marked unknown. Transfer-out records reduce quantity without being classified as a profitable or losing trade.
 
 Historical records are always replayed by `(trade_time, created_at, _id)`. Editing or deleting a historical record recalculates all later position and PnL results for both the old and new canonical asset and position side when identity fields change.
 
@@ -266,7 +266,7 @@ Normalized quote response:
 {
   "market": "CRYPTO",
   "exchange": "binance",
-  "symbol": "BTC/USDT",
+  "symbol": "BTC/USDT:USDT",
   "price": "65000.12",
   "quote_currency": "USDT",
   "source": "ccxt",
@@ -422,9 +422,9 @@ The migration is idempotent and supports dry-run mode.
 
 ## 15. Acceptance Criteria
 
-- A user can record A-share, Hong Kong, US, and crypto spot fills in one real portfolio.
+- A user can record A-share, Hong Kong, US, and USDT linear perpetual fills in one real portfolio.
 - A user can record long and short Hong Kong, US, and USDT linear perpetual positions.
-- A-shares and crypto spot remain long-only.
+- A-shares remain long-only.
 - A-share quantities enforce multiples of 100; other supported assets do not inherit this rule.
 - Crypto quantities preserve exchange-compatible decimal precision.
 - Positions and realized PnL are reconstructed correctly from chronological fills.

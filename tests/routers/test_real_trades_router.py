@@ -1,18 +1,60 @@
 from bson import ObjectId
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from decimal import Decimal
 import pytest
 
 import app.routers.real_trades as real_trades
+from app.services.portfolio.asset_normalizer import QuantityRules
+from app.services.portfolio.types import Market
 
 
 class FakeLedger:
+    def __init__(self):
+        self.by_idempotency_key = {}
+
     async def create_record(self, user_id, payload):
-        return {"_id": ObjectId(), "user_id": user_id, "version": 1, **payload,
-                "created_at": "2026-07-14T12:00:00+00:00", "updated_at": "2026-07-14T12:00:00+00:00"}
+        document = {"_id": ObjectId(), "user_id": user_id, "version": 1, **payload,
+                    "created_at": "2026-07-14T12:00:00+00:00", "updated_at": "2026-07-14T12:00:00+00:00"}
+        if payload.get("idempotency_key"):
+            self.by_idempotency_key[payload["idempotency_key"]] = document
+        return document
+
+    async def create_record_with_status(self, user_id, payload):
+        existing = await self.get_by_idempotency_key(
+            user_id, payload.get("idempotency_key")
+        )
+        if existing is not None:
+            return existing, False
+        return await self.create_record(user_id, payload), True
+
+    async def get_by_idempotency_key(self, user_id, key):
+        return self.by_idempotency_key.get(key)
 
     async def get_record(self, user_id, record_id):
         return None
+
+    async def list_records(self, user_id):
+        return [{
+            "_id": ObjectId(),
+            "user_id": user_id,
+            "record_type": "trade",
+            "market": "CRYPTO",
+            "exchange": "binance",
+            "symbol": "BTC/USDT:USDT",
+            "instrument_type": "crypto_linear_perpetual",
+            "quote_asset": "USDT",
+            "side": "buy",
+            "position_side": "long",
+            "position_action": "open",
+            "price": "60000",
+            "quantity": "0.01",
+            "gross_amount": "600",
+            "fee_amount": "0.01",
+            "fee_currency": "BNB",
+            "trade_time": "2026-07-14T12:00:00+00:00",
+            "version": 1,
+        }]
 
 
 class FakePortfolio:
@@ -35,6 +77,17 @@ class FakePreference:
         return {"user_id": user_id, "base_currency": base_currency}
 
 
+class FakeQuoteGateway:
+    async def get_asset_rules(self, market, exchange, symbol, instrument_type):
+        if str(market) == "CRYPTO":
+            return QuantityRules(
+                "decimal", Decimal("0.001"), Decimal("0.001"), 3, Market.CRYPTO
+            )
+        return QuantityRules(
+            "integer", Decimal("1"), Decimal("1"), 0, Market(str(market))
+        )
+
+
 @pytest.fixture
 def client():
     app = FastAPI()
@@ -44,6 +97,7 @@ def client():
     app.dependency_overrides[real_trades.get_ledger_service] = lambda: FakeLedger()
     app.dependency_overrides[real_trades.get_portfolio_service] = lambda: FakePortfolio()
     app.dependency_overrides[real_trades.get_preference_service] = lambda: preference
+    app.dependency_overrides[real_trades.get_quote_gateway] = lambda: FakeQuoteGateway()
     return TestClient(app, raise_server_exceptions=False)
 
 
@@ -81,16 +135,92 @@ def test_a_share_short_returns_422(client):
     assert "A-share short" in str(response.json())
 
 
+def test_crypto_quantity_must_match_exchange_step(client):
+    response = client.post(
+        "/api/real-trades/record",
+        json=us_short_open_payload(
+            market="CRYPTO",
+            exchange="binance",
+            symbol="BTC/USDT:USDT",
+            instrument_type="crypto_linear_perpetual",
+            quote_asset="USDT",
+            quantity="0.0005",
+        ),
+    )
+    assert response.status_code == 422
+    assert "quantity must be at least 0.001" in str(response.json())
+
+
 def test_positions_accept_base_currency(client):
     response = client.get("/api/real-trades/positions", params={"base_currency": "USDT"})
     assert response.status_code == 200
     assert response.json()["data"]["base_currency"] == "USDT"
 
 
+def test_records_convert_fee_to_selected_base_currency_at_trade_time(client, monkeypatch):
+    class FakeFx:
+        async def convert(self, amount, source, target, at):
+            assert amount == Decimal("0.01")
+            assert source == "BNB"
+            assert target == "CNY"
+            assert at.isoformat() == "2026-07-14T12:00:00+00:00"
+            return Decimal("2.5")
+
+    monkeypatch.setattr(real_trades, "FxService", lambda db=None: FakeFx())
+    monkeypatch.setattr(real_trades, "get_mongo_db", lambda: {})
+
+    response = client.get(
+        "/api/real-trades/records",
+        params={"base_currency": "CNY"},
+    )
+
+    assert response.status_code == 200
+    record = response.json()["data"]["items"][0]
+    assert record["fee_amount"] == "0.01"
+    assert record["fee_currency"] == "BNB"
+    assert record["base_fee_amount"] == "2.5"
+    assert record["base_fee_currency"] == "CNY"
+    assert record["fee_conversion_error"] is None
+
+
 def test_portfolio_preference_round_trip(client):
     assert client.put("/api/real-trades/portfolio-preference", json={"base_currency": "USD"}).status_code == 200
     loaded = client.get("/api/real-trades/portfolio-preference")
     assert loaded.json()["data"]["base_currency"] == "USD"
+
+
+def test_imports_report_success_duplicate_and_error(client):
+    valid = us_short_open_payload(idempotency_key="row-1")
+    spaced_duplicate = {**valid, "idempotency_key": " row-1 "}
+    invalid = us_short_open_payload(
+        idempotency_key="row-2",
+        market="CN",
+        exchange="SSE",
+        symbol="600519",
+        quote_asset="CNY",
+        position_side="long",
+        side="buy",
+        quantity="150",
+    )
+
+    response = client.post(
+        "/api/real-trades/imports",
+        json={"items": [valid, spaced_duplicate, invalid]},
+    )
+
+    assert response.status_code == 200
+    results = response.json()["data"]["results"]
+    assert [item["status"] for item in results] == [
+        "success",
+        "duplicate",
+        "error",
+    ]
+    assert response.json()["data"]["counts"] == {
+        "success": 1,
+        "duplicate": 1,
+        "error": 1,
+    }
+    assert results[1]["idempotency_key"] == "row-1"
 
 
 def test_invalid_object_id_returns_422(client):

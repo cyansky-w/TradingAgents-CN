@@ -53,3 +53,17 @@ it('persists changed base currency before refreshing valuations', async () => {
   expect(saveOrder).toBeLessThan(refreshOrder)
   expect(realTradesApi.getPositions).toHaveBeenLastCalledWith('USD')
 })
+
+it('loads transaction records in the selected base currency', async () => {
+  const wrapper = mountPage()
+  await flushPromises()
+
+  await wrapper.get('.toolbar button').trigger('click')
+  await flushPromises()
+
+  expect(realTradesApi.getRecords).toHaveBeenCalledWith({
+    page: 1,
+    page_size: 100,
+    base_currency: 'USDT',
+  })
+})

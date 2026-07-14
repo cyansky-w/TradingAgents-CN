@@ -30,13 +30,13 @@ def test_crypto_perpetual_trade_keeps_decimal_strings():
 def test_transfer_does_not_require_trade_side():
     payload = CreateLedgerRecordRequest(
         record_type="transfer_in",
-        market="CRYPTO",
-        exchange="binance",
-        symbol="BTC/USDT",
-        instrument_type="crypto_spot",
-        quote_asset="USDT",
+        market="US",
+        exchange="NASDAQ",
+        symbol="AAPL",
+        instrument_type="equity",
+        quote_asset="USD",
         position_side="long",
-        quantity="0.5",
+        quantity="5",
         trade_time="2026-07-14T12:00:00Z",
     )
 
@@ -79,8 +79,8 @@ def test_a_share_rejects_short_position():
         )
 
 
-def test_crypto_spot_rejects_short_position():
-    with pytest.raises(ValidationError, match="crypto spot short"):
+def test_v1_rejects_crypto_spot_records():
+    with pytest.raises(ValidationError, match="USDT linear perpetuals only"):
         CreateLedgerRecordRequest(
             record_type="trade",
             market="CRYPTO",
@@ -88,8 +88,8 @@ def test_crypto_spot_rejects_short_position():
             symbol="BTC/USDT",
             instrument_type="crypto_spot",
             quote_asset="USDT",
-            side="sell",
-            position_side="short",
+            side="buy",
+            position_side="long",
             position_action="open",
             price="65000",
             quantity="0.1",

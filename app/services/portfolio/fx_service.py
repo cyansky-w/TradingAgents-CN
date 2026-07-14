@@ -37,25 +37,21 @@ class FxService:
         if source == target:
             return FxRate(source, target, Decimal("1"), [source], "identity", at.isoformat())
 
-        direct = await self._get_direct_rate(source, target, at)
-        if direct is not None:
-            return FxRate(source, target, direct, [source, target], "direct", at.isoformat())
-
-        inverse = await self._get_direct_rate(target, source, at)
-        if inverse not in {None, Decimal("0")}:
+        pair = await self._get_pair_rate(source, target, at)
+        if pair is not None:
+            rate, rate_source = pair
             return FxRate(
-                source, target, Decimal("1") / inverse,
-                [source, target], "inverse", at.isoformat()
+                source, target, rate, [source, target], rate_source, at.isoformat()
             )
 
         for bridge in self.BRIDGES:
             if bridge in {source, target}:
                 continue
-            first = await self._get_direct_rate(source, bridge, at)
-            second = await self._get_direct_rate(bridge, target, at)
+            first = await self._get_pair_rate(source, bridge, at)
+            second = await self._get_pair_rate(bridge, target, at)
             if first is not None and second is not None:
                 return FxRate(
-                    source, target, first * second,
+                    source, target, first[0] * second[0],
                     [source, bridge, target], "multi-hop", at.isoformat()
                 )
 
@@ -65,6 +61,17 @@ class FxService:
         self, amount: Decimal, source: str, target: str, at: datetime
     ) -> Decimal:
         return amount * (await self.get_rate(source, target, at)).rate
+
+    async def _get_pair_rate(
+        self, source: str, target: str, at: datetime
+    ) -> Optional[tuple[Decimal, str]]:
+        direct = await self._get_direct_rate(source, target, at)
+        if direct is not None:
+            return direct, "direct"
+        inverse = await self._get_direct_rate(target, source, at)
+        if inverse not in {None, Decimal("0")}:
+            return Decimal("1") / inverse, "inverse"
+        return None
 
     async def _get_direct_rate(
         self, source: str, target: str, at: datetime
@@ -79,15 +86,22 @@ class FxService:
     ) -> Optional[Decimal]:
         import yfinance as yf
 
-        symbol = f"{source}{target}=X"
+        symbols = [f"{source}{target}=X"]
         if {source, target} == {"USD", "USDT"}:
-            symbol = "USDT-USD" if source == "USDT" else "USDUSDT=X"
+            symbols = ["USDT-USD" if source == "USDT" else "USDUSDT=X"]
+        elif target == "USD":
+            symbols.append(f"{source}-USD")
         start = at.date().isoformat()
         end = (at.date() + timedelta(days=1)).isoformat()
-        history = yf.download(symbol, start=start, end=end, progress=False)
-        if history.empty:
-            return None
-        value = history["Close"].dropna().iloc[-1]
-        if hasattr(value, "iloc"):
-            value = value.iloc[0]
-        return Decimal(str(value))
+        for symbol in symbols:
+            try:
+                history = yf.download(symbol, start=start, end=end, progress=False)
+            except Exception:
+                continue
+            if history.empty:
+                continue
+            value = history["Close"].dropna().iloc[-1]
+            if hasattr(value, "iloc"):
+                value = value.iloc[0]
+            return Decimal(str(value))
+        return None
