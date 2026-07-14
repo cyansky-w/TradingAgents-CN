@@ -379,6 +379,22 @@ async def create_database_indexes(db):
         await real_trades.create_index([("user_id", 1), ("code", 1)])
         await real_trades.create_index([("user_id", 1), ("side", 1)])
         await real_trades.create_index([("user_id", 1), ("tags", 1)])
+        await real_trades.create_index([("user_id", 1), ("trade_time", -1)])
+        await real_trades.create_index([
+            ("user_id", 1), ("market", 1), ("exchange", 1), ("symbol", 1),
+            ("position_side", 1), ("trade_time", 1),
+        ])
+        await real_trades.create_index(
+            [("user_id", 1), ("idempotency_key", 1)],
+            unique=True,
+            partialFilterExpression={"idempotency_key": {"$type": "string", "$ne": ""}},
+        )
+        await real_trades.create_index([("user_id", 1), ("analysis_id", 1)])
+        await db["portfolio_preferences"].create_index([("user_id", 1)], unique=True)
+        await db["portfolio_fx_rates"].create_index(
+            [("source", 1), ("target", 1), ("rate_date", 1), ("provider", 1)],
+            unique=True,
+        )
 
         logger.info("✅ 数据库索引创建完成")
 
