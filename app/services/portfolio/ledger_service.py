@@ -89,3 +89,28 @@ class LedgerService:
         if symbol is not None:
             documents = [d for d in documents if d.get("symbol") == symbol]
         return [state for state in PositionCalculator.replay(documents) if state.quantity > Decimal("0")]
+
+    async def get_record(self, user_id, record_id):
+        return await self.records.find_one({"_id": ObjectId(record_id), "user_id": user_id})
+
+    async def delete_record(self, user_id, record_id, expected_version=None):
+        object_id = ObjectId(record_id)
+        existing = await self.records.find_one({"_id": object_id, "user_id": user_id})
+        if existing is None:
+            raise LookupError("record not found")
+        if expected_version is not None and existing.get("version", 1) != expected_version:
+            raise VersionConflict(existing.get("version", 1))
+        remaining = [d for d in await self._documents(user_id) if d["_id"] != object_id]
+        try:
+            PositionCalculator.replay(remaining)
+        except PositionError as exc:
+            raise PositionConflict(str(exc), exc.available_quantity) from exc
+        await self.records.delete_one({"_id": object_id, "user_id": user_id})
+        await self.audit.insert_one({
+            "action": "delete", "record_id": object_id, "user_id": user_id,
+            "previous": existing, "new": None,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+
+    async def list_records(self, user_id):
+        return await self._documents(user_id)
