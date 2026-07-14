@@ -136,7 +136,7 @@ export const realTradesApi = {
   async createRecord(data: CreateTradePayload | CreateLedgerRecordPayload) {
     return ApiClient.post<{ record: RealTradeRecord }>('/api/real-trades/record', data, { showLoading: true })
   },
-  async updateRecord(id: string, data: UpdateTradePayload) {
+  async updateRecord(id: string, data: UpdateTradePayload | CreateLedgerRecordPayload) {
     return ApiClient.put<{ message: string }>(`/api/real-trades/record/${id}`, data, { showLoading: true })
   },
   async deleteRecord(id: string) {

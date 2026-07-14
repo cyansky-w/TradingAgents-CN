@@ -158,109 +158,11 @@
     <el-dialog
       v-model="addDialogVisible"
       :title="editingId ? '编辑交易记录' : '新增交易记录'"
-      width="520px"
-      @opened="onAddDialogOpened"
+      width="680px"
     >
-      <el-form :model="form" label-width="90px">
-        <el-form-item label="股票代码" required>
-          <el-input
-            v-model="form.code"
-            placeholder="A股:600519 | 港股:0700 | 美股:AAPL"
-            @input="detectMarket"
-          />
-          <div v-if="detectedMarket" style="margin-top: 4px">
-            <el-tag v-if="detectedMarket === 'CN'" type="success" size="small">A股 (CNY)</el-tag>
-            <el-tag v-else-if="detectedMarket === 'HK'" type="warning" size="small"
-              >港股 (HKD)</el-tag
-            >
-            <el-tag v-else-if="detectedMarket === 'US'" type="info" size="small">美股 (USD)</el-tag>
-            <span style="margin-left: 8px; font-size: 12px; color: #909399">
-              {{ detectedMarket === 'CN' ? 'T+1结算' : 'T+0结算' }}
-            </span>
-          </div>
-        </el-form-item>
-        <el-form-item label="交易类型" required>
-          <el-radio-group v-model="form.side">
-            <el-radio-button label="buy">买入</el-radio-button>
-            <el-radio-button label="sell">卖出</el-radio-button>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item label="交易日期" required>
-          <el-date-picker
-            v-model="form.trade_date"
-            type="datetime"
-            placeholder="选择时间"
-            format="YYYY-MM-DD HH:mm"
-            value-format="YYYY-MM-DDTHH:mm:ss"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-row :gutter="12">
-          <el-col :span="12">
-            <el-form-item label="成交单价" required>
-              <el-input-number
-                v-model="form.price"
-                :min="0.01"
-                :precision="2"
-                style="width: 100%"
-              />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="数量(股)" required>
-              <el-input-number v-model="form.quantity" :min="1" style="width: 100%" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="12">
-          <el-col :span="12">
-            <el-form-item label="预估金额">
-              <el-input :model-value="estimatedAmount" disabled />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="手续费">
-              <el-input-number
-                v-model="form.commission"
-                :min="0"
-                :precision="2"
-                style="width: 100%"
-              />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-form-item label="交易原因" required>
-          <el-input
-            v-model="form.reason"
-            type="textarea"
-            :rows="2"
-            placeholder="记录交易原因，便于复盘"
-          />
-        </el-form-item>
-        <el-form-item label="标签">
-          <el-select
-            v-model="form.tags"
-            multiple
-            filterable
-            allow-create
-            placeholder="输入后回车"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="备注">
-          <el-input
-            v-model="form.notes"
-            type="textarea"
-            :rows="2"
-            placeholder="止损计划、后续跟踪等"
-          />
-        </el-form-item>
-      </el-form>
+      <TradeRecordForm :initial-value="formInitial" :submitting="submitting" @submit="submitRecord" />
       <template #footer>
         <el-button @click="addDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitAddRecord" :loading="submitting">{{
-          editingId ? '确认修改' : '确认添加'
-        }}</el-button>
       </template>
     </el-dialog>
 
@@ -400,11 +302,13 @@ import {
 } from 'echarts/components'
 import {
   realTradesApi,
+  type CreateLedgerRecordPayload,
   type RealPositionItem,
   type RealTradeRecord,
   type DashboardData
 } from '@/api/realTrades'
 import { formatDateTime } from '@/utils/datetime'
+import TradeRecordForm from './components/TradeRecordForm.vue'
 
 use([
   CanvasRenderer,
@@ -489,7 +393,6 @@ const loadingPositions = ref(false)
 const addDialogVisible = ref(false)
 const submitting = ref(false)
 const editingId = ref<string | null>(null)
-const detectedMarket = ref('')
 
 const nowStr = () => {
   const d = new Date()
@@ -497,96 +400,38 @@ const nowStr = () => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
-const form = reactive({
-  code: '',
-  side: 'buy' as 'buy' | 'sell',
-  price: 0,
-  quantity: 100,
-  commission: 0,
-  trade_date: nowStr(),
-  reason: '',
-  tags: [] as string[],
-  notes: ''
+const makeDefaultRecord = (): CreateLedgerRecordPayload => ({
+  record_type: 'trade', market: 'CN', exchange: 'SSE', symbol: '',
+  instrument_type: 'equity', quote_asset: 'CNY', side: 'buy',
+  position_side: 'long', position_action: 'open', price: '', quantity: '100',
+  fee_amount: '', fee_currency: 'CNY', trade_time: nowStr(), reason: '', tags: [], notes: null
 })
-
-const estimatedAmount = computed(() => {
-  const amt = (form.price || 0) * (form.quantity || 0)
-  return '¥' + amt.toFixed(2)
-})
-
-function detectMarket() {
-  const code = form.code.trim().toUpperCase()
-  if (!code) {
-    detectedMarket.value = ''
-    return
-  }
-  if (/^[A-Z]+$/.test(code)) {
-    detectedMarket.value = 'US'
-    return
-  }
-  if (/^\d{4,5}$/.test(code) || code.endsWith('.HK')) {
-    detectedMarket.value = 'HK'
-    return
-  }
-  if (/^\d{6}$/.test(code)) {
-    detectedMarket.value = 'CN'
-    return
-  }
-  detectedMarket.value = 'CN'
-}
+const formInitial = ref<CreateLedgerRecordPayload>(makeDefaultRecord())
 
 function openAddDialog() {
   editingId.value = null
-  form.code = ''
-  form.side = 'buy'
-  form.price = 0
-  form.quantity = 100
-  form.commission = 0
-  form.trade_date = nowStr()
-  form.reason = ''
-  form.tags = []
-  form.notes = ''
-  detectedMarket.value = ''
+  formInitial.value = makeDefaultRecord()
   addDialogVisible.value = true
 }
 
 async function openEditDialog(row: RealTradeRecord) {
   editingId.value = row.id
-  form.code = row.code
-  form.side = row.side
-  form.price = row.price
-  form.quantity = row.quantity
-  form.commission = row.commission
-  form.trade_date = row.trade_date
-  form.reason = row.reason
-  form.tags = [...row.tags]
-  form.notes = row.notes || ''
-  detectMarket()
+  const market = row.market as 'CN' | 'HK' | 'US'
+  formInitial.value = {
+    record_type: 'trade', market,
+    exchange: market === 'CN' ? (row.code.startsWith('6') ? 'SSE' : 'SZSE') : market === 'HK' ? 'SEHK' : 'NASDAQ',
+    symbol: row.code, instrument_type: 'equity', quote_asset: row.currency,
+    side: row.side, position_side: 'long', position_action: row.side === 'buy' ? 'open' : 'close',
+    price: String(row.price), quantity: String(row.quantity), fee_amount: String(row.commission || 0),
+    fee_currency: row.currency, trade_time: row.trade_date, reason: row.reason,
+    tags: [...row.tags], notes: row.notes || null, version: (row as any).version
+  }
   addDialogVisible.value = true
 }
 
-function onAddDialogOpened() {
-  // optional focus
-}
-
-async function submitAddRecord() {
-  if (!form.code || !form.price || !form.quantity || !form.reason) {
-    ElMessage.warning('请填写必填项')
-    return
-  }
+async function submitRecord(payload: CreateLedgerRecordPayload) {
   try {
     submitting.value = true
-    const payload = {
-      code: form.code,
-      side: form.side,
-      price: form.price,
-      quantity: form.quantity,
-      commission: form.commission || 0,
-      trade_date: form.trade_date,
-      reason: form.reason,
-      tags: form.tags,
-      notes: form.notes || null
-    }
     if (editingId.value) {
       const res = await realTradesApi.updateRecord(editingId.value, payload)
       if (res.success) {
