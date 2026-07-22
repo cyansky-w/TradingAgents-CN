@@ -19,7 +19,7 @@ def to_str_id(v: Any) -> str:
 
 
 # 枚举类型定义
-MarketType = Literal["CN", "HK", "US"]  # 市场类型
+MarketType = Literal["CN", "HK", "US", "CRYPTO"]  # 市场类型
 ExchangeType = Literal["SZSE", "SSE", "SEHK", "NYSE", "NASDAQ"]  # 交易所
 StockStatus = Literal["L", "D", "P"]  # 上市状态: L-上市 D-退市 P-暂停
 CurrencyType = Literal["CNY", "HKD", "USD"]  # 货币类型

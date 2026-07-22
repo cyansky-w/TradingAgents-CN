@@ -39,6 +39,9 @@ class DataSourceCode(str, Enum):
     ALPHA_VANTAGE = "alpha_vantage"  # Alpha Vantage - 美股技术分析
     IEX_CLOUD = "iex_cloud"       # IEX Cloud - 美股实时数据
     
+    # ==================== 加密货币数据源 ====================
+    CCXT = "ccxt"              # CCXT - 统一加密货币交易所接口
+
     # ==================== 港股数据源 ====================
     # 注意：AKShare 也支持港股，已在上面定义
     
@@ -249,6 +252,21 @@ DATA_SOURCE_REGISTRY: Dict[str, DataSourceInfo] = {
         features=["经济数据", "金融数据", "全球覆盖"],
     ),
     
+    # CCXT
+    DataSourceCode.CCXT: DataSourceInfo(
+        code=DataSourceCode.CCXT,
+        name="CCXT",
+        display_name="CCXT (加密货币)",
+        provider="CCXT Open Source",
+        description="统一的加密货币交易所接口，支持 Binance、OKX、Bybit 等 100+ 交易所",
+        supported_markets=["crypto"],
+        requires_api_key=False,
+        is_free=True,
+        official_website="https://ccxt.trade",
+        documentation_url="https://docs.ccxt.com",
+        features=["多交易所", "实时行情", "历史K线", "跨交易所比价", "完全免费"],
+    ),
+
     # Local File
     DataSourceCode.LOCAL_FILE: DataSourceInfo(
         code=DataSourceCode.LOCAL_FILE,

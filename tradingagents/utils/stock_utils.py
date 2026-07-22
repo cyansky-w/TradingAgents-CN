@@ -17,6 +17,7 @@ class StockMarket(Enum):
     CHINA_A = "china_a"      # 中国A股
     HONG_KONG = "hong_kong"  # 港股
     US = "us"                # 美股
+    CRYPTO = "crypto"        # 加密货币
     UNKNOWN = "unknown"      # 未知
 
 
@@ -38,6 +39,11 @@ class StockUtils:
             return StockMarket.UNKNOWN
 
         ticker = str(ticker).strip().upper()
+
+        # 加密货币：包含 '/' 分隔符（CCXT 标准格式，如 BTC/USDT）
+        # 可能带 @exchange 后缀（如 BTC/USDT@binance）
+        if '/' in ticker:
+            return StockMarket.CRYPTO
 
         # 中国A股：6位数字
         if re.match(r'^\d{6}$', ticker):
@@ -83,14 +89,56 @@ class StockUtils:
     def is_us_stock(ticker: str) -> bool:
         """
         判断是否为美股
-        
+
         Args:
             ticker: 股票代码
-            
+
         Returns:
             bool: 是否为美股
         """
         return StockUtils.identify_stock_market(ticker) == StockMarket.US
+
+    @staticmethod
+    def is_crypto(ticker: str) -> bool:
+        """
+        判断是否为加密货币
+
+        Args:
+            ticker: 交易对代码
+
+        Returns:
+            bool: 是否为加密货币
+        """
+        return StockUtils.identify_stock_market(ticker) == StockMarket.CRYPTO
+
+    @staticmethod
+    def parse_crypto_symbol(ticker: str) -> Dict:
+        """
+        解析加密货币 ticker 为组件
+
+        格式: BASE/QUOTE[@exchange]
+
+        Args:
+            ticker: 加密货币代码
+
+        Returns:
+            Dict: {"symbol": "BTC/USDT", "base": "BTC", "quote": "USDT", "exchange": "binance"}
+        """
+        result = {"symbol": ticker, "base": "", "quote": "", "exchange": "binance"}
+
+        if "@" in ticker:
+            symbol_part, exchange = ticker.rsplit("@", 1)
+            result["symbol"] = symbol_part
+            result["exchange"] = exchange.lower()
+        else:
+            symbol_part = ticker
+
+        if "/" in symbol_part:
+            parts = symbol_part.split("/")
+            result["base"] = parts[0].upper()
+            result["quote"] = parts[1].upper()
+
+        return result
     
     @staticmethod
     def get_currency_info(ticker: str) -> Tuple[str, str]:
@@ -111,6 +159,8 @@ class StockUtils:
             return "港币", "HK$"
         elif market == StockMarket.US:
             return "美元", "$"
+        elif market == StockMarket.CRYPTO:
+            return "USDT", "$"
         else:
             return "未知", "?"
     
@@ -128,11 +178,13 @@ class StockUtils:
         market = StockUtils.identify_stock_market(ticker)
         
         if market == StockMarket.CHINA_A:
-            return "china_unified"  # 使用统一的中国股票数据源
+            return "china_unified"
         elif market == StockMarket.HONG_KONG:
-            return "yahoo_finance"  # 港股使用Yahoo Finance
+            return "yahoo_finance"
         elif market == StockMarket.US:
-            return "yahoo_finance"  # 美股使用Yahoo Finance
+            return "yahoo_finance"
+        elif market == StockMarket.CRYPTO:
+            return "ccxt"
         else:
             return "unknown"
     
@@ -181,10 +233,11 @@ class StockUtils:
             StockMarket.CHINA_A: "中国A股",
             StockMarket.HONG_KONG: "港股",
             StockMarket.US: "美股",
+            StockMarket.CRYPTO: "加密货币",
             StockMarket.UNKNOWN: "未知市场"
         }
-        
-        return {
+
+        result = {
             "ticker": ticker,
             "market": market.value,
             "market_name": market_names[market],
@@ -193,8 +246,17 @@ class StockUtils:
             "data_source": data_source,
             "is_china": market == StockMarket.CHINA_A,
             "is_hk": market == StockMarket.HONG_KONG,
-            "is_us": market == StockMarket.US
+            "is_us": market == StockMarket.US,
+            "is_crypto": market == StockMarket.CRYPTO,
         }
+
+        if market == StockMarket.CRYPTO:
+            parsed = StockUtils.parse_crypto_symbol(ticker)
+            result["base"] = parsed["base"]
+            result["quote"] = parsed["quote"]
+            result["exchange"] = parsed["exchange"]
+
+        return result
 
 
 # 便捷函数，保持向后兼容

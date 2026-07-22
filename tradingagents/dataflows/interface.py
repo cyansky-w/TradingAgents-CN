@@ -49,6 +49,15 @@ except (ImportError, AttributeError) as e:
     def get_hk_stock_info_akshare(*args, **kwargs):
         return None
 
+# 导入加密货币工具
+try:
+    from .providers.crypto.ccxt_provider import get_ccxt_provider
+    from tradingagents.utils.stock_utils import StockUtils
+    CCXT_CRYPTO_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"⚠️ 加密货币工具不可用: {e}")
+    CCXT_CRYPTO_AVAILABLE = False
+
 
 # ==================== 数据源配置读取 ====================
 
@@ -1929,6 +1938,9 @@ def get_stock_data_by_market(symbol: str, start_date: str = None, end_date: str 
         elif market_info['is_hk']:
             # 港股
             return get_hk_stock_data_unified(symbol, start_date, end_date)
+        elif market_info['is_crypto']:
+            # 加密货币
+            return get_crypto_data_unified(symbol, start_date, end_date)
         else:
             # 美股或其他
             # 导入美股数据提供器（支持新旧路径）
@@ -1943,3 +1955,115 @@ def get_stock_data_by_market(symbol: str, start_date: str = None, end_date: str 
     except Exception as e:
         logger.error(f"❌ 获取股票数据失败: {e}")
         return f"❌ 获取股票{symbol}数据失败: {e}"
+
+
+# ==================== 加密货币数据接口 ====================
+
+def get_crypto_data_unified(ticker: str, start_date: str = None, end_date: str = None, timeframe: str = "1d") -> str:
+    """
+    获取加密货币行情数据
+
+    Args:
+        ticker: 完整 ticker，如 BTC/USDT@binance
+        start_date: 开始日期
+        end_date: 结束日期
+        timeframe: K线周期
+
+    Returns:
+        str: 格式化的行情分析文本
+    """
+    if not CCXT_CRYPTO_AVAILABLE:
+        return "加密货币数据源不可用（CCXT 未安装）"
+
+    parsed = StockUtils.parse_crypto_symbol(ticker)
+    provider = get_ccxt_provider()
+    return provider.get_crypto_market_data(
+        symbol=parsed["symbol"],
+        exchange=parsed["exchange"],
+        start_date=start_date,
+        end_date=end_date,
+        timeframe=timeframe,
+    )
+
+
+def get_crypto_info_unified(ticker: str) -> str:
+    """
+    获取加密货币交易对基本信息
+
+    Args:
+        ticker: 完整 ticker，如 BTC/USDT@binance
+
+    Returns:
+        str: 交易对信息文本
+    """
+    if not CCXT_CRYPTO_AVAILABLE:
+        return "加密货币数据源不可用（CCXT 未安装）"
+
+    parsed = StockUtils.parse_crypto_symbol(ticker)
+    provider = get_ccxt_provider()
+    return provider.get_crypto_fundamentals(
+        symbol=parsed["symbol"],
+        exchange=parsed["exchange"],
+    )
+
+
+def get_crypto_fundamentals_unified(ticker: str, curr_date: str = None) -> str:
+    """
+    获取加密货币基本面信息（交易所级别）
+
+    Args:
+        ticker: 完整 ticker，如 BTC/USDT@binance
+        curr_date: 当前日期（未使用，保持接口一致）
+
+    Returns:
+        str: 基本面信息文本
+    """
+    if not CCXT_CRYPTO_AVAILABLE:
+        return "加密货币数据源不可用（CCXT 未安装）"
+
+    parsed = StockUtils.parse_crypto_symbol(ticker)
+    provider = get_ccxt_provider()
+    return provider.get_crypto_fundamentals(
+        symbol=parsed["symbol"],
+        exchange=parsed["exchange"],
+    )
+
+
+def get_crypto_overview_unified(exchange: str = "binance") -> str:
+    """
+    获取加密货币市场总览
+
+    Args:
+        exchange: 交易所 ID
+
+    Returns:
+        str: 市场总览文本
+    """
+    if not CCXT_CRYPTO_AVAILABLE:
+        return "加密货币数据源不可用（CCXT 未安装）"
+
+    provider = get_ccxt_provider()
+    return provider.get_crypto_market_overview(exchange=exchange)
+
+
+def get_crypto_cross_exchange_comparison(ticker: str, exchanges: list = None) -> str:
+    """
+    跨交易所比价
+
+    Args:
+        ticker: 交易对，如 BTC/USDT（不含 @exchange）
+        exchanges: 要比较的交易所列表
+
+    Returns:
+        str: 跨交易所比价文本
+    """
+    if not CCXT_CRYPTO_AVAILABLE:
+        return "加密货币数据源不可用（CCXT 未安装）"
+
+    # 对于跨交易所比价，只取交易对部分
+    parsed = StockUtils.parse_crypto_symbol(ticker)
+    provider = get_ccxt_provider()
+    return provider.compare_cross_exchange(
+        symbol=parsed["symbol"],
+        exchanges=exchanges,
+    )

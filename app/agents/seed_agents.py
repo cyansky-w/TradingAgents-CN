@@ -146,6 +146,16 @@ AGENT_SEEDS: List[Dict[str, Any]] = [
         "tags": ["交易", "决策", "执行"],
         "is_chat": False,
     },
+    # ── 加密货币 ──────────────────────────────────────────────
+    {
+        "code": "crypto_market_analyst",
+        "name": "加密货币分析师",
+        "description": "分析加密货币市场行情、技术指标，支持多交易所和跨交易所比价",
+        "prompt_code": "crypto_market_analyst_system",
+        "message_template": "请分析 {{ticker}} 的加密货币市场行情和技术指标。",
+        "tags": ["加密货币", "技术分析", "多交易所"],
+        "is_chat": False,
+    },
 ]
 
 

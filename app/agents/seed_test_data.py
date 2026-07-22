@@ -502,7 +502,7 @@ async def seed_test_data() -> Dict[str, Any]:
                 continue
 
             prompt = await db.prompts.find_one(
-                {"code": seed["prompt_code"], "enabled": True},
+                {"code": seed["prompt_code"], "enabled": True, "is_active": True},
             )
             if not prompt:
                 stats["failed"].append(

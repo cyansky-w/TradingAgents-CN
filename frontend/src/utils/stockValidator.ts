@@ -5,7 +5,7 @@
 
 export interface StockValidationResult {
   valid: boolean
-  market?: 'A股' | '美股' | '港股'
+  market?: 'A股' | '美股' | '港股' | '加密货币'
   message?: string
   normalizedCode?: string
 }
@@ -110,13 +110,53 @@ export function validateHKStock(code: string): StockValidationResult {
 }
 
 /**
+ * 加密货币代码格式验证
+ * 格式：BASE/QUOTE 或 BASE/QUOTE@exchange
+ * 示例：BTC/USDT, ETH/USDT@binance, BTC/USDT@okx
+ */
+export function validateCrypto(code: string): StockValidationResult {
+  const trimmed = code.trim().toUpperCase()
+
+  // 必须包含 /
+  if (!trimmed.includes('/')) {
+    return {
+      valid: false,
+      message: '加密货币代码格式：BASE/QUOTE（如 BTC/USDT），可选 @exchange（如 BTC/USDT@binance）'
+    }
+  }
+
+  const parts = trimmed.split('/')
+  if (parts.length !== 2 || !parts[0] || !parts[1]) {
+    return {
+      valid: false,
+      message: '格式不正确，应为 BASE/QUOTE（如 BTC/USDT）'
+    }
+  }
+
+  // quote 部分可能含 @exchange
+  const quotePart = parts[1].split('@')[0]
+  if (!/^[A-Z]{2,10}$/.test(parts[0]) || !/^[A-Z]{2,10}$/.test(quotePart)) {
+    return {
+      valid: false,
+      message: '基础货币和报价货币必须是2-10个字母'
+    }
+  }
+
+  return {
+    valid: true,
+    market: '加密货币',
+    normalizedCode: trimmed
+  }
+}
+
+/**
  * 自动识别股票代码格式并验证
  * @param code 股票代码
  * @param marketHint 市场提示（可选），如果提供则优先验证该市场
  */
 export function validateStockCode(
   code: string,
-  marketHint?: 'A股' | '美股' | '港股'
+  marketHint?: 'A股' | '美股' | '港股' | '加密货币'
 ): StockValidationResult {
   if (!code || !code.trim()) {
     return {
@@ -124,9 +164,9 @@ export function validateStockCode(
       message: '请输入股票代码'
     }
   }
-  
+
   const trimmedCode = code.trim()
-  
+
   // 如果提供了市场提示，优先验证该市场
   if (marketHint) {
     switch (marketHint) {
@@ -136,7 +176,14 @@ export function validateStockCode(
         return validateUSStock(trimmedCode)
       case '港股':
         return validateHKStock(trimmedCode)
+      case '加密货币':
+        return validateCrypto(trimmedCode)
     }
+  }
+
+  // 自动识别：含 / 即为加密货币
+  if (trimmedCode.includes('/')) {
+    return validateCrypto(trimmedCode)
   }
   
   // 自动识别：先判断是否全是数字
@@ -175,7 +222,7 @@ export function validateStockCode(
 /**
  * 获取股票代码格式说明
  */
-export function getStockCodeFormatHelp(market: 'A股' | '美股' | '港股'): string {
+export function getStockCodeFormatHelp(market: 'A股' | '美股' | '港股' | '加密货币'): string {
   switch (market) {
     case 'A股':
       return '6位数字，如：000001（平安银行）、600519（贵州茅台）'
@@ -183,6 +230,8 @@ export function getStockCodeFormatHelp(market: 'A股' | '美股' | '港股'): st
       return '1-5个字母，如：AAPL（苹果）、TSLA（特斯拉）'
     case '港股':
       return '1-5位数字，如：700（腾讯）、9988（阿里巴巴）'
+    case '加密货币':
+      return 'BASE/QUOTE 格式，如：BTC/USDT、ETH/USDT（可加 @交易所，如 BTC/USDT@binance）'
     default:
       return ''
   }
@@ -191,7 +240,7 @@ export function getStockCodeFormatHelp(market: 'A股' | '美股' | '港股'): st
 /**
  * 获取股票代码示例
  */
-export function getStockCodeExamples(market: 'A股' | '美股' | '港股'): string[] {
+export function getStockCodeExamples(market: 'A股' | '美股' | '港股' | '加密货币'): string[] {
   switch (market) {
     case 'A股':
       return ['000001', '600519', '000858', '300750']
@@ -199,6 +248,8 @@ export function getStockCodeExamples(market: 'A股' | '美股' | '港股'): stri
       return ['AAPL', 'MSFT', 'GOOGL', 'TSLA']
     case '港股':
       return ['00700', '09988', '01810', '03690']
+    case '加密货币':
+      return ['BTC/USDT', 'ETH/USDT', 'BTC/USDT@binance', 'ETH/USDT@okx']
     default:
       return []
   }
@@ -209,7 +260,7 @@ export function getStockCodeExamples(market: 'A股' | '美股' | '港股'): stri
  * @param code 原始代码
  * @param market 市场类型
  */
-export function formatStockCode(code: string, market: 'A股' | '美股' | '港股'): string {
+export function formatStockCode(code: string, market: 'A股' | '美股' | '港股' | '加密货币'): string {
   const validation = validateStockCode(code, market)
   return validation.normalizedCode || code
 }

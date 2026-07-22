@@ -882,10 +882,10 @@ class Toolkit:
             is_china = market_info['is_china']
             is_hk = market_info['is_hk']
             is_us = market_info['is_us']
+            is_crypto = market_info.get('is_crypto', False)
 
             logger.info(f"🔍 [股票代码追踪] StockUtils.get_market_info 返回的市场信息: {market_info}")
             logger.info(f"📊 [统一基本面工具] 股票类型: {market_info['market_name']}")
-            logger.info(f"📊 [统一基本面工具] 货币: {market_info['currency_name']} ({market_info['currency_symbol']})")
 
             # 检查ticker是否在处理过程中发生了变化
             if str(ticker) != str(original_ticker):
@@ -1049,6 +1049,18 @@ class Toolkit:
                         result_data.append(fallback_info)
                         logger.error(f"❌ [统一基本面工具] 港股所有数据源都失败: {e2}")
 
+            elif is_crypto:
+                # 加密货币：使用CCXT获取交易对信息
+                logger.info(f"🪙 [统一基本面工具] 处理加密货币数据...")
+
+                try:
+                    from tradingagents.dataflows.interface import get_crypto_fundamentals_unified
+                    crypto_data = get_crypto_fundamentals_unified(ticker, curr_date)
+                    result_data.append(f"## 加密货币基本面数据\n{crypto_data}")
+                except Exception as e:
+                    result_data.append(f"## 加密货币基本面数据\n获取失败: {e}")
+                    logger.error(f"❌ [统一基本面工具] 加密货币数据获取失败: {e}")
+
             else:
                 # 美股：使用OpenAI/Finnhub数据源
                 logger.info(f"🇺🇸 [统一基本面工具] 处理美股数据...")
@@ -1158,9 +1170,9 @@ class Toolkit:
             is_china = market_info['is_china']
             is_hk = market_info['is_hk']
             is_us = market_info['is_us']
+            is_crypto = market_info.get('is_crypto', False)
 
             logger.info(f"📈 [统一市场工具] 股票类型: {market_info['market_name']}")
-            logger.info(f"📈 [统一市场工具] 货币: {market_info['currency_name']} ({market_info['currency_symbol']}")
 
             result_data = []
 
@@ -1189,14 +1201,22 @@ class Toolkit:
                     from tradingagents.dataflows.interface import get_hk_stock_data_unified
                     hk_data = get_hk_stock_data_unified(ticker, start_date, end_date)
 
-                    # 🔍 调试：打印返回数据的前500字符
-                    logger.info(f"🔍 [市场工具调试] 港股数据返回长度: {len(hk_data)}")
-                    logger.info(f"🔍 [市场工具调试] 港股数据前500字符:\n{hk_data[:500]}")
-
                     result_data.append(f"## 港股市场数据\n{hk_data}")
                 except Exception as e:
                     logger.error(f"❌ [市场工具调试] 港股数据获取失败: {e}")
                     result_data.append(f"## 港股市场数据\n获取失败: {e}")
+
+            elif is_crypto:
+                # 加密货币
+                logger.info(f"🪙 [统一市场工具] 处理加密货币市场数据...")
+
+                try:
+                    from tradingagents.dataflows.interface import get_crypto_data_unified
+                    crypto_data = get_crypto_data_unified(ticker, start_date, end_date)
+                    result_data.append(f"## 加密货币市场数据\n{crypto_data}")
+                except Exception as e:
+                    logger.error(f"❌ [市场工具调试] 加密货币数据获取失败: {e}")
+                    result_data.append(f"## 加密货币市场数据\n获取失败: {e}")
 
             else:
                 # 美股：优先使用FINNHUB API数据源
@@ -1259,6 +1279,7 @@ class Toolkit:
             is_china = market_info['is_china']
             is_hk = market_info['is_hk']
             is_us = market_info['is_us']
+            is_crypto = market_info.get('is_crypto', False)
 
             logger.info(f"📰 [统一新闻工具] 股票类型: {market_info['market_name']}")
 
@@ -1332,6 +1353,19 @@ class Toolkit:
                     logger.error(f"❌ [统一新闻工具] Google新闻获取失败: {google_e}")
                     result_data.append(f"## Google新闻\n获取失败: {google_e}")
 
+            elif is_crypto:
+                # 加密货币：使用Google新闻搜索
+                logger.info(f"🪙 [统一新闻工具] 处理加密货币新闻...")
+
+                try:
+                    parsed = StockUtils.parse_crypto_symbol(ticker)
+                    search_query = f"{parsed['base']} {parsed['quote']} crypto cryptocurrency"
+                    from tradingagents.dataflows.interface import get_google_news
+                    news_data = get_google_news(search_query, curr_date)
+                    result_data.append(f"## 加密货币新闻\n{news_data}")
+                except Exception as e:
+                    result_data.append(f"## 加密货币新闻\n获取失败: {e}")
+
             else:
                 # 美股：使用Finnhub新闻
                 logger.info(f"🇺🇸 [统一新闻工具] 处理美股新闻...")
@@ -1392,6 +1426,7 @@ class Toolkit:
             is_china = market_info['is_china']
             is_hk = market_info['is_hk']
             is_us = market_info['is_us']
+            is_crypto = market_info.get('is_crypto', False)
 
             logger.info(f"😊 [统一情绪工具] 股票类型: {market_info['market_name']}")
 
@@ -1426,6 +1461,18 @@ class Toolkit:
                 except Exception as e:
                     result_data.append(f"## 中文市场情绪\n获取失败: {e}")
 
+            elif is_crypto:
+                # 加密货币：使用Reddit r/cryptocurrency 情绪分析
+                logger.info(f"🪙 [统一情绪工具] 处理加密货币情绪...")
+
+                try:
+                    from tradingagents.dataflows.interface import get_reddit_sentiment
+                    parsed = StockUtils.parse_crypto_symbol(ticker)
+                    sentiment_data = get_reddit_sentiment(parsed["base"], curr_date)
+                    result_data.append(f"## 加密货币Reddit情绪\n{sentiment_data}")
+                except Exception as e:
+                    result_data.append(f"## 加密货币情绪\n获取失败: {e}")
+
             else:
                 # 美股：使用Reddit情绪分析
                 logger.info(f"🇺🇸 [统一情绪工具] 处理美股情绪...")
@@ -1457,3 +1504,157 @@ class Toolkit:
             error_msg = f"统一情绪分析工具执行失败: {str(e)}"
             logger.error(f"❌ [统一情绪工具] {error_msg}")
             return error_msg
+
+    # ==================== 加密货币专用工具 ====================
+
+    @staticmethod
+    @tool
+    @log_tool_call(tool_name="get_crypto_market_data_unified", log_args=True)
+    def get_crypto_market_data_unified(
+        ticker: Annotated[str, "加密货币代码，格式: BASE/QUOTE[@exchange]，如 BTC/USDT@binance、ETH/USDT@okx"],
+        start_date: Annotated[str, "开始日期，格式：YYYY-MM-DD"],
+        end_date: Annotated[str, "结束日期，格式：YYYY-MM-DD"]
+    ) -> str:
+        """
+        获取加密货币行情数据（指定交易所）
+        支持的交易所: binance, okx, bybit, bitget, gate
+        不同交易所的同一交易对视为不同标的
+
+        Args:
+            ticker: 加密货币代码（如：BTC/USDT@binance）
+            start_date: 开始日期
+            end_date: 结束日期
+
+        Returns:
+            str: 行情分析报告
+        """
+        try:
+            from tradingagents.dataflows.interface import get_crypto_data_unified
+            return get_crypto_data_unified(ticker, start_date, end_date)
+        except Exception as e:
+            logger.error(f"❌ 加密货币行情获取失败: {e}")
+            return f"获取加密货币行情失败: {e}"
+
+    @staticmethod
+    @tool
+    @log_tool_call(tool_name="get_crypto_news_unified", log_args=True)
+    def get_crypto_news_unified(
+        ticker: Annotated[str, "加密货币代码，格式: BASE/QUOTE[@exchange]"],
+        curr_date: Annotated[str, "当前日期，格式：YYYY-MM-DD"]
+    ) -> str:
+        """
+        获取加密货币相关新闻
+
+        Args:
+            ticker: 加密货币代码
+            curr_date: 当前日期
+
+        Returns:
+            str: 新闻分析报告
+        """
+        try:
+            from tradingagents.utils.stock_utils import StockUtils
+            from tradingagents.dataflows.interface import get_google_news
+
+            parsed = StockUtils.parse_crypto_symbol(ticker)
+            search_query = f"{parsed['base']} cryptocurrency crypto news"
+            return get_google_news(search_query, curr_date)
+        except Exception as e:
+            logger.error(f"❌ 加密货币新闻获取失败: {e}")
+            return f"获取加密货币新闻失败: {e}"
+
+    @staticmethod
+    @tool
+    @log_tool_call(tool_name="get_crypto_fundamentals_unified", log_args=True)
+    def get_crypto_fundamentals_unified(
+        ticker: Annotated[str, "加密货币代码，格式: BASE/QUOTE[@exchange]"],
+        curr_date: Annotated[str, "当前日期，格式：YYYY-MM-DD"]
+    ) -> str:
+        """
+        获取加密货币基本面信息（交易对精度、限制、手续费）
+
+        Args:
+            ticker: 加密货币代码
+            curr_date: 当前日期
+
+        Returns:
+            str: 基本面信息报告
+        """
+        try:
+            from tradingagents.dataflows.interface import get_crypto_fundamentals_unified
+            return get_crypto_fundamentals_unified(ticker, curr_date)
+        except Exception as e:
+            logger.error(f"❌ 加密货币基本面获取失败: {e}")
+            return f"获取加密货币基本面失败: {e}"
+
+    @staticmethod
+    @tool
+    @log_tool_call(tool_name="get_crypto_sentiment_unified", log_args=True)
+    def get_crypto_sentiment_unified(
+        ticker: Annotated[str, "加密货币代码，格式: BASE/QUOTE[@exchange]"],
+        curr_date: Annotated[str, "当前日期，格式：YYYY-MM-DD"]
+    ) -> str:
+        """
+        获取加密货币市场情绪（Reddit r/cryptocurrency）
+
+        Args:
+            ticker: 加密货币代码
+            curr_date: 当前日期
+
+        Returns:
+            str: 情绪分析报告
+        """
+        try:
+            from tradingagents.utils.stock_utils import StockUtils
+            from tradingagents.dataflows.interface import get_reddit_sentiment
+
+            parsed = StockUtils.parse_crypto_symbol(ticker)
+            return get_reddit_sentiment(parsed["base"], curr_date)
+        except Exception as e:
+            logger.error(f"❌ 加密货币情绪获取失败: {e}")
+            return f"获取加密货币情绪失败: {e}"
+
+    @staticmethod
+    @tool
+    @log_tool_call(tool_name="get_crypto_market_overview", log_args=True)
+    def get_crypto_market_overview(
+        curr_date: Annotated[str, "当前日期，格式：YYYY-MM-DD"]
+    ) -> str:
+        """
+        获取加密货币市场总览（头部币种排名、涨跌幅、成交量）
+
+        Args:
+            curr_date: 当前日期
+
+        Returns:
+            str: 市场总览报告
+        """
+        try:
+            from tradingagents.dataflows.interface import get_crypto_overview_unified
+            return get_crypto_overview_unified()
+        except Exception as e:
+            logger.error(f"❌ 加密货币市场总览获取失败: {e}")
+            return f"获取加密货币市场总览失败: {e}"
+
+    @staticmethod
+    @tool
+    @log_tool_call(tool_name="get_crypto_cross_exchange_comparison", log_args=True)
+    def get_crypto_cross_exchange_comparison(
+        ticker: Annotated[str, "加密货币交易对，格式: BASE/QUOTE，如 BTC/USDT"]
+    ) -> str:
+        """
+        跨交易所比价 — 同一交易对在不同交易所的价格对比
+        比较所有支持的交易所（binance, okx, bybit, bitget, gate）
+
+        Args:
+            ticker: 加密货币交易对（如：BTC/USDT）
+
+        Returns:
+            str: 跨交易所价格对比报告
+        """
+        try:
+            from tradingagents.dataflows.interface import get_crypto_cross_exchange_comparison
+            return get_crypto_cross_exchange_comparison(ticker)
+        except Exception as e:
+            logger.error(f"❌ 跨交易所比价失败: {e}")
+            return f"跨交易所比价失败: {e}"

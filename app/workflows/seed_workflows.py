@@ -230,6 +230,51 @@ WORKFLOW_SEEDS: List[Dict[str, Any]] = [
         "settings": {"timeout": 1800, "on_failure": "notify", "retry_count": 0},
         "tags": ["A股", "筛选", "系统"],
     },
+    # ── 加密货币分析工作流 ──────────────────────────────────────────
+    {
+        "code": "crypto_analysis",
+        "name": "加密货币分析工作流",
+        "description": "完整加密货币分析：行情分析 + 基本面 + 新闻 + 跨交易所比价 → 投研总结",
+        "version": 1,
+        "trigger": {"type": "manual"},
+        "message_template": "请对 {{ticker}} 进行加密货币全面分析（交易所：{{exchange}}）",
+        "output_template": "{{summary.output}}",
+        "nodes": [
+            {"id": "start", "type": "io", "label": "开始", "config": {"io_direction": "input"}},
+            {"id": "market", "type": "agent", "label": "行情分析", "config": {
+                "agent_code": "crypto_market_analyst",
+                "input_mapping": {"ticker": "{{input.ticker}}"},
+            }},
+            {"id": "fundamentals", "type": "agent", "label": "基本面分析", "config": {
+                "agent_code": "fundamentals_analyst",
+                "input_mapping": {"ticker": "{{input.ticker}}"},
+            }},
+            {"id": "news", "type": "agent", "label": "新闻分析", "config": {
+                "agent_code": "news_analyst",
+                "input_mapping": {"ticker": "{{input.ticker}}"},
+            }},
+            {"id": "summary", "type": "agent", "label": "投研总结", "config": {
+                "agent_code": "research_manager",
+                "input_mapping": {
+                    "market_report": "{{market.output}}",
+                    "fundamentals_report": "{{fundamentals.output}}",
+                    "news_report": "{{news.output}}",
+                },
+            }},
+            {"id": "end", "type": "io", "label": "结束", "config": {"io_direction": "output"}},
+        ],
+        "edges": [
+            {"id": "e1", "source": "start", "target": "market"},
+            {"id": "e2", "source": "start", "target": "fundamentals"},
+            {"id": "e3", "source": "start", "target": "news"},
+            {"id": "e4", "source": "market", "target": "summary"},
+            {"id": "e5", "source": "fundamentals", "target": "summary"},
+            {"id": "e6", "source": "news", "target": "summary"},
+            {"id": "e7", "source": "summary", "target": "end"},
+        ],
+        "settings": {"timeout": 1800, "on_failure": "notify", "retry_count": 0},
+        "tags": ["加密货币", "系统"],
+    },
 ]
 
 
