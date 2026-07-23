@@ -420,6 +420,11 @@
     "@jridgewell/resolve-uri" "^3.1.0"
     "@jridgewell/sourcemap-codec" "^1.4.14"
 
+"@lucide/vue@^1.25.0":
+  version "1.25.0"
+  resolved "https://registry.npmmirror.com/@lucide/vue/-/vue-1.25.0.tgz#758c98fd8e8a65bf72b0e67ff37e9f523afc4cee"
+  integrity sha512-hkEetV+v48ScIn3uwqwWQ66sI8foeP2q6OMI09GzLFH4SfvBlfe3JHYlMBdBCqFC7WRlhFsndyDn/awRKRc2OQ==
+
 "@markmend/ast@1.0.0-beta.2":
   version "1.0.0-beta.2"
   resolved "https://registry.npmjs.org/@markmend/ast/-/ast-1.0.0-beta.2.tgz"
