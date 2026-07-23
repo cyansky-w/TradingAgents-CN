@@ -9,7 +9,7 @@ from app.services.portfolio.position_calculator import PositionCalculator, Posit
 from app.services.portfolio.types import decimal_string
 
 
-DECIMAL_FIELDS = {"price", "quantity", "gross_amount", "fee_amount", "funding_fee", "leverage", "initial_margin"}
+DECIMAL_FIELDS = {"price", "quantity", "gross_amount", "fee_amount", "funding_fee", "leverage", "initial_margin", "order_notional"}
 
 
 class VersionConflict(RuntimeError):

@@ -25,6 +25,30 @@ class ExistingPreferenceCollection:
         }
 
 
+class RecordsCursor:
+    def __init__(self, records):
+        self.records = records
+
+    def sort(self, _fields):
+        return self
+
+    async def to_list(self, length=None):
+        return self.records
+
+
+class RecordsCollection:
+    def __init__(self, records):
+        self.records = records
+
+    def find(self, _query):
+        return RecordsCursor(self.records)
+
+
+class UnavailableQuoteGateway:
+    async def get_quote(self, *_args):
+        raise Exception("无法获取美股AAPL的行情数据：所有数据源均失败")
+
+
 @pytest.mark.asyncio
 async def test_preference_creation_does_not_return_mongo_object_id():
     service = PreferenceService(InsertMutatingCollection())
@@ -72,6 +96,38 @@ def record(**overrides):
     }
     item.update(overrides)
     return item
+
+
+@pytest.mark.asyncio
+async def test_quote_failure_excludes_position_instead_of_failing_portfolio():
+    service = PortfolioService(
+        RecordsCollection([
+            record(
+                market="US", exchange="NASDAQ", symbol="AAPL", quote_asset="USD",
+                side="sell", position_side="short", position_action="open",
+            )
+        ]),
+        UnavailableQuoteGateway(),
+        ValuationService(),
+    )
+
+    positions = await service.get_positions("user-1", "USD")
+
+    assert [item["symbol"] for item in positions["items"]] == ["AAPL"]
+    assert positions["items"][0]["position_side"] == "short"
+    assert positions["items"][0]["quote_unavailable"] is True
+    assert positions["items"][0]["mark_price"] is None
+    assert positions["items"][0]["base_market_value"] is None
+    assert positions["items"][0]["weight_percent"] is None
+    assert positions["excluded"] == [{
+        "scope": "quote",
+        "storage_key": "US:NASDAQ:AAPL:equity",
+        "market": "US",
+        "exchange": "NASDAQ",
+        "symbol": "AAPL",
+        "position_side": "short",
+        "error": "无法获取美股AAPL的行情数据：所有数据源均失败",
+    }]
 
 
 @pytest.mark.asyncio

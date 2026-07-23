@@ -5,12 +5,12 @@
         <td><strong>{{ position.symbol }}</strong><small>{{ position.exchange }} · {{ instrument(position.instrument_type) }}</small></td>
         <td><span :class="['side', position.position_side]">{{ position.position_side === 'long' ? '多头' : '空头' }}</span></td>
         <td>{{ position.quantity }}</td>
-        <td>{{ value(position.average_entry_price) }} / {{ value(position.mark_price) }}</td>
-        <td>{{ position.quote_asset }} {{ value(position.market_value) }}</td>
-        <td>{{ position.converted === false ? '-' : value(position.base_market_value) }}</td>
-        <td>{{ value(position.base_unrealized_pnl) }}</td>
-        <td data-testid="position-weight">{{ position.converted === false || position.weight_percent == null ? '-' : formatDecimal(position.weight_percent, 2) + '%' }}</td>
-        <td><span v-if="position.converted === false" data-testid="conversion-unavailable" class="warning">未换算</span><span v-if="position.quote_stale" data-testid="quote-stale" class="muted">行情过期</span></td>
+        <td>{{ value(position.average_entry_price) }} / {{ unavailable(position) ? '-' : value(position.mark_price) }}</td>
+        <td>{{ unavailable(position) ? '-' : `${position.quote_asset} ${value(position.market_value)}` }}</td>
+        <td>{{ unavailable(position) || position.converted === false ? '-' : value(position.base_market_value) }}</td>
+        <td>{{ unavailable(position) ? '-' : value(position.base_unrealized_pnl) }}</td>
+        <td data-testid="position-weight">{{ unavailable(position) || position.converted === false || position.weight_percent == null ? '-' : formatDecimal(position.weight_percent, 2) + '%' }}</td>
+        <td><span v-if="position.quote_unavailable" data-testid="quote-unavailable" class="warning">行情不可用</span><span v-else-if="position.converted === false" data-testid="conversion-unavailable" class="warning">未换算</span><span v-if="!position.quote_unavailable && position.quote_stale" data-testid="quote-stale" class="muted">行情过期</span></td>
       </tr></tbody>
     </table>
     <div v-if="positions.length === 0" class="empty">暂无持仓</div>
@@ -23,6 +23,7 @@ import { formatDecimal } from '@/utils/portfolioDecimal'
 defineProps<{ positions: PortfolioPosition[]; baseCurrency: BaseCurrency }>()
 const emit = defineEmits<{ open: [position: PortfolioPosition] }>()
 const value = (input?: string | null) => input == null ? '-' : formatDecimal(input, 4)
+const unavailable = (position: PortfolioPosition) => position.quote_unavailable === true
 const instrument = (value: InstrumentType) => ({ equity: '股票', crypto_spot: '现货', crypto_linear_perpetual: 'USDT 永续' }[value])
 </script>
 

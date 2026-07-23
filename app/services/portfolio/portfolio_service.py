@@ -17,8 +17,14 @@ class PortfolioService:
         ]).to_list(length=None)
 
     async def get_positions(self, user_id, base_currency):
-        states = PositionCalculator.replay(await self._records(user_id))
+        records = await self._records(user_id)
+        states = PositionCalculator.replay(records)
+        quote_assets = {
+            f"{item['market']}:{item['exchange']}:{item['symbol']}:{item['instrument_type']}": item.get("quote_asset")
+            for item in records
+        }
         raw_positions = []
+        unavailable_positions = []
         excluded = []
         for state in states:
             if state.quantity <= 0:
@@ -28,8 +34,35 @@ class PortfolioService:
                     state.asset.market, state.asset.exchange, state.asset.symbol,
                     state.asset.instrument_type,
                 )
-            except (LookupError, ValueError) as exc:
-                excluded.append({"storage_key": state.asset.storage_key, "error": str(exc)})
+            except Exception as exc:
+                error = str(exc)
+                unavailable_positions.append({
+                    "storage_key": state.asset.storage_key,
+                    "market": state.asset.market.value,
+                    "exchange": state.asset.exchange,
+                    "symbol": state.asset.symbol,
+                    "instrument_type": state.asset.instrument_type.value,
+                    "position_side": state.position_side.value,
+                    "quote_asset": quote_assets.get(state.asset.storage_key),
+                    "quantity": decimal_string(state.quantity),
+                    "average_entry_price": decimal_string(state.average_entry_price) if state.average_entry_price is not None else None,
+                    "cost_value": decimal_string(state.cost_value) if state.cost_value is not None else None,
+                    "realized_pnl": decimal_string(state.realized_pnl) if state.realized_pnl is not None else None,
+                    "mark_price": None,
+                    "market_value": None,
+                    "unrealized_pnl": None,
+                    "quote_unavailable": True,
+                    "quote_error": error,
+                })
+                excluded.append({
+                    "scope": "quote",
+                    "storage_key": state.asset.storage_key,
+                    "market": state.asset.market.value,
+                    "exchange": state.asset.exchange,
+                    "symbol": state.asset.symbol,
+                    "position_side": state.position_side.value,
+                    "error": error,
+                })
                 continue
             mark = Decimal(quote.price)
             market_value = mark * state.quantity
@@ -52,6 +85,17 @@ class PortfolioService:
                 "quote_stale": quote.stale,
             })
         valued = await self.valuation_service.value_positions(raw_positions, base_currency)
+        for item in unavailable_positions:
+            item.update({
+                "converted": False,
+                "base_currency": base_currency,
+                "base_market_value": None,
+                "base_cost_value": None,
+                "base_realized_pnl": None,
+                "base_unrealized_pnl": None,
+                "weight_percent": None,
+            })
+        valued.positions.extend(unavailable_positions)
         valued.excluded.extend(excluded)
         return {**valued.__dict__, "items": valued.positions}
 

@@ -33,6 +33,23 @@ async def test_multi_hop_rate_uses_usd(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_same_day_rate_is_cached_for_repeated_valuation_requests():
+    calls = 0
+
+    async def fake_direct(source, target, at):
+        nonlocal calls
+        calls += 1
+        return Decimal("0.14")
+
+    service = FxService(direct_rate_provider=fake_direct)
+    at = datetime(2026, 7, 21, 12, tzinfo=timezone.utc)
+
+    assert (await service.get_rate("CNY", "USD", at)).rate == Decimal("0.14")
+    assert (await service.get_rate("CNY", "USD", at.replace(hour=13))).rate == Decimal("0.14")
+    assert calls == 1
+
+
+@pytest.mark.asyncio
 async def test_multi_hop_rate_can_use_inverse_quotes(monkeypatch):
     async def fake_direct(source, target, at):
         rates = {

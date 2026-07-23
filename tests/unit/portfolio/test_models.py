@@ -110,3 +110,91 @@ def test_perpetual_rejects_transfer_record():
             quantity="0.1",
             trade_time="2026-07-14T12:00:00Z",
         )
+
+
+def test_perpetual_open_validates_order_notional_and_initial_margin():
+    payload = CreateLedgerRecordRequest(
+        record_type="trade",
+        market="CRYPTO",
+        exchange="binance",
+        symbol="BTC/USDT:USDT",
+        instrument_type="crypto_linear_perpetual",
+        quote_asset="USDT",
+        side="buy",
+        position_side="long",
+        position_action="open",
+        price="100000",
+        quantity="0.01",
+        order_notional="1000",
+        leverage="10",
+        initial_margin="100",
+        trade_time="2026-07-22T12:00:00Z",
+    )
+
+    assert payload.order_notional == Decimal("1000")
+    assert payload.initial_margin == Decimal("100")
+
+
+def test_perpetual_open_accepts_decimal_rounding_from_leverage_division():
+    payload = CreateLedgerRecordRequest(
+        record_type="trade",
+        market="CRYPTO",
+        exchange="binance",
+        symbol="BTC/USDT:USDT",
+        instrument_type="crypto_linear_perpetual",
+        quote_asset="USDT",
+        side="buy",
+        position_side="long",
+        position_action="open",
+        price="100000",
+        quantity="0.01",
+        order_notional="1000",
+        leverage="30",
+        initial_margin="33.333333333333333333",
+        trade_time="2026-07-22T12:00:00Z",
+    )
+
+    assert payload.order_notional == Decimal("1000")
+
+
+def test_perpetual_open_accepts_decimal_rounding_from_quantity_division():
+    payload = CreateLedgerRecordRequest(
+        record_type="trade",
+        market="CRYPTO",
+        exchange="binance",
+        symbol="BTC/USDT:USDT",
+        instrument_type="crypto_linear_perpetual",
+        quote_asset="USDT",
+        side="buy",
+        position_side="long",
+        position_action="open",
+        price="3",
+        quantity="33.333333333333333333",
+        order_notional="100",
+        leverage="10",
+        initial_margin="10",
+        trade_time="2026-07-22T12:00:00Z",
+    )
+
+    assert payload.quantity == Decimal("33.333333333333333333")
+
+
+def test_perpetual_open_rejects_inconsistent_order_notional():
+    with pytest.raises(ValidationError, match="order_notional"):
+        CreateLedgerRecordRequest(
+            record_type="trade",
+            market="CRYPTO",
+            exchange="binance",
+            symbol="BTC/USDT:USDT",
+            instrument_type="crypto_linear_perpetual",
+            quote_asset="USDT",
+            side="buy",
+            position_side="long",
+            position_action="open",
+            price="100000",
+            quantity="0.01",
+            order_notional="999",
+            leverage="10",
+            initial_margin="100",
+            trade_time="2026-07-22T12:00:00Z",
+        )

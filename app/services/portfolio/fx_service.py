@@ -29,20 +29,29 @@ class FxService:
     ):
         self.db = db
         self.direct_rate_provider = direct_rate_provider
+        self._rate_cache: dict[tuple[str, str, str], FxRate] = {}
 
     async def get_rate(self, source: str, target: str, at: datetime) -> FxRate:
         source = source.upper()
         target = target.upper()
         at = at if at.tzinfo else at.replace(tzinfo=timezone.utc)
+        cache_key = (source, target, at.date().isoformat())
+        cached = self._rate_cache.get(cache_key)
+        if cached is not None:
+            return cached
         if source == target:
-            return FxRate(source, target, Decimal("1"), [source], "identity", at.isoformat())
+            result = FxRate(source, target, Decimal("1"), [source], "identity", at.isoformat())
+            self._rate_cache[cache_key] = result
+            return result
 
         pair = await self._get_pair_rate(source, target, at)
         if pair is not None:
             rate, rate_source = pair
-            return FxRate(
+            result = FxRate(
                 source, target, rate, [source, target], rate_source, at.isoformat()
             )
+            self._rate_cache[cache_key] = result
+            return result
 
         for bridge in self.BRIDGES:
             if bridge in {source, target}:
@@ -50,10 +59,12 @@ class FxService:
             first = await self._get_pair_rate(source, bridge, at)
             second = await self._get_pair_rate(bridge, target, at)
             if first is not None and second is not None:
-                return FxRate(
+                result = FxRate(
                     source, target, first[0] * second[0],
                     [source, bridge, target], "multi-hop", at.isoformat()
                 )
+                self._rate_cache[cache_key] = result
+                return result
 
         raise ValueError(f"no FX route from {source} to {target}")
 

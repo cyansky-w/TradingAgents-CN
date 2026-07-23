@@ -32,7 +32,13 @@ class AssetNormalizer:
     def normalize(market, exchange, symbol, instrument_type) -> AssetKey:
         normalized_market = Market(str(market).upper())
         instrument = InstrumentType(str(instrument_type))
-        normalized_symbol = str(symbol).strip().upper()
+        normalized_symbol = (
+            str(symbol)
+            .strip()
+            .upper()
+            .replace("／", "/")
+            .replace("：", ":")
+        )
 
         if normalized_market == Market.CN:
             if not re.fullmatch(r"\d{6}", normalized_symbol):

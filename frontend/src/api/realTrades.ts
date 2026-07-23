@@ -25,6 +25,7 @@ export interface CreateLedgerRecordPayload {
   funding_fee?: DecimalString
   leverage?: DecimalString
   initial_margin?: DecimalString
+  order_notional?: DecimalString
   margin_mode?: 'cross' | 'isolated'
   trade_time: string
   version?: number
@@ -57,6 +58,8 @@ export interface PortfolioPosition {
   weight_percent?: DecimalString | null
   converted?: boolean
   conversion_error?: string
+  quote_unavailable?: boolean
+  quote_error?: string
   quote_stale?: boolean
 }
 

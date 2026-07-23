@@ -54,7 +54,7 @@
 
       <!-- 页面内容 -->
       <main class="main-content" :style="{ height: mainContentHeight }">
-        <div class="content-wrapper">
+        <ScrollArea class="content-wrapper">
           <router-view v-slot="{ Component, route }">
             <transition
               :name="route.meta.transition || 'fade'"
@@ -66,7 +66,7 @@
               </keep-alive>
             </transition>
           </router-view>
-        </div>
+        </ScrollArea>
       </main>
 
       <!-- 页脚 -->
@@ -83,6 +83,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useAppStore } from '@/stores/app'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import SidebarMenu from '@/components/Layout/SidebarMenu.vue'
 import UserProfile from '@/components/Layout/UserProfile.vue'
 import Breadcrumb from '@/components/Layout/Breadcrumb.vue'
@@ -252,10 +253,13 @@ watch(() => route.fullPath, () => {
 }
 
 .main-content {
+  overflow: hidden;
   // padding: 24px;
 
   .content-wrapper {
     height: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
     // max-width: 1400px;
     // margin: 0 auto;
   }

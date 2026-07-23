@@ -1,3 +1,4 @@
+import logging
 import re
 from datetime import datetime
 from decimal import Decimal
@@ -19,7 +20,14 @@ from app.services.portfolio.valuation_service import ValuationService
 
 
 router = APIRouter(prefix="/real-trades", tags=["real-trades"])
+logger = logging.getLogger(__name__)
 CURRENCY_MAP = {"CN": "CNY", "HK": "HKD", "US": "USD"}
+VALIDATION_LOG_FIELDS = (
+    "record_type", "market", "exchange", "symbol", "instrument_type",
+    "quote_asset", "side", "position_side", "position_action", "price",
+    "quantity", "order_notional", "leverage", "initial_margin",
+    "fee_amount", "fee_currency", "funding_fee", "trade_time",
+)
 
 
 def _detect_market_and_code(code: str) -> tuple:
@@ -146,8 +154,18 @@ async def create_record(payload: Dict[str, Any], current_user=Depends(get_curren
         document = await ledger.create_record(current_user["id"], model.model_dump(mode="json", exclude_none=True))
         return ok({"record": _record_response(document)})
     except ValidationError as exc:
+        logger.warning(
+            "创建实盘记录模型校验失败: %s payload=%s",
+            exc,
+            {key: payload.get(key) for key in VALIDATION_LOG_FIELDS if key in payload},
+        )
         raise HTTPException(422, detail=str(exc)) from exc
     except (LookupError, ValueError) as exc:
+        logger.warning(
+            "创建实盘记录业务校验失败: %s payload=%s",
+            exc,
+            {key: payload.get(key) for key in VALIDATION_LOG_FIELDS if key in payload},
+        )
         raise HTTPException(422, detail=str(exc)) from exc
     except PositionConflict as exc:
         raise HTTPException(409, detail={"message": str(exc), "available_quantity": str(exc.available_quantity)}) from exc

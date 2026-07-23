@@ -26,6 +26,13 @@ from app.services.portfolio.asset_normalizer import AssetNormalizer
             "crypto_linear_perpetual",
             ("binance", "BTC/USDT:USDT"),
         ),
+        (
+            "CRYPTO",
+            "binance",
+            "btc／usdt：usdt",
+            "crypto_linear_perpetual",
+            ("binance", "BTC/USDT:USDT"),
+        ),
     ],
 )
 def test_normalize_asset(market, exchange, symbol, instrument, expected):

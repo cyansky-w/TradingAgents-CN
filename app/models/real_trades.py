@@ -21,6 +21,14 @@ from app.services.portfolio.types import (
 )
 
 
+DECIMAL_RELATIVE_TOLERANCE = Decimal("1e-18")
+
+
+def _decimal_close(actual: Decimal, expected: Decimal) -> bool:
+    scale = max(abs(actual), abs(expected), Decimal("1"))
+    return abs(actual - expected) <= scale * DECIMAL_RELATIVE_TOLERANCE
+
+
 class LedgerRecordBase(BaseModel):
     record_type: RecordType
     market: Market
@@ -43,6 +51,7 @@ class LedgerRecordBase(BaseModel):
     funding_fee: Optional[Decimal] = None
     leverage: Optional[Decimal] = Field(default=None, gt=0)
     initial_margin: Optional[Decimal] = Field(default=None, ge=0)
+    order_notional: Optional[Decimal] = Field(default=None, ge=0)
     margin_mode: Optional[MarginMode] = None
     trade_time: datetime
     analysis_id: Optional[str] = None
@@ -118,6 +127,25 @@ class LedgerRecordBase(BaseModel):
                 raise ValueError("transfers are long-only")
             if self.instrument_type == InstrumentType.CRYPTO_LINEAR_PERPETUAL:
                 raise ValueError("perpetual positions cannot use transfer records")
+
+        is_perpetual_open = (
+            self.instrument_type == InstrumentType.CRYPTO_LINEAR_PERPETUAL
+            and self.record_type == RecordType.TRADE
+            and self.position_action == PositionAction.OPEN
+        )
+        perpetual_values = (self.order_notional, self.leverage, self.initial_margin)
+        if is_perpetual_open and any(value is not None for value in perpetual_values):
+            if any(value is None for value in perpetual_values):
+                raise ValueError(
+                    "perpetual open requires order_notional, leverage and initial_margin together"
+                )
+            expected_notional = self.price * self.quantity
+            if not _decimal_close(self.order_notional, expected_notional):
+                raise ValueError("order_notional must equal price multiplied by quantity")
+            if not _decimal_close(
+                self.initial_margin * self.leverage, self.order_notional
+            ):
+                raise ValueError("initial_margin multiplied by leverage must equal order_notional")
 
         return self
 

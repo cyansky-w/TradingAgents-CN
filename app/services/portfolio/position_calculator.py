@@ -35,6 +35,13 @@ def _quote_fee(item: Mapping) -> Decimal:
     return fee if fee_currency.upper() == quote_asset.upper() else ZERO
 
 
+def _entry_notional(item: Mapping) -> Decimal:
+    order_notional = item.get("order_notional")
+    if order_notional not in {None, ""}:
+        return _decimal(order_notional)
+    return _decimal(item["price"]) * _decimal(item["quantity"])
+
+
 def _require_available(
     state: PositionState,
     quantity: Decimal,
@@ -66,7 +73,7 @@ def _open_long(state: PositionState, item: Mapping) -> None:
         state.average_entry_price = None
         state.cost_value = None
     else:
-        new_cost = state.cost_value + price * quantity + fee
+        new_cost = state.cost_value + _entry_notional(item) + fee
         state.quantity = new_quantity
         state.cost_value = new_cost
         state.average_entry_price = new_cost / new_quantity
@@ -110,7 +117,7 @@ def _open_short(state: PositionState, item: Mapping) -> None:
         state.average_entry_price = None
         state.cost_value = None
     else:
-        new_entry_value = state.cost_value + price * quantity - fee
+        new_entry_value = state.cost_value + _entry_notional(item) - fee
         state.quantity = new_quantity
         state.cost_value = new_entry_value
         state.average_entry_price = new_entry_value / new_quantity

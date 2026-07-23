@@ -1,0 +1,9 @@
+[mcp_servers.shadcn_vue]
+command = "npx"
+args = [
+  "--yes",
+  "shadcn-vue@latest",
+  "mcp",
+  "--cwd",
+  "frontend"
+]
