@@ -1,103 +1,10 @@
-<template>
-  <div class="run-detail">
-    <div class="run-header">
-      <el-button @click="goBack" text>
-        <el-icon><ArrowLeft /></el-icon> 返回
-      </el-button>
-      <span class="run-title">运行详情</span>
-      <el-tag :type="runStatusType(run.status)" size="large">{{ runStatusLabel(run.status) }}</el-tag>
-      <div class="run-header-actions">
-        <el-button v-if="run.status === 'running'" size="small" type="danger" @click="handleCancel">取消运行</el-button>
-      </div>
-    </div>
-
-    <el-row :gutter="20">
-      <el-col :span="16">
-        <div class="run-info-card">
-          <h4>基本信息</h4>
-          <el-descriptions :column="2" size="small" border>
-            <el-descriptions-item label="运行 ID">{{ run.id }}</el-descriptions-item>
-            <el-descriptions-item label="工作流">{{ run.workflow_name }}</el-descriptions-item>
-            <el-descriptions-item label="触发方式">{{ run.trigger_type }}</el-descriptions-item>
-            <el-descriptions-item label="状态">{{ runStatusLabel(run.status) }}</el-descriptions-item>
-            <el-descriptions-item label="开始时间">{{ formatTime(run.started_at) }}</el-descriptions-item>
-            <el-descriptions-item label="完成时间">{{ formatTime(run.completed_at) }}</el-descriptions-item>
-          </el-descriptions>
-        </div>
-
-        <div class="run-info-card">
-          <h4>节点执行状态</h4>
-          <el-table v-if="run.node_executions?.length" :data="run.node_executions" size="small" stripe>
-            <el-table-column prop="node_id" label="节点" width="160">
-              <template #default="{ row }">
-                <span class="mono">{{ row.node_id }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="status" label="状态" width="100">
-              <template #default="{ row }">
-                <el-tag :type="nodeStatusType(row.status)" size="small">{{ row.status }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="output" label="输出">
-              <template #default="{ row }">
-                <div class="node-output mono">{{ formatOutput(row.output) }}</div>
-              </template>
-            </el-table-column>
-          </el-table>
-          <div v-else-if="run.status === 'running'" class="loading-placeholder">
-            <el-icon class="is-loading"><Loading /></el-icon> 等待节点状态...
-          </div>
-          <div v-else class="text-muted">无节点执行记录</div>
-        </div>
-
-        <div v-if="run.error" class="run-info-card run-error-card">
-          <h4>错误信息</h4>
-          <pre class="error-text">{{ run.error }}</pre>
-        </div>
-
-        <div v-if="run.output" class="run-info-card">
-          <h4>输出</h4>
-          <pre class="output-text">{{ formatOutput(run.output) }}</pre>
-        </div>
-      </el-col>
-
-      <el-col :span="8">
-        <div class="run-info-card">
-          <h4>输入数据</h4>
-          <pre class="output-text">{{ JSON.stringify(run.input || {}, null, 2) }}</pre>
-        </div>
-
-        <div class="run-info-card">
-          <h4>SSE 连接状态</h4>
-          <div class="sse-status">
-            <el-tag :type="sseConnected ? 'success' : sseError ? 'danger' : 'info'" size="small">
-              {{ sseConnected ? '已连接' : sseError ? '断开' : '未连接' }}
-            </el-tag>
-            <el-button size="small" text @click="connectSSE" v-if="run.status === 'running' && !sseConnected">
-              重连
-            </el-button>
-          </div>
-          <div class="sse-events" v-if="sseEvents.length">
-            <div v-for="(evt, i) in sseEvents.slice(-10)" :key="i" class="sse-event">
-              <span class="sse-event-time">{{ evt.time }}</span>
-              <el-tag :type="evt.type === 'status' ? 'primary' : evt.type === 'error' ? 'danger' : 'info'" size="small">
-                {{ evt.type }}
-              </el-tag>
-              <span class="sse-event-data">{{ evt.summary }}</span>
-            </div>
-          </div>
-        </div>
-      </el-col>
-    </el-row>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import type { WorkflowRun } from '@/api/workflows'
 import { ArrowLeft, Loading } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { workflowsApi, type WorkflowRun } from '@/api/workflows'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { workflowsApi } from '@/api/workflows'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
@@ -113,12 +20,12 @@ const run = ref<Partial<WorkflowRun>>({
   input: {},
   node_executions: [],
   started_at: '',
-  completed_at: '',
+  completed_at: ''
 })
 
 const sseConnected = ref(false)
 const sseError = ref(false)
-const sseEvents = ref<Array<{ time: string; type: string; summary: string }>>([])
+const sseEvents = ref<Array<{ time: string, type: string, summary: string }>>([])
 let eventSource: EventSource | null = null
 
 function runStatusLabel(status?: string) {
@@ -137,16 +44,19 @@ function nodeStatusType(status?: string) {
 }
 
 function formatTime(value?: string) {
-  if (!value) return '-'
+  if (!value)
+    return '-'
   try { return new Date(value).toLocaleString() } catch { return value }
 }
 
 function formatOutput(output: any) {
-  if (!output) return '-'
-  if (typeof output === 'string') return output.length > 500 ? output.slice(0, 500) + '...' : output
+  if (!output)
+    return '-'
+  if (typeof output === 'string')
+    return output.length > 500 ? `${output.slice(0, 500)}...` : output
   try {
     const json = JSON.stringify(output, null, 2)
-    return json.length > 500 ? json.slice(0, 500) + '...' : json
+    return json.length > 500 ? `${json.slice(0, 500)}...` : json
   } catch {
     return String(output)
   }
@@ -233,7 +143,7 @@ function addSseEvent(type: string, summary: string) {
   sseEvents.value.push({
     time: new Date().toLocaleTimeString(),
     type,
-    summary,
+    summary
   })
 }
 
@@ -248,6 +158,124 @@ onBeforeUnmount(() => {
   disconnectSSE()
 })
 </script>
+
+<template>
+  <div class="run-detail">
+    <div class="run-header">
+      <el-button text @click="goBack">
+        <el-icon><ArrowLeft /></el-icon> 返回
+      </el-button>
+      <span class="run-title">运行详情</span>
+      <el-tag :type="runStatusType(run.status)" size="large">
+        {{ runStatusLabel(run.status) }}
+      </el-tag>
+      <div class="run-header-actions">
+        <el-button v-if="run.status === 'running'" size="small" type="danger" @click="handleCancel">
+          取消运行
+        </el-button>
+      </div>
+    </div>
+
+    <el-row :gutter="20">
+      <el-col :span="16">
+        <div class="run-info-card">
+          <h4>基本信息</h4>
+          <el-descriptions :column="2" size="small" border>
+            <el-descriptions-item label="运行 ID">
+              {{ run.id }}
+            </el-descriptions-item>
+            <el-descriptions-item label="工作流">
+              {{ run.workflow_name }}
+            </el-descriptions-item>
+            <el-descriptions-item label="触发方式">
+              {{ run.trigger_type }}
+            </el-descriptions-item>
+            <el-descriptions-item label="状态">
+              {{ runStatusLabel(run.status) }}
+            </el-descriptions-item>
+            <el-descriptions-item label="开始时间">
+              {{ formatTime(run.started_at) }}
+            </el-descriptions-item>
+            <el-descriptions-item label="完成时间">
+              {{ formatTime(run.completed_at) }}
+            </el-descriptions-item>
+          </el-descriptions>
+        </div>
+
+        <div class="run-info-card">
+          <h4>节点执行状态</h4>
+          <el-table v-if="run.node_executions?.length" :data="run.node_executions" size="small" stripe>
+            <el-table-column prop="node_id" label="节点" width="160">
+              <template #default="{ row }">
+                <span class="mono">{{ row.node_id }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="status" label="状态" width="100">
+              <template #default="{ row }">
+                <el-tag :type="nodeStatusType(row.status)" size="small">
+                  {{ row.status }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="output" label="输出">
+              <template #default="{ row }">
+                <div class="node-output mono">
+                  {{ formatOutput(row.output) }}
+                </div>
+              </template>
+            </el-table-column>
+          </el-table>
+          <div v-else-if="run.status === 'running'" class="loading-placeholder">
+            <el-icon class="is-loading">
+              <Loading />
+            </el-icon> 等待节点状态...
+          </div>
+          <div v-else class="text-muted">
+            无节点执行记录
+          </div>
+        </div>
+
+        <div v-if="run.error" class="run-info-card run-error-card">
+          <h4>错误信息</h4>
+          <pre class="error-text">{{ run.error }}</pre>
+        </div>
+
+        <div v-if="run.output" class="run-info-card">
+          <h4>输出</h4>
+          <pre class="output-text">{{ formatOutput(run.output) }}</pre>
+        </div>
+      </el-col>
+
+      <el-col :span="8">
+        <div class="run-info-card">
+          <h4>输入数据</h4>
+          <pre class="output-text">{{ JSON.stringify(run.input || {}, null, 2) }}</pre>
+        </div>
+
+        <div class="run-info-card">
+          <h4>SSE 连接状态</h4>
+          <div class="sse-status">
+            <el-tag :type="sseConnected ? 'success' : sseError ? 'danger' : 'info'" size="small">
+              {{ sseConnected ? '已连接' : sseError ? '断开' : '未连接' }}
+            </el-tag>
+            <el-button v-if="run.status === 'running' && !sseConnected" size="small" text @click="connectSSE">
+              重连
+            </el-button>
+          </div>
+          <div v-if="sseEvents.length" class="sse-events">
+            <div v-for="(evt, i) in sseEvents.slice(-10)" :key="i" class="sse-event">
+              <span class="sse-event-time">{{ evt.time }}</span>
+              <el-tag :type="evt.type === 'status' ? 'primary' : evt.type === 'error' ? 'danger' : 'info'" size="small">
+                {{ evt.type }}
+              </el-tag>
+              <span class="sse-event-data">{{ evt.summary }}</span>
+            </div>
+          </div>
+        </div>
+      </el-col>
+    </el-row>
+  </div>
+</template>
 
 <style scoped>
 .run-detail { padding: 20px; height: 100%; }

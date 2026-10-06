@@ -2,8 +2,8 @@
  * 数据库管理API
  */
 
-import { ApiClient } from './request'
 import { useAuthStore } from '@/stores/auth'
+import { ApiClient } from './request'
 
 // 数据库状态接口
 export interface DatabaseStatus {
@@ -92,7 +92,7 @@ export const databaseApi = {
   },
 
   // 测试数据库连接
-  testConnections(): Promise<{ success: boolean; message: string; data: ConnectionTestResult }> {
+  testConnections(): Promise<{ success: boolean, message: string, data: ConnectionTestResult }> {
     return ApiClient.post('/api/system/database/test')
   },
 
@@ -100,17 +100,17 @@ export const databaseApi = {
   createBackup(data: {
     name: string
     collections?: string[]
-  }): Promise<{ success: boolean; message: string; data: BackupInfo }> {
+  }): Promise<{ success: boolean, message: string, data: BackupInfo }> {
     return ApiClient.post('/api/system/database/backup', data)
   },
 
   // 获取备份列表
-  getBackups(): Promise<{ success: boolean; data: BackupInfo[] }> {
+  getBackups(): Promise<{ success: boolean, data: BackupInfo[] }> {
     return ApiClient.get('/api/system/database/backups')
   },
 
   // 删除备份
-  deleteBackup(backupId: string): Promise<{ success: boolean; message: string }> {
+  deleteBackup(backupId: string): Promise<{ success: boolean, message: string }> {
     return ApiClient.delete(`/api/system/database/backups/${backupId}`)
   },
 
@@ -122,7 +122,7 @@ export const databaseApi = {
       format?: string
       overwrite?: boolean
     }
-  ): Promise<{ success: boolean; message: string; data: any }> {
+  ): Promise<{ success: boolean, message: string, data: any }> {
     const formData = new FormData()
     formData.append('file', file)
 
@@ -153,7 +153,7 @@ export const databaseApi = {
   exportData(options: {
     collections?: string[]
     format?: string
-    sanitize?: boolean  // 是否脱敏（清空敏感字段，用于演示系统）
+    sanitize?: boolean // 是否脱敏（清空敏感字段，用于演示系统）
   }): Promise<Blob> {
     const token = useAuthStore().token
     return fetch('/api/system/database/export', {
@@ -163,7 +163,7 @@ export const databaseApi = {
         ...(token ? { Authorization: `Bearer ${token}` } : {})
       },
       body: JSON.stringify(options)
-    }).then(async (response) => {
+    }).then(async response => {
       if (!response.ok) {
         throw new Error(`导出数据失败: HTTP ${response.status}`)
       }
@@ -213,11 +213,12 @@ export const databaseApi = {
 
 // 工具函数
 export const formatBytes = (bytes: number): string => {
-  if (bytes === 0) return '0 B'
+  if (bytes === 0)
+    return '0 B'
   const k = 1024
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  return `${Number.parseFloat((bytes / k ** i).toFixed(2))} ${sizes[i]}`
 }
 
 export const formatDateTime = (dateTime: string): string => {
@@ -228,7 +229,7 @@ export const formatUptime = (seconds: number): string => {
   const days = Math.floor(seconds / 86400)
   const hours = Math.floor((seconds % 86400) / 3600)
   const minutes = Math.floor((seconds % 3600) / 60)
-  
+
   if (days > 0) {
     return `${days}天 ${hours}小时 ${minutes}分钟`
   } else if (hours > 0) {

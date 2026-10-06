@@ -2,8 +2,8 @@
  * 配置管理API
  */
 
-import { ApiClient } from './request'
 import type { ApiResponse } from './request'
+import { ApiClient } from './request'
 
 // 配置相关类型定义
 
@@ -35,8 +35,8 @@ export interface LLMProvider {
 export interface LLMConfig {
   provider: string
   model_name: string
-  model_display_name?: string  // 新增：模型显示名称
-  api_key?: string  // 可选，优先从厂家配置获取
+  model_display_name?: string // 新增：模型显示名称
+  api_key?: string // 可选，优先从厂家配置获取
   api_base?: string
   max_tokens: number
   temperature: number
@@ -54,14 +54,14 @@ export interface LLMConfig {
   priority?: number
   model_category?: string
   // 🆕 模型能力分级系统
-  capability_level?: number  // 模型能力等级(1-5): 1=基础, 2=标准, 3=高级, 4=专业, 5=旗舰
-  suitable_roles?: string[]  // 适用角色: quick_analysis(快速分析), deep_analysis(深度分析), both(两者都适合)
-  features?: string[]  // 模型特性: tool_calling, long_context, reasoning, vision, fast_response, cost_effective
-  recommended_depths?: string[]  // 推荐的分析深度级别: 快速, 基础, 标准, 深度, 全面
-  performance_metrics?: {  // 性能指标
-    speed?: number  // 速度(1-5)
-    cost?: number  // 成本(1-5)
-    quality?: number  // 质量(1-5)
+  capability_level?: number // 模型能力等级(1-5): 1=基础, 2=标准, 3=高级, 4=专业, 5=旗舰
+  suitable_roles?: string[] // 适用角色: quick_analysis(快速分析), deep_analysis(深度分析), both(两者都适合)
+  features?: string[] // 模型特性: tool_calling, long_context, reasoning, vision, fast_response, cost_effective
+  recommended_depths?: string[] // 推荐的分析深度级别: 快速, 基础, 标准, 深度, 全面
+  performance_metrics?: { // 性能指标
+    speed?: number // 速度(1-5)
+    cost?: number // 成本(1-5)
+    quality?: number // 质量(1-5)
   }
   created_at?: string
   updated_at?: string
@@ -94,9 +94,9 @@ export interface DataSourceConfig {
   config_params: Record<string, any>
   description?: string
   // 新增字段：支持市场分类
-  market_categories?: string[]  // 所属市场分类列表
-  display_name?: string         // 显示名称
-  provider?: string            // 数据提供商
+  market_categories?: string[] // 所属市场分类列表
+  display_name?: string // 显示名称
+  provider?: string // 数据提供商
   created_at?: string
   updated_at?: string
 }
@@ -117,7 +117,7 @@ export interface MarketCategory {
 export interface DataSourceGrouping {
   data_source_name: string
   market_category_id: string
-  priority: number              // 在该分类中的优先级
+  priority: number // 在该分类中的优先级
   enabled: boolean
   created_at?: string
   updated_at?: string
@@ -164,7 +164,6 @@ export interface ConfigTestResponse {
   details?: Record<string, any>
 }
 
-
 // 系统设置元数据
 export interface SettingMeta {
   key: string
@@ -175,7 +174,7 @@ export interface SettingMeta {
 }
 
 const unwrapResponse = <T>(promise: Promise<ApiResponse<T>>): Promise<T> =>
-  promise.then((res) => res.data)
+  promise.then(res => res.data)
 
 // 配置管理API
 export const configApi = {
@@ -192,8 +191,8 @@ export const configApi = {
   },
 
   // 添加大模型厂家
-  addLLMProvider(provider: Partial<LLMProvider>): Promise<{ message: string; id: string }> {
-    return unwrapResponse(ApiClient.post<{ message: string; id: string }>('/api/config/llm/providers', provider))
+  addLLMProvider(provider: Partial<LLMProvider>): Promise<{ message: string, id: string }> {
+    return unwrapResponse(ApiClient.post<{ message: string, id: string }>('/api/config/llm/providers', provider))
   },
 
   // 更新大模型厂家
@@ -212,30 +211,30 @@ export const configApi = {
   },
 
   // 迁移环境变量到厂家管理
-  migrateEnvToProviders(): Promise<{ message: string; data: any }> {
-    return unwrapResponse(ApiClient.post<{ message: string; data: any }>('/api/config/llm/providers/migrate-env'))
+  migrateEnvToProviders(): Promise<{ message: string, data: any }> {
+    return unwrapResponse(ApiClient.post<{ message: string, data: any }>('/api/config/llm/providers/migrate-env'))
   },
 
   // 🆕 初始化聚合渠道厂家配置
-  initAggregatorProviders(): Promise<{ success: boolean; message: string; data: { added_count: number; skipped_count: number } }> {
-    return unwrapResponse(ApiClient.post<{ success: boolean; message: string; data: { added_count: number; skipped_count: number } }>('/api/config/llm/providers/init-aggregators'))
+  initAggregatorProviders(): Promise<{ success: boolean, message: string, data: { added_count: number, skipped_count: number } }> {
+    return unwrapResponse(ApiClient.post<{ success: boolean, message: string, data: { added_count: number, skipped_count: number } }>('/api/config/llm/providers/init-aggregators'))
   },
 
   // 测试厂家API
-  testProviderAPI(providerId: string): Promise<{ success: boolean; message: string; data?: any }> {
-    return unwrapResponse(ApiClient.post<{ success: boolean; message: string; data?: any }>(`/api/config/llm/providers/${providerId}/test`))
+  testProviderAPI(providerId: string): Promise<{ success: boolean, message: string, data?: any }> {
+    return unwrapResponse(ApiClient.post<{ success: boolean, message: string, data?: any }>(`/api/config/llm/providers/${providerId}/test`))
   },
 
   // 获取可用的模型列表（按厂家分组）
   getAvailableModels(): Promise<Array<{
     provider: string
     provider_name: string
-    models: Array<{ name: string; display_name: string }>
+    models: Array<{ name: string, display_name: string }>
   }>> {
     return unwrapResponse(ApiClient.get<Array<{
       provider: string
       provider_name: string
-      models: Array<{ name: string; display_name: string }>
+      models: Array<{ name: string, display_name: string }>
     }>>('/api/config/models'))
   },
 
@@ -319,19 +318,19 @@ export const configApi = {
   saveModelCatalog(catalog: {
     provider: string
     provider_name: string
-    models: Array<{ name: string; display_name: string; description?: string }>
-  }): Promise<{ success: boolean; message: string }> {
-    return unwrapResponse(ApiClient.post<{ success: boolean; message: string }>('/api/config/model-catalog', catalog))
+    models: Array<{ name: string, display_name: string, description?: string }>
+  }): Promise<{ success: boolean, message: string }> {
+    return unwrapResponse(ApiClient.post<{ success: boolean, message: string }>('/api/config/model-catalog', catalog))
   },
 
   // 删除模型目录
-  deleteModelCatalog(provider: string): Promise<{ success: boolean; message: string }> {
-    return unwrapResponse(ApiClient.delete<{ success: boolean; message: string }>(`/api/config/model-catalog/${provider}`))
+  deleteModelCatalog(provider: string): Promise<{ success: boolean, message: string }> {
+    return unwrapResponse(ApiClient.delete<{ success: boolean, message: string }>(`/api/config/model-catalog/${provider}`))
   },
 
   // 初始化默认模型目录
-  initModelCatalog(): Promise<{ success: boolean; message: string }> {
-    return unwrapResponse(ApiClient.post<{ success: boolean; message: string }>('/api/config/model-catalog/init'))
+  initModelCatalog(): Promise<{ success: boolean, message: string }> {
+    return unwrapResponse(ApiClient.post<{ success: boolean, message: string }>('/api/config/model-catalog/init'))
   },
 
   // 从厂家 API 获取模型列表
@@ -375,8 +374,8 @@ export const configApi = {
   },
 
   // 添加或更新大模型配置
-  updateLLMConfig(config: Partial<LLMConfig>): Promise<{ message: string; model_name: string }> {
-    return unwrapResponse(ApiClient.post<{ message: string; model_name: string }>('/api/config/llm', config))
+  updateLLMConfig(config: Partial<LLMConfig>): Promise<{ message: string, model_name: string }> {
+    return unwrapResponse(ApiClient.post<{ message: string, model_name: string }>('/api/config/llm', config))
   },
 
   // 删除大模型配置
@@ -385,8 +384,8 @@ export const configApi = {
   },
 
   // 设置默认大模型
-  setDefaultLLM(name: string): Promise<{ message: string; default_llm: string }> {
-    return unwrapResponse(ApiClient.post<{ message: string; default_llm: string }>('/api/config/llm/set-default', { name }))
+  setDefaultLLM(name: string): Promise<{ message: string, default_llm: string }> {
+    return unwrapResponse(ApiClient.post<{ message: string, default_llm: string }>('/api/config/llm/set-default', { name }))
   },
 
   // 获取所有数据源配置
@@ -395,13 +394,13 @@ export const configApi = {
   },
 
   // 添加数据源配置
-  addDataSourceConfig(config: Partial<DataSourceConfig>): Promise<{ message: string; name: string }> {
-    return unwrapResponse(ApiClient.post<{ message: string; name: string }>('/api/config/datasource', config))
+  addDataSourceConfig(config: Partial<DataSourceConfig>): Promise<{ message: string, name: string }> {
+    return unwrapResponse(ApiClient.post<{ message: string, name: string }>('/api/config/datasource', config))
   },
 
   // 设置默认数据源
-  setDefaultDataSource(name: string): Promise<{ message: string; default_data_source: string }> {
-    return unwrapResponse(ApiClient.post<{ message: string; default_data_source: string }>('/api/config/datasource/set-default', { name }))
+  setDefaultDataSource(name: string): Promise<{ message: string, default_data_source: string }> {
+    return unwrapResponse(ApiClient.post<{ message: string, default_data_source: string }>('/api/config/datasource/set-default', { name }))
   },
 
   // 更新数据源配置
@@ -419,8 +418,8 @@ export const configApi = {
     return unwrapResponse(ApiClient.get<MarketCategory[]>('/api/config/market-categories'))
   },
 
-  addMarketCategory(category: Partial<MarketCategory>): Promise<{ message: string; id: string }> {
-    return unwrapResponse(ApiClient.post<{ message: string; id: string }>('/api/config/market-categories', category))
+  addMarketCategory(category: Partial<MarketCategory>): Promise<{ message: string, id: string }> {
+    return unwrapResponse(ApiClient.post<{ message: string, id: string }>('/api/config/market-categories', category))
   },
 
   updateMarketCategory(id: string, category: Partial<MarketCategory>): Promise<{ message: string }> {
@@ -454,7 +453,7 @@ export const configApi = {
   },
 
   // 批量更新分类内数据源排序
-  updateCategoryDataSourceOrder(categoryId: string, orderedDataSources: Array<{name: string, priority: number}>): Promise<{ message: string }> {
+  updateCategoryDataSourceOrder(categoryId: string, orderedDataSources: Array<{ name: string, priority: number }>): Promise<{ message: string }> {
     return unwrapResponse(ApiClient.put<{ message: string }>(`/api/config/market-categories/${categoryId}/datasource-order`, {
       data_sources: orderedDataSources
     }))
@@ -464,7 +463,6 @@ export const configApi = {
   getSystemSettingsMeta(): Promise<{ items: SettingMeta[] }> {
     return unwrapResponse(ApiClient.get<{ items: SettingMeta[] }>('/api/config/settings/meta'))
   },
-
 
   // ========== 数据库配置管理 ==========
 
@@ -479,18 +477,18 @@ export const configApi = {
   },
 
   // 添加数据库配置
-  addDatabaseConfig(config: Partial<DatabaseConfig>): Promise<{ success: boolean; message: string }> {
-    return unwrapResponse(ApiClient.post<{ success: boolean; message: string }>('/api/config/database', config))
+  addDatabaseConfig(config: Partial<DatabaseConfig>): Promise<{ success: boolean, message: string }> {
+    return unwrapResponse(ApiClient.post<{ success: boolean, message: string }>('/api/config/database', config))
   },
 
   // 更新数据库配置
-  updateDatabaseConfig(dbName: string, config: Partial<DatabaseConfig>): Promise<{ success: boolean; message: string }> {
-    return unwrapResponse(ApiClient.put<{ success: boolean; message: string }>(`/api/config/database/${encodeURIComponent(dbName)}`, config))
+  updateDatabaseConfig(dbName: string, config: Partial<DatabaseConfig>): Promise<{ success: boolean, message: string }> {
+    return unwrapResponse(ApiClient.put<{ success: boolean, message: string }>(`/api/config/database/${encodeURIComponent(dbName)}`, config))
   },
 
   // 删除数据库配置
-  deleteDatabaseConfig(dbName: string): Promise<{ success: boolean; message: string }> {
-    return unwrapResponse(ApiClient.delete<{ success: boolean; message: string }>(`/api/config/database/${encodeURIComponent(dbName)}`))
+  deleteDatabaseConfig(dbName: string): Promise<{ success: boolean, message: string }> {
+    return unwrapResponse(ApiClient.delete<{ success: boolean, message: string }>(`/api/config/database/${encodeURIComponent(dbName)}`))
   },
 
   // 测试数据库配置连接
@@ -504,7 +502,7 @@ export const configApi = {
   },
 
   // 获取默认模型配置
-  getDefaultModels(): Promise<{ quick_analysis_model: string; deep_analysis_model: string }> {
+  getDefaultModels(): Promise<{ quick_analysis_model: string, deep_analysis_model: string }> {
     return unwrapResponse(ApiClient.get<Record<string, any>>('/api/config/settings')).then(settings => ({
       quick_analysis_model: settings.quick_analysis_model || 'qwen-turbo',
       deep_analysis_model: settings.deep_analysis_model || 'qwen-max'
@@ -522,8 +520,8 @@ export const configApi = {
   },
 
   // 导出配置
-  exportConfig(): Promise<{ message: string; data: any; exported_at: string }> {
-    return unwrapResponse(ApiClient.post<{ message: string; data: any; exported_at: string }>('/api/config/export'))
+  exportConfig(): Promise<{ message: string, data: any, exported_at: string }> {
+    return unwrapResponse(ApiClient.post<{ message: string, data: any, exported_at: string }>('/api/config/export'))
   },
 
   // 导入配置
@@ -537,8 +535,8 @@ export const configApi = {
   },
 
   // 配置重载
-  reloadConfig(): Promise<{ success: boolean; message: string; data?: any }> {
-    return unwrapResponse(ApiClient.post<{ success: boolean; message: string; data?: any }>('/api/config/reload'))
+  reloadConfig(): Promise<{ success: boolean, message: string, data?: any }> {
+    return unwrapResponse(ApiClient.post<{ success: boolean, message: string, data?: any }>('/api/config/reload'))
   }
 }
 
@@ -662,10 +660,13 @@ export const DEFAULT_DATABASE_CONFIG: Partial<DatabaseConfig> = {
 export const validateLLMConfig = (config: Partial<LLMConfig>): string[] => {
   const errors: string[] = []
 
-  if (!config.provider) errors.push('供应商不能为空')
-  if (!config.model_name) errors.push('模型名称不能为空')
+  if (!config.provider)
+    errors.push('供应商不能为空')
+  if (!config.model_name)
+    errors.push('模型名称不能为空')
   // 注意：API密钥不在这里验证，因为它是在厂家配置中管理的
-  if (config.max_tokens && config.max_tokens <= 0) errors.push('最大Token数必须大于0')
+  if (config.max_tokens && config.max_tokens <= 0)
+    errors.push('最大Token数必须大于0')
   if (config.temperature && (config.temperature < 0 || config.temperature > 2)) {
     errors.push('温度参数必须在0-2之间')
   }
@@ -676,10 +677,14 @@ export const validateLLMConfig = (config: Partial<LLMConfig>): string[] => {
 export const validateDataSourceConfig = (config: Partial<DataSourceConfig>): string[] => {
   const errors: string[] = []
 
-  if (!config.name) errors.push('数据源名称不能为空')
-  if (!config.type) errors.push('数据源类型不能为空')
-  if (config.timeout && config.timeout <= 0) errors.push('超时时间必须大于0')
-  if (config.rate_limit && config.rate_limit <= 0) errors.push('速率限制必须大于0')
+  if (!config.name)
+    errors.push('数据源名称不能为空')
+  if (!config.type)
+    errors.push('数据源类型不能为空')
+  if (config.timeout && config.timeout <= 0)
+    errors.push('超时时间必须大于0')
+  if (config.rate_limit && config.rate_limit <= 0)
+    errors.push('速率限制必须大于0')
 
   return errors
 }
@@ -687,11 +692,16 @@ export const validateDataSourceConfig = (config: Partial<DataSourceConfig>): str
 export const validateDatabaseConfig = (config: Partial<DatabaseConfig>): string[] => {
   const errors: string[] = []
 
-  if (!config.name) errors.push('数据库名称不能为空')
-  if (!config.type) errors.push('数据库类型不能为空')
-  if (!config.host) errors.push('主机地址不能为空')
-  if (!config.port || config.port <= 0) errors.push('端口号必须大于0')
-  if (config.pool_size && config.pool_size <= 0) errors.push('连接池大小必须大于0')
+  if (!config.name)
+    errors.push('数据库名称不能为空')
+  if (!config.type)
+    errors.push('数据库类型不能为空')
+  if (!config.host)
+    errors.push('主机地址不能为空')
+  if (!config.port || config.port <= 0)
+    errors.push('端口号必须大于0')
+  if (config.pool_size && config.pool_size <= 0)
+    errors.push('连接池大小必须大于0')
 
   return errors
 }

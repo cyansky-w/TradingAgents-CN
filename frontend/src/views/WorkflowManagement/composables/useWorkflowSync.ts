@@ -1,12 +1,12 @@
+import type { WorkflowEdge, WorkflowNode } from '@/api/workflows'
 import { ref } from 'vue'
 import { workflowsApi } from '@/api/workflows'
-import type { WorkflowNode, WorkflowEdge } from '@/api/workflows'
 
 export interface FlowNode {
   id: string
   type: string
   label: string
-  position: { x: number; y: number }
+  position: { x: number, y: number }
   data: Record<string, any>
 }
 
@@ -31,7 +31,7 @@ export function toFlowNodes(nodes: WorkflowNode[]): FlowNode[] {
     position: n.position || { x: 0, y: 0 },
     data: {
       label: n.label || n.id,
-      ...(n.config || {}),
+      ...(n.config || {})
     }
   }))
 }
@@ -40,7 +40,7 @@ export function toFlowEdges(edges: WorkflowEdge[]): FlowEdge[] {
   return edges.map(e => ({
     id: e.id,
     source: e.source,
-    target: e.target,
+    target: e.target
   }))
 }
 
@@ -52,7 +52,7 @@ export function toApiNodes(flowNodes: FlowNode[]): WorkflowNode[] {
       type: n.type as 'agent' | 'subflow' | 'io',
       label: n.label,
       position: n.position,
-      config: { io_direction, agent_id, agentName, workflow_id, workflowName, input_mapping, loop_over, parallel, max_concurrency, ...rest },
+      config: { io_direction, agent_id, agentName, workflow_id, workflowName, input_mapping, loop_over, parallel, max_concurrency, ...rest }
     }
   })
 }
@@ -61,7 +61,7 @@ export function toApiEdges(flowEdges: FlowEdge[]): WorkflowEdge[] {
   return flowEdges.map(e => ({
     id: e.id,
     source: e.source,
-    target: e.target,
+    target: e.target
   }))
 }
 
@@ -83,11 +83,13 @@ export function createNode(type: string, x: number, y: number): FlowNode {
 }
 
 export function autoLayoutIfNeeded(nodes: FlowNode[], edges: FlowEdge[]): void {
-  if (!nodes.length) return
+  if (!nodes.length)
+    return
   const needsLayout = nodes.every(n =>
     !n.position || (n.position.x === 0 && n.position.y === 0)
   )
-  if (!needsLayout) return
+  if (!needsLayout)
+    return
 
   const inDeg: Record<string, number> = {}
   const adj: Record<string, string[]> = {}
@@ -102,7 +104,8 @@ export function autoLayoutIfNeeded(nodes: FlowNode[], edges: FlowEdge[]): void {
   const layers: string[][] = []
   const assigned = new Set<string>()
   let queue = nodes.filter(n => inDeg[n.id] === 0).map(n => n.id)
-  if (!queue.length) queue = [nodes[0].id]
+  if (!queue.length)
+    queue = [nodes[0].id]
 
   while (queue.length) {
     layers.push([...queue])
@@ -125,7 +128,7 @@ export function autoLayoutIfNeeded(nodes: FlowNode[], edges: FlowEdge[]): void {
     }
   }
 
-  const LAYER_GAP = 280, NODE_GAP = 120, START_X = 80, START_Y = 50
+  const LAYER_GAP = 280; const NODE_GAP = 120; const START_X = 80; const START_Y = 50
   const nodeMap = new Map(nodes.map(n => [n.id, n]))
   layers.forEach((layer, li) => {
     const x = START_X + li * LAYER_GAP
@@ -133,7 +136,8 @@ export function autoLayoutIfNeeded(nodes: FlowNode[], edges: FlowEdge[]): void {
     const startY = START_Y + Math.max(0, (300 - totalH) / 2)
     layer.forEach((id, ni) => {
       const node = nodeMap.get(id)
-      if (node) node.position = { x, y: startY + ni * NODE_GAP }
+      if (node)
+        node.position = { x, y: startY + ni * NODE_GAP }
     })
   })
 }
@@ -146,7 +150,8 @@ export function useWorkflowSync() {
     loading.value = true
     try {
       const res = await workflowsApi.get(workflowId)
-      if (res.success) return res.data
+      if (res.success)
+        return res.data
       return null
     } finally {
       loading.value = false
@@ -159,7 +164,7 @@ export function useWorkflowSync() {
       const res = await workflowsApi.update(workflowId, {
         nodes: toApiNodes(nodes),
         edges: toApiEdges(edges),
-        ...extra,
+        ...extra
       })
       return res.success ? res.data : null
     } finally {

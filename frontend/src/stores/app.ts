@@ -1,6 +1,6 @@
-import { defineStore } from 'pinia'
 import type { RouteLocationNormalized } from 'vue-router'
 import { useStorage } from '@vueuse/core'
+import { defineStore } from 'pinia'
 
 export interface AppState {
   // 应用基础状态
@@ -24,7 +24,7 @@ export interface AppState {
   // 用户偏好
   preferences: {
     defaultMarket: 'A股' | '美股' | '港股'
-    defaultDepth: '1' | '2' | '3' | '4' | '5'  // 1-5级分析深度
+    defaultDepth: '1' | '2' | '3' | '4' | '5' // 1-5级分析深度
     autoRefresh: boolean
     refreshInterval: number
     showWelcome: boolean
@@ -77,17 +77,17 @@ export const useAppStore = defineStore('app', {
       }
       return this.theme === 'dark'
     },
-    
+
     // 侧边栏实际宽度
     actualSidebarWidth(): number {
       return this.sidebarCollapsed ? 64 : this.sidebarWidth
     },
-    
+
     // 当前页面标题
     currentPageTitle(): string {
       return this.currentRoute?.meta?.title as string || 'TradingAgents-CN'
     },
-    
+
     // 应用信息
     appInfo(): Record<string, any> {
       return {
@@ -106,12 +106,12 @@ export const useAppStore = defineStore('app', {
       this.loading = loading
       this.loadingProgress = progress
     },
-    
+
     // 设置加载进度
     setLoadingProgress(progress: number) {
       this.loadingProgress = Math.max(0, Math.min(100, progress))
     },
-    
+
     // 切换主题
     toggleTheme() {
       const themes: Array<'light' | 'dark' | 'auto'> = ['light', 'dark', 'auto']
@@ -119,7 +119,7 @@ export const useAppStore = defineStore('app', {
       this.theme = themes[(currentIndex + 1) % themes.length]
       this.applyTheme()
     },
-    
+
     // 设置主题
     setTheme(theme: 'light' | 'dark' | 'auto') {
       this.theme = theme
@@ -127,19 +127,19 @@ export const useAppStore = defineStore('app', {
       // 同步到 localStorage
       localStorage.setItem('app-theme', theme)
     },
-    
+
     // 应用主题
     applyTheme() {
       const isDark = this.isDarkTheme
       document.documentElement.classList.toggle('dark', isDark)
-      
+
       // 更新meta标签
       const themeColorMeta = document.querySelector('meta[name="theme-color"]')
       if (themeColorMeta) {
         themeColorMeta.setAttribute('content', isDark ? '#1f2937' : '#409EFF')
       }
     },
-    
+
     // 切换语言
     setLanguage(language: 'zh-CN' | 'en-US') {
       this.language = language
@@ -147,12 +147,12 @@ export const useAppStore = defineStore('app', {
       // 同步到 localStorage
       localStorage.setItem('app-language', language)
     },
-    
+
     // 切换侧边栏
     toggleSidebar() {
       this.sidebarCollapsed = !this.sidebarCollapsed
     },
-    
+
     // 设置侧边栏状态
     setSidebarCollapsed(collapsed: boolean) {
       this.sidebarCollapsed = collapsed
@@ -166,26 +166,26 @@ export const useAppStore = defineStore('app', {
       // 同步到 localStorage
       localStorage.setItem('sidebar-width', String(this.sidebarWidth))
     },
-    
+
     // 设置当前路由
     setCurrentRoute(route: RouteLocationNormalized) {
       this.currentRoute = route
     },
-    
+
     // 更新用户偏好
     updatePreferences(preferences: Partial<AppState['preferences']>) {
       this.preferences = { ...this.preferences, ...preferences }
       // 同步到 localStorage
       localStorage.setItem('user-preferences', JSON.stringify(this.preferences))
     },
-    
+
     // 重置偏好设置
     resetPreferences() {
       this.preferences = {
         ...defaultPreferences
       }
     },
-    
+
     // 设置网络状态
     setOnlineStatus(isOnline: boolean) {
       this.isOnline = isOnline
@@ -256,7 +256,7 @@ export const useAppStore = defineStore('app', {
         this.setApiConnected(false)
       }
     },
-    
+
     // 重置应用状态
     resetAppState() {
       this.loading = false

@@ -1,10 +1,10 @@
-import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
-import { nextTick } from 'vue'
-import { useAuthStore } from '@/stores/auth'
-import { useAppStore } from '@/stores/app'
 import { ElMessage } from 'element-plus'
 import NProgress from 'nprogress'
+import { nextTick } from 'vue'
+import { createRouter, createWebHistory } from 'vue-router'
+import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 import 'nprogress/nprogress.css'
 
 const BasicLayout = () => import('@/layouts/BasicLayout.vue')
@@ -27,7 +27,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/paper/:name.md',
     name: 'PaperMdRedirect',
-    redirect: (to) => `/learning/article/${to.params.name as string}`,
+    redirect: to => `/learning/article/${to.params.name as string}`,
     meta: { title: '文档跳转', hideInMenu: true, requiresAuth: false }
   },
   {
@@ -67,7 +67,7 @@ const routes: RouteRecordRaw[] = [
         path: 'batch',
         name: 'BatchAnalysis',
         component: () => import('@/views/Analysis/BatchAnalysis.vue')
-      },
+      }
 
     ]
   },
@@ -181,7 +181,6 @@ const routes: RouteRecordRaw[] = [
       }
     ]
   },
-
 
   {
     path: '/tasks',
@@ -397,28 +396,28 @@ const routes: RouteRecordRaw[] = [
 
   {
     path: '/real-trading',
-      name: 'RealTrading',
-      component: BasicLayout,
-      meta: {
-        title: '实盘持仓',
-        icon: 'TrendCharts',
-        requiresAuth: true,
-        transition: 'slide-up'
-      },
-      children: [
-        {
-          path: '',
-          name: 'RealTradingHome',
-          component: () => import('@/views/RealTrading/index.vue'),
-          meta: {
-            title: '实盘持仓',
-            requiresAuth: true
-          }
-        }
-      ]
+    name: 'RealTrading',
+    component: BasicLayout,
+    meta: {
+      title: '实盘持仓',
+      icon: 'TrendCharts',
+      requiresAuth: true,
+      transition: 'slide-up'
     },
+    children: [
+      {
+        path: '',
+        name: 'RealTradingHome',
+        component: () => import('@/views/RealTrading/index.vue'),
+        meta: {
+          title: '实盘持仓',
+          requiresAuth: true
+        }
+      }
+    ]
+  },
 
-    {
+  {
     path: '/chat',
     name: 'Chat',
     component: BasicLayout,
@@ -614,8 +613,6 @@ router.beforeEach(async (to, _from, next) => {
     return
   }
 
-
-
   // 如果已登录且访问登录页，重定向到仪表板
   if (authStore.isAuthenticated && to.name === 'Login') {
     next('/dashboard')
@@ -640,7 +637,7 @@ router.afterEach((_to, _from) => {
 })
 
 // 路由错误处理
-router.onError((error) => {
+router.onError(error => {
   console.error('路由错误:', error)
   NProgress.done()
   ElMessage.error('页面加载失败，请重试')

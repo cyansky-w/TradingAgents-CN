@@ -1,3 +1,33 @@
+<script setup lang="ts">
+import {
+  ChatDotRound,
+  CircleCheck,
+  Cpu,
+  Document,
+  Files,
+  Link,
+  Message,
+  Monitor,
+  Search,
+  Setting,
+  Star,
+  TrendCharts
+} from '@element-plus/icons-vue'
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
+const buildTime = ref(new Date().toLocaleString('zh-CN'))
+
+const goToAnalysis = () => {
+  router.push('/analysis/single')
+}
+
+const viewDocumentation = () => {
+  window.open('https://mp.weixin.qq.com/s/ppsYiBncynxlsfKFG8uEbw', '_blank')
+}
+</script>
+
 <template>
   <div class="about">
     <!-- Hero Section -->
@@ -34,16 +64,28 @@
           <div class="hero-card">
             <div class="hero-stats">
               <div class="stat-item">
-                <div class="stat-number">12</div>
-                <div class="stat-label">智能体</div>
+                <div class="stat-number">
+                  12
+                </div>
+                <div class="stat-label">
+                  智能体
+                </div>
               </div>
               <div class="stat-item">
-                <div class="stat-number">12+</div>
-                <div class="stat-label">数据源</div>
+                <div class="stat-number">
+                  12+
+                </div>
+                <div class="stat-label">
+                  数据源
+                </div>
               </div>
               <div class="stat-item">
-                <div class="stat-number">24/7</div>
-                <div class="stat-label">实时监控</div>
+                <div class="stat-number">
+                  24/7
+                </div>
+                <div class="stat-label">
+                  实时监控
+                </div>
               </div>
             </div>
           </div>
@@ -54,8 +96,12 @@
     <!-- 核心功能 -->
     <div class="features-section">
       <div class="section-header">
-        <h2 class="section-title">核心功能</h2>
-        <p class="section-subtitle">强大的AI驱动分析能力，全方位投资决策支持</p>
+        <h2 class="section-title">
+          核心功能
+        </h2>
+        <p class="section-subtitle">
+          强大的AI驱动分析能力，全方位投资决策支持
+        </p>
       </div>
 
       <div class="features-grid">
@@ -68,10 +114,18 @@
           </div>
           <p>基本面、技术面、新闻分析、社媒分析等12个智能体协作，提供全方位的股票分析视角</p>
           <div class="feature-tags">
-            <el-tag size="small">基本面分析</el-tag>
-            <el-tag size="small">技术分析</el-tag>
-            <el-tag size="small">新闻分析</el-tag>
-            <el-tag size="small">社媒分析</el-tag>
+            <el-tag size="small">
+              基本面分析
+            </el-tag>
+            <el-tag size="small">
+              技术分析
+            </el-tag>
+            <el-tag size="small">
+              新闻分析
+            </el-tag>
+            <el-tag size="small">
+              社媒分析
+            </el-tag>
           </div>
         </div>
 
@@ -84,8 +138,12 @@
           </div>
           <p>多维度筛选条件，智能算法推荐，快速发现具有投资价值的优质股票</p>
           <div class="feature-tags">
-            <el-tag size="small" type="success">多维筛选</el-tag>
-            <el-tag size="small" type="success">智能推荐</el-tag>
+            <el-tag size="small" type="success">
+              多维筛选
+            </el-tag>
+            <el-tag size="small" type="success">
+              智能推荐
+            </el-tag>
           </div>
         </div>
 
@@ -98,8 +156,12 @@
           </div>
           <p>支持批量股票分析，并行处理提高效率，适合大规模投资组合分析</p>
           <div class="feature-tags">
-            <el-tag size="small" type="warning">批量处理</el-tag>
-            <el-tag size="small" type="warning">并行计算</el-tag>
+            <el-tag size="small" type="warning">
+              批量处理
+            </el-tag>
+            <el-tag size="small" type="warning">
+              并行计算
+            </el-tag>
           </div>
         </div>
 
@@ -112,8 +174,12 @@
           </div>
           <p>生成详细的分析报告，支持PDF、Excel等多种格式导出，便于分享和存档</p>
           <div class="feature-tags">
-            <el-tag size="small" type="info">PDF导出</el-tag>
-            <el-tag size="small" type="info">Excel报表</el-tag>
+            <el-tag size="small" type="info">
+              PDF导出
+            </el-tag>
+            <el-tag size="small" type="info">
+              Excel报表
+            </el-tag>
           </div>
         </div>
 
@@ -126,8 +192,12 @@
           </div>
           <p>实时监控分析进度和系统状态，提供详细的任务执行日志和性能指标</p>
           <div class="feature-tags">
-            <el-tag size="small" type="danger">实时监控</el-tag>
-            <el-tag size="small" type="danger">性能分析</el-tag>
+            <el-tag size="small" type="danger">
+              实时监控
+            </el-tag>
+            <el-tag size="small" type="danger">
+              性能分析
+            </el-tag>
           </div>
         </div>
 
@@ -140,8 +210,12 @@
           </div>
           <p>灵活的参数配置和个人偏好设置，支持自定义分析策略和风险偏好</p>
           <div class="feature-tags">
-            <el-tag size="small">自定义策略</el-tag>
-            <el-tag size="small">风险配置</el-tag>
+            <el-tag size="small">
+              自定义策略
+            </el-tag>
+            <el-tag size="small">
+              风险配置
+            </el-tag>
           </div>
         </div>
       </div>
@@ -150,8 +224,12 @@
     <!-- 技术架构 -->
     <div class="tech-section">
       <div class="section-header">
-        <h2 class="section-title">技术架构</h2>
-        <p class="section-subtitle">现代化的技术栈，确保系统的稳定性和可扩展性</p>
+        <h2 class="section-title">
+          技术架构
+        </h2>
+        <p class="section-subtitle">
+          现代化的技术栈，确保系统的稳定性和可扩展性
+        </p>
       </div>
 
       <div class="tech-stack">
@@ -249,8 +327,12 @@
     <!-- 项目来源 -->
     <div class="origin-section">
       <div class="section-header">
-        <h2 class="section-title">项目来源</h2>
-        <p class="section-subtitle">致敬开源，感谢原项目的贡献</p>
+        <h2 class="section-title">
+          项目来源
+        </h2>
+        <p class="section-subtitle">
+          致敬开源，感谢原项目的贡献
+        </p>
       </div>
 
       <div class="origin-content">
@@ -261,10 +343,12 @@
             </div>
             <div class="origin-info">
               <h3>TradingAgents</h3>
-              <a href="https://github.com/TauricResearch/TradingAgents"
-                 target="_blank"
-                 rel="noopener noreferrer"
-                 class="origin-link">
+              <a
+                href="https://github.com/TauricResearch/TradingAgents"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="origin-link"
+              >
                 <el-icon><Link /></el-icon>
                 github.com/TauricResearch/TradingAgents
               </a>
@@ -281,27 +365,39 @@
             </p>
             <ul class="origin-improvements">
               <li>
-                <el-icon class="check-icon"><CircleCheck /></el-icon>
+                <el-icon class="check-icon">
+                  <CircleCheck />
+                </el-icon>
                 <span><strong>完整的中文支持：</strong>针对中国A股市场优化，支持中文数据源和分析</span>
               </li>
               <li>
-                <el-icon class="check-icon"><CircleCheck /></el-icon>
+                <el-icon class="check-icon">
+                  <CircleCheck />
+                </el-icon>
                 <span><strong>现代化Web界面：</strong>基于 Vue 3 + Element Plus 开发的全新前端界面</span>
               </li>
               <li>
-                <el-icon class="check-icon"><CircleCheck /></el-icon>
+                <el-icon class="check-icon">
+                  <CircleCheck />
+                </el-icon>
                 <span><strong>增强的数据源：</strong>集成 Tushare、AKShare 等中国市场数据源</span>
               </li>
               <li>
-                <el-icon class="check-icon"><CircleCheck /></el-icon>
+                <el-icon class="check-icon">
+                  <CircleCheck />
+                </el-icon>
                 <span><strong>多LLM支持：</strong>支持国内外主流大语言模型（OpenAI、Claude、智谱AI、DeepSeek等）,推荐使用 AIHubMix 聚合平台统一接入</span>
               </li>
               <li>
-                <el-icon class="check-icon"><CircleCheck /></el-icon>
+                <el-icon class="check-icon">
+                  <CircleCheck />
+                </el-icon>
                 <span><strong>批量分析功能：</strong>支持批量股票分析和任务管理</span>
               </li>
               <li>
-                <el-icon class="check-icon"><CircleCheck /></el-icon>
+                <el-icon class="check-icon">
+                  <CircleCheck />
+                </el-icon>
                 <span><strong>用户系统：</strong>完整的用户认证和个性化配置</span>
               </li>
             </ul>
@@ -317,14 +413,20 @@
     <!-- 版本信息 -->
     <div class="version-section">
       <div class="section-header">
-        <h2 class="section-title">版本信息</h2>
+        <h2 class="section-title">
+          版本信息
+        </h2>
       </div>
 
       <div class="version-info">
         <div class="version-card">
           <div class="version-main">
-            <div class="version-number">v1.0.1</div>
-            <div class="version-status">稳定版</div>
+            <div class="version-number">
+              v1.0.1
+            </div>
+            <div class="version-status">
+              稳定版
+            </div>
           </div>
           <div class="version-details">
             <div class="version-item">
@@ -369,8 +471,12 @@
     <!-- 联系我们 -->
     <div class="contact-section">
       <div class="section-header">
-        <h2 class="section-title">联系我们</h2>
-        <p class="section-subtitle">获取支持、反馈问题或加入社区讨论</p>
+        <h2 class="section-title">
+          联系我们
+        </h2>
+        <p class="section-subtitle">
+          获取支持、反馈问题或加入社区讨论
+        </p>
       </div>
 
       <div class="contact-grid">
@@ -407,10 +513,12 @@
           </div>
           <h4>使用文档</h4>
           <p>
-            <a href="https://mp.weixin.qq.com/s/ppsYiBncynxlsfKFG8uEbw"
-               target="_blank"
-               rel="noopener noreferrer"
-               class="doc-link">
+            <a
+              href="https://mp.weixin.qq.com/s/ppsYiBncynxlsfKFG8uEbw"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="doc-link"
+            >
               查看详细文档
             </a>
           </p>
@@ -428,36 +536,6 @@
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import {
-  TrendCharts,
-  Search,
-  Files,
-  Document,
-  Monitor,
-  Setting,
-  Message,
-  ChatDotRound,
-  Cpu,
-  Star,
-  Link,
-  CircleCheck
-} from '@element-plus/icons-vue'
-
-const router = useRouter()
-const buildTime = ref(new Date().toLocaleString('zh-CN'))
-
-const goToAnalysis = () => {
-  router.push('/analysis/single')
-}
-
-const viewDocumentation = () => {
-  window.open('https://mp.weixin.qq.com/s/ppsYiBncynxlsfKFG8uEbw', '_blank')
-}
-</script>
 
 <style lang="scss" scoped>
 .about {

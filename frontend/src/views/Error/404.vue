@@ -1,19 +1,49 @@
+<script setup lang="ts">
+import {
+  ArrowLeft,
+  Document,
+  HomeFilled,
+  House,
+  Search,
+  TrendCharts
+} from '@element-plus/icons-vue'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
+
+const goHome = () => {
+  router.push('/')
+}
+
+const goBack = () => {
+  if (window.history.length > 1) {
+    router.go(-1)
+  } else {
+    router.push('/')
+  }
+}
+</script>
+
 <template>
   <div class="error-404">
     <div class="error-container">
       <div class="error-content">
         <div class="error-image">
-          <img src="/404-illustration.svg" alt="404" />
+          <img src="/404-illustration.svg" alt="404">
         </div>
-        
+
         <div class="error-info">
-          <h1 class="error-code">404</h1>
-          <h2 class="error-title">页面不存在</h2>
+          <h1 class="error-code">
+            404
+          </h1>
+          <h2 class="error-title">
+            页面不存在
+          </h2>
           <p class="error-description">
             抱歉，您访问的页面不存在或已被移除。
             请检查URL是否正确，或返回首页继续浏览。
           </p>
-          
+
           <div class="error-actions">
             <el-button type="primary" size="large" @click="goHome">
               <el-icon><HomeFilled /></el-icon>
@@ -26,7 +56,7 @@
           </div>
         </div>
       </div>
-      
+
       <!-- 推荐链接 -->
       <div class="suggestions">
         <h3>您可能想要访问：</h3>
@@ -52,32 +82,6 @@
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-import { useRouter } from 'vue-router'
-import {
-  HomeFilled,
-  ArrowLeft,
-  House,
-  TrendCharts,
-  Search,
-  Document
-} from '@element-plus/icons-vue'
-
-const router = useRouter()
-
-const goHome = () => {
-  router.push('/')
-}
-
-const goBack = () => {
-  if (window.history.length > 1) {
-    router.go(-1)
-  } else {
-    router.push('/')
-  }
-}
-</script>
 
 <style lang="scss" scoped>
 .error-404 {

@@ -30,7 +30,7 @@ export interface LLMConfig {
   name: string
   provider: string
   model_name: string
-  api_key?: string  // 可选，优先从厂家配置获取
+  api_key?: string // 可选，优先从厂家配置获取
   base_url?: string
   max_tokens?: number
   temperature?: number

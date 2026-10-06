@@ -6,20 +6,20 @@ import {
   SelectContent,
   SelectPortal,
   SelectViewport,
-  useForwardPropsEmits,
+  useForwardPropsEmits
 } from 'reka-ui'
 import { cn } from '@/lib/utils'
 import { SelectScrollDownButton, SelectScrollUpButton } from '.'
 
 defineOptions({
-  inheritAttrs: false,
+  inheritAttrs: false
 })
 
 const props = withDefaults(
-  defineProps<SelectContentProps & { class?: HTMLAttributes["class"] }>(),
+  defineProps<SelectContentProps & { class?: HTMLAttributes['class'] }>(),
   {
-    position: 'popper',
-  },
+    position: 'popper'
+  }
 )
 const emits = defineEmits<SelectContentEmits>()
 

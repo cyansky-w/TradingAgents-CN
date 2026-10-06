@@ -1,458 +1,24 @@
-<template>
-  <div class="settings">
-    <!-- 页面标题 -->
-    <div class="page-header">
-      <h1 class="page-title">
-        <el-icon><Setting /></el-icon>
-        {{ pageTitle }}
-      </h1>
-      <p class="page-description">
-        {{ pageDescription }}
-      </p>
-    </div>
-
-    <el-row :gutter="24">
-      <!-- 左侧：设置菜单 -->
-      <el-col :span="6">
-        <el-card class="settings-menu" shadow="never">
-          <el-menu
-            :default-active="activeTab"
-            @select="handleMenuSelect"
-            class="settings-nav"
-          >
-            <!-- 个人设置菜单 -->
-            <template v-if="currentSection === 'personal'">
-              <el-menu-item index="general">
-                <el-icon><User /></el-icon>
-                <span>通用设置</span>
-              </el-menu-item>
-              <el-menu-item index="appearance">
-                <el-icon><Brush /></el-icon>
-                <span>外观设置</span>
-              </el-menu-item>
-              <el-menu-item index="analysis">
-                <el-icon><TrendCharts /></el-icon>
-                <span>分析偏好</span>
-              </el-menu-item>
-              <el-menu-item index="notifications">
-                <el-icon><Bell /></el-icon>
-                <span>通知设置</span>
-              </el-menu-item>
-              <el-menu-item index="security">
-                <el-icon><Lock /></el-icon>
-                <span>安全设置</span>
-              </el-menu-item>
-            </template>
-
-            <!-- 系统配置菜单 -->
-            <template v-else-if="currentSection === 'config'">
-              <el-menu-item index="config">
-                <el-icon><Tools /></el-icon>
-                <span>配置管理</span>
-              </el-menu-item>
-              <el-menu-item index="usage">
-                <el-icon><DataAnalysis /></el-icon>
-                <span>使用统计</span>
-              </el-menu-item>
-              <el-menu-item index="cache">
-                <el-icon><Coin /></el-icon>
-                <span>缓存管理</span>
-              </el-menu-item>
-            </template>
-
-            <!-- 系统管理菜单 -->
-            <template v-else-if="currentSection === 'admin'">
-              <el-menu-item index="database">
-                <el-icon><Monitor /></el-icon>
-                <span>数据库管理</span>
-              </el-menu-item>
-              <el-menu-item index="logs">
-                <el-icon><Document /></el-icon>
-                <span>操作日志</span>
-              </el-menu-item>
-              <el-menu-item index="sync">
-                <el-icon><Refresh /></el-icon>
-                <span>多数据源同步</span>
-              </el-menu-item>
-            </template>
-          </el-menu>
-        </el-card>
-      </el-col>
-
-      <!-- 右侧：设置内容 -->
-      <el-col :span="18">
-        <!-- 通用设置 -->
-        <el-card v-show="activeTab === 'general'" class="settings-content" shadow="never">
-          <template #header>
-            <h3>通用设置</h3>
-          </template>
-          
-          <el-form :model="generalSettings" label-width="120px">
-            <el-form-item label="用户名">
-              <el-input v-model="generalSettings.username" disabled />
-            </el-form-item>
-            
-            <el-form-item label="邮箱">
-              <el-input v-model="generalSettings.email" />
-            </el-form-item>
-            
-            <el-form-item label="语言">
-              <el-select v-model="generalSettings.language">
-                <el-option label="简体中文" value="zh-CN" />
-                <el-option label="English" value="en-US" />
-              </el-select>
-            </el-form-item>
-            
-            <el-form-item label="时区">
-              <el-select v-model="generalSettings.timezone">
-                <el-option label="北京时间 (UTC+8)" value="Asia/Shanghai" />
-                <el-option label="纽约时间 (UTC-5)" value="America/New_York" />
-                <el-option label="伦敦时间 (UTC+0)" value="Europe/London" />
-              </el-select>
-            </el-form-item>
-            
-            <el-form-item>
-              <el-button type="primary" @click="saveGeneralSettings">
-                保存设置
-              </el-button>
-            </el-form-item>
-          </el-form>
-        </el-card>
-
-        <!-- 外观设置 -->
-        <el-card v-show="activeTab === 'appearance'" class="settings-content" shadow="never">
-          <template #header>
-            <h3>外观设置</h3>
-          </template>
-          
-          <el-form :model="appearanceSettings" label-width="120px">
-            <el-form-item label="主题模式">
-              <el-radio-group v-model="appearanceSettings.theme" @change="handleThemeChange">
-                <el-radio label="light">浅色主题</el-radio>
-                <el-radio label="dark">深色主题</el-radio>
-                <el-radio label="auto">跟随系统</el-radio>
-              </el-radio-group>
-            </el-form-item>
-
-            <el-form-item label="侧边栏宽度">
-              <el-slider
-                v-model="appearanceSettings.sidebarWidth"
-                :min="200"
-                :max="400"
-                :step="20"
-                show-input
-              />
-            </el-form-item>
-
-            <el-form-item>
-              <el-button type="primary" @click="saveAppearanceSettings">
-                保存设置
-              </el-button>
-            </el-form-item>
-          </el-form>
-        </el-card>
-
-        <!-- 分析偏好 -->
-        <el-card v-show="activeTab === 'analysis'" class="settings-content" shadow="never">
-          <template #header>
-            <h3>分析偏好</h3>
-          </template>
-          
-          <el-form :model="analysisSettings" label-width="120px">
-            <el-form-item label="默认市场">
-              <el-select v-model="analysisSettings.defaultMarket">
-                <el-option label="A股" value="A股" />
-                <el-option label="美股" value="美股" />
-                <el-option label="港股" value="港股" />
-              </el-select>
-            </el-form-item>
-            
-            <el-form-item label="默认分析深度">
-              <el-select v-model="analysisSettings.defaultDepth">
-                <el-option label="1级 - 快速分析" value="1" />
-                <el-option label="2级 - 基础分析" value="2" />
-                <el-option label="3级 - 标准分析（推荐）" value="3" />
-                <el-option label="4级 - 深度分析" value="4" />
-                <el-option label="5级 - 全面分析" value="5" />
-              </el-select>
-            </el-form-item>
-
-            <el-form-item label="默认分析师">
-              <el-checkbox-group v-model="analysisSettings.defaultAnalysts">
-                <el-checkbox label="市场分析师">市场分析师</el-checkbox>
-                <el-checkbox label="基本面分析师">基本面分析师</el-checkbox>
-                <el-checkbox label="新闻分析师">新闻分析师</el-checkbox>
-                <el-checkbox label="社媒分析师">社媒分析师</el-checkbox>
-              </el-checkbox-group>
-            </el-form-item>
-
-
-            
-            <el-form-item label="自动刷新">
-              <el-switch v-model="analysisSettings.autoRefresh" />
-              <span class="setting-description">自动刷新分析结果</span>
-            </el-form-item>
-            
-            <el-form-item label="刷新间隔">
-              <el-input-number
-                v-model="analysisSettings.refreshInterval"
-                :min="10"
-                :max="300"
-                :step="10"
-                :disabled="!analysisSettings.autoRefresh"
-              />
-              <span class="setting-description">秒</span>
-            </el-form-item>
-            
-            <el-form-item>
-              <el-button type="primary" @click="saveAnalysisSettings">
-                保存设置
-              </el-button>
-            </el-form-item>
-          </el-form>
-        </el-card>
-
-        <!-- 通知设置 -->
-        <el-card v-show="activeTab === 'notifications'" class="settings-content" shadow="never">
-          <template #header>
-            <h3>通知设置</h3>
-          </template>
-          
-          <el-form :model="notificationSettings" label-width="120px">
-            <el-form-item label="桌面通知">
-              <el-switch v-model="notificationSettings.desktop" />
-              <span class="setting-description">显示桌面通知</span>
-            </el-form-item>
-
-            <el-form-item label="分析完成通知">
-              <el-switch v-model="notificationSettings.analysisComplete" />
-            </el-form-item>
-
-            <el-form-item label="系统维护通知">
-              <el-switch v-model="notificationSettings.systemMaintenance" />
-            </el-form-item>
-
-            <el-form-item>
-              <el-button type="primary" @click="saveNotificationSettings">
-                保存设置
-              </el-button>
-            </el-form-item>
-          </el-form>
-        </el-card>
-
-        <!-- 安全设置 -->
-        <el-card v-show="activeTab === 'security'" class="settings-content" shadow="never">
-          <template #header>
-            <h3>安全设置</h3>
-          </template>
-
-          <el-form label-width="120px">
-            <el-form-item label="修改密码">
-              <el-button type="primary" @click="changePasswordDialogVisible = true">
-                修改密码
-              </el-button>
-            </el-form-item>
-          </el-form>
-        </el-card>
-
-
-
-        <!-- 配置管理 -->
-        <el-card v-show="activeTab === 'config'" class="settings-content" shadow="never">
-          <template #header>
-            <h3>配置管理</h3>
-          </template>
-
-          <div class="config-content">
-            <el-alert
-              title="配置管理"
-              type="info"
-              description="管理 LLM 配置、数据源配置和市场分类配置"
-              :closable="false"
-              style="margin-bottom: 20px;"
-            />
-            <el-button type="primary" @click="goToConfigManagement">
-              进入配置管理
-            </el-button>
-          </div>
-        </el-card>
-
-        <!-- 使用统计 -->
-        <el-card v-show="activeTab === 'usage'" class="settings-content" shadow="never">
-          <template #header>
-            <h3>使用统计</h3>
-          </template>
-
-          <div class="cache-content">
-            <el-alert
-              title="使用统计与计费"
-              type="info"
-              description="查看模型使用情况、Token 消耗和成本统计"
-              :closable="false"
-              style="margin-bottom: 20px;"
-            />
-            <el-button type="primary" @click="goToUsageStatistics">
-              查看使用统计
-            </el-button>
-          </div>
-        </el-card>
-
-        <!-- 缓存管理 -->
-        <el-card v-show="activeTab === 'cache'" class="settings-content" shadow="never">
-          <template #header>
-            <h3>缓存管理</h3>
-          </template>
-
-          <div class="settings-section">
-            <el-alert
-              title="缓存管理"
-              type="info"
-              description="管理系统缓存，清理过期数据"
-              :closable="false"
-              style="margin-bottom: 20px;"
-            />
-            <el-button type="primary" @click="goToCacheManagement">
-              进入缓存管理
-            </el-button>
-          </div>
-        </el-card>
-
-        <!-- 数据库管理 -->
-        <el-card v-show="activeTab === 'database'" class="settings-content" shadow="never">
-          <template #header>
-            <h3>数据库管理</h3>
-          </template>
-
-          <div class="database-content">
-            <el-alert
-              title="数据库管理"
-              type="info"
-              description="管理数据库连接、备份和恢复"
-              :closable="false"
-              style="margin-bottom: 20px;"
-            />
-            <el-button type="primary" @click="goToDatabaseManagement">
-              进入数据库管理
-            </el-button>
-          </div>
-        </el-card>
-
-        <!-- 操作日志 -->
-        <el-card v-show="activeTab === 'logs'" class="settings-content" shadow="never">
-          <template #header>
-            <h3>操作日志</h3>
-          </template>
-
-          <div class="logs-content">
-            <el-alert
-              title="操作日志"
-              type="info"
-              description="查看系统操作日志和审计记录"
-              :closable="false"
-              style="margin-bottom: 20px;"
-            />
-            <el-button type="primary" @click="goToOperationLogs">
-              查看操作日志
-            </el-button>
-          </div>
-        </el-card>
-
-        <!-- 多数据源同步 -->
-        <el-card v-show="activeTab === 'sync'" class="settings-content" shadow="never">
-          <template #header>
-            <h3>多数据源同步</h3>
-          </template>
-
-          <div class="sync-content">
-            <el-alert
-              title="多数据源同步"
-              type="info"
-              description="管理多个数据源的同步配置和状态"
-              :closable="false"
-              style="margin-bottom: 20px;"
-            />
-            <el-button type="primary" @click="goToMultiSourceSync">
-              进入同步管理
-            </el-button>
-          </div>
-        </el-card>
-
-
-      </el-col>
-    </el-row>
-
-    <!-- 修改密码对话框 -->
-    <el-dialog
-      v-model="changePasswordDialogVisible"
-      title="修改密码"
-      width="500px"
-      :close-on-click-modal="false"
-    >
-      <el-form
-        ref="changePasswordFormRef"
-        :model="changePasswordForm"
-        :rules="changePasswordRules"
-        label-width="100px"
-      >
-        <el-form-item label="当前密码" prop="oldPassword">
-          <el-input
-            v-model="changePasswordForm.oldPassword"
-            type="password"
-            placeholder="请输入当前密码"
-            show-password
-          />
-        </el-form-item>
-
-        <el-form-item label="新密码" prop="newPassword">
-          <el-input
-            v-model="changePasswordForm.newPassword"
-            type="password"
-            placeholder="请输入新密码（至少6位）"
-            show-password
-          />
-        </el-form-item>
-
-        <el-form-item label="确认密码" prop="confirmPassword">
-          <el-input
-            v-model="changePasswordForm.confirmPassword"
-            type="password"
-            placeholder="请再次输入新密码"
-            show-password
-          />
-        </el-form-item>
-      </el-form>
-
-      <template #footer>
-        <el-button @click="changePasswordDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="changePasswordLoading" @click="handleChangePassword">
-          确认修改
-        </el-button>
-      </template>
-    </el-dialog>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { useAppStore } from '@/stores/app'
-import { useAuthStore } from '@/stores/auth'
 import type { UserPreferences } from '@/types/auth'
 import {
-  Setting,
-  User,
-  Brush,
-  TrendCharts,
   Bell,
-  Lock,
-  Tools,
-  Monitor,
+  Brush,
   Coin,
+  DataAnalysis,
   Document,
+  Lock,
+  Monitor,
   Refresh,
-  DataAnalysis
+  Setting,
+  Tools,
+  TrendCharts,
+  User
 } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
 const route = useRoute()
@@ -580,7 +146,7 @@ const buildPreferencesPayload = (
 }
 
 // 监听用户信息变化，同步更新设置
-watch(() => authStore.user, (newUser) => {
+watch(() => authStore.user, newUser => {
   if (newUser) {
     // 更新通用设置
     generalSettings.value.username = newUser.username || 'admin'
@@ -768,7 +334,8 @@ const changePasswordRules = {
 }
 
 const handleChangePassword = async () => {
-  if (!changePasswordFormRef.value) return
+  if (!changePasswordFormRef.value)
+    return
 
   await changePasswordFormRef.value.validate(async (valid: boolean) => {
     if (valid) {
@@ -802,20 +369,462 @@ const handleChangePassword = async () => {
   })
 }
 
-
-
 // 生命周期
 onMounted(() => {
   // 从store加载设置
   appearanceSettings.value.theme = appStore.theme
   appearanceSettings.value.sidebarWidth = appStore.sidebarWidth
-  
+
   analysisSettings.value.defaultMarket = appStore.preferences.defaultMarket
   analysisSettings.value.defaultDepth = appStore.preferences.defaultDepth
   analysisSettings.value.autoRefresh = appStore.preferences.autoRefresh
   analysisSettings.value.refreshInterval = appStore.preferences.refreshInterval
 })
 </script>
+
+<template>
+  <div class="settings">
+    <!-- 页面标题 -->
+    <div class="page-header">
+      <h1 class="page-title">
+        <el-icon><Setting /></el-icon>
+        {{ pageTitle }}
+      </h1>
+      <p class="page-description">
+        {{ pageDescription }}
+      </p>
+    </div>
+
+    <el-row :gutter="24">
+      <!-- 左侧：设置菜单 -->
+      <el-col :span="6">
+        <el-card class="settings-menu" shadow="never">
+          <el-menu
+            :default-active="activeTab"
+            class="settings-nav"
+            @select="handleMenuSelect"
+          >
+            <!-- 个人设置菜单 -->
+            <template v-if="currentSection === 'personal'">
+              <el-menu-item index="general">
+                <el-icon><User /></el-icon>
+                <span>通用设置</span>
+              </el-menu-item>
+              <el-menu-item index="appearance">
+                <el-icon><Brush /></el-icon>
+                <span>外观设置</span>
+              </el-menu-item>
+              <el-menu-item index="analysis">
+                <el-icon><TrendCharts /></el-icon>
+                <span>分析偏好</span>
+              </el-menu-item>
+              <el-menu-item index="notifications">
+                <el-icon><Bell /></el-icon>
+                <span>通知设置</span>
+              </el-menu-item>
+              <el-menu-item index="security">
+                <el-icon><Lock /></el-icon>
+                <span>安全设置</span>
+              </el-menu-item>
+            </template>
+
+            <!-- 系统配置菜单 -->
+            <template v-else-if="currentSection === 'config'">
+              <el-menu-item index="config">
+                <el-icon><Tools /></el-icon>
+                <span>配置管理</span>
+              </el-menu-item>
+              <el-menu-item index="usage">
+                <el-icon><DataAnalysis /></el-icon>
+                <span>使用统计</span>
+              </el-menu-item>
+              <el-menu-item index="cache">
+                <el-icon><Coin /></el-icon>
+                <span>缓存管理</span>
+              </el-menu-item>
+            </template>
+
+            <!-- 系统管理菜单 -->
+            <template v-else-if="currentSection === 'admin'">
+              <el-menu-item index="database">
+                <el-icon><Monitor /></el-icon>
+                <span>数据库管理</span>
+              </el-menu-item>
+              <el-menu-item index="logs">
+                <el-icon><Document /></el-icon>
+                <span>操作日志</span>
+              </el-menu-item>
+              <el-menu-item index="sync">
+                <el-icon><Refresh /></el-icon>
+                <span>多数据源同步</span>
+              </el-menu-item>
+            </template>
+          </el-menu>
+        </el-card>
+      </el-col>
+
+      <!-- 右侧：设置内容 -->
+      <el-col :span="18">
+        <!-- 通用设置 -->
+        <el-card v-show="activeTab === 'general'" class="settings-content" shadow="never">
+          <template #header>
+            <h3>通用设置</h3>
+          </template>
+
+          <el-form :model="generalSettings" label-width="120px">
+            <el-form-item label="用户名">
+              <el-input v-model="generalSettings.username" disabled />
+            </el-form-item>
+
+            <el-form-item label="邮箱">
+              <el-input v-model="generalSettings.email" />
+            </el-form-item>
+
+            <el-form-item label="语言">
+              <el-select v-model="generalSettings.language">
+                <el-option label="简体中文" value="zh-CN" />
+                <el-option label="English" value="en-US" />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item label="时区">
+              <el-select v-model="generalSettings.timezone">
+                <el-option label="北京时间 (UTC+8)" value="Asia/Shanghai" />
+                <el-option label="纽约时间 (UTC-5)" value="America/New_York" />
+                <el-option label="伦敦时间 (UTC+0)" value="Europe/London" />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item>
+              <el-button type="primary" @click="saveGeneralSettings">
+                保存设置
+              </el-button>
+            </el-form-item>
+          </el-form>
+        </el-card>
+
+        <!-- 外观设置 -->
+        <el-card v-show="activeTab === 'appearance'" class="settings-content" shadow="never">
+          <template #header>
+            <h3>外观设置</h3>
+          </template>
+
+          <el-form :model="appearanceSettings" label-width="120px">
+            <el-form-item label="主题模式">
+              <el-radio-group v-model="appearanceSettings.theme" @change="handleThemeChange">
+                <el-radio label="light">
+                  浅色主题
+                </el-radio>
+                <el-radio label="dark">
+                  深色主题
+                </el-radio>
+                <el-radio label="auto">
+                  跟随系统
+                </el-radio>
+              </el-radio-group>
+            </el-form-item>
+
+            <el-form-item label="侧边栏宽度">
+              <el-slider
+                v-model="appearanceSettings.sidebarWidth"
+                :min="200"
+                :max="400"
+                :step="20"
+                show-input
+              />
+            </el-form-item>
+
+            <el-form-item>
+              <el-button type="primary" @click="saveAppearanceSettings">
+                保存设置
+              </el-button>
+            </el-form-item>
+          </el-form>
+        </el-card>
+
+        <!-- 分析偏好 -->
+        <el-card v-show="activeTab === 'analysis'" class="settings-content" shadow="never">
+          <template #header>
+            <h3>分析偏好</h3>
+          </template>
+
+          <el-form :model="analysisSettings" label-width="120px">
+            <el-form-item label="默认市场">
+              <el-select v-model="analysisSettings.defaultMarket">
+                <el-option label="A股" value="A股" />
+                <el-option label="美股" value="美股" />
+                <el-option label="港股" value="港股" />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item label="默认分析深度">
+              <el-select v-model="analysisSettings.defaultDepth">
+                <el-option label="1级 - 快速分析" value="1" />
+                <el-option label="2级 - 基础分析" value="2" />
+                <el-option label="3级 - 标准分析（推荐）" value="3" />
+                <el-option label="4级 - 深度分析" value="4" />
+                <el-option label="5级 - 全面分析" value="5" />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item label="默认分析师">
+              <el-checkbox-group v-model="analysisSettings.defaultAnalysts">
+                <el-checkbox label="市场分析师">
+                  市场分析师
+                </el-checkbox>
+                <el-checkbox label="基本面分析师">
+                  基本面分析师
+                </el-checkbox>
+                <el-checkbox label="新闻分析师">
+                  新闻分析师
+                </el-checkbox>
+                <el-checkbox label="社媒分析师">
+                  社媒分析师
+                </el-checkbox>
+              </el-checkbox-group>
+            </el-form-item>
+
+            <el-form-item label="自动刷新">
+              <el-switch v-model="analysisSettings.autoRefresh" />
+              <span class="setting-description">自动刷新分析结果</span>
+            </el-form-item>
+
+            <el-form-item label="刷新间隔">
+              <el-input-number
+                v-model="analysisSettings.refreshInterval"
+                :min="10"
+                :max="300"
+                :step="10"
+                :disabled="!analysisSettings.autoRefresh"
+              />
+              <span class="setting-description">秒</span>
+            </el-form-item>
+
+            <el-form-item>
+              <el-button type="primary" @click="saveAnalysisSettings">
+                保存设置
+              </el-button>
+            </el-form-item>
+          </el-form>
+        </el-card>
+
+        <!-- 通知设置 -->
+        <el-card v-show="activeTab === 'notifications'" class="settings-content" shadow="never">
+          <template #header>
+            <h3>通知设置</h3>
+          </template>
+
+          <el-form :model="notificationSettings" label-width="120px">
+            <el-form-item label="桌面通知">
+              <el-switch v-model="notificationSettings.desktop" />
+              <span class="setting-description">显示桌面通知</span>
+            </el-form-item>
+
+            <el-form-item label="分析完成通知">
+              <el-switch v-model="notificationSettings.analysisComplete" />
+            </el-form-item>
+
+            <el-form-item label="系统维护通知">
+              <el-switch v-model="notificationSettings.systemMaintenance" />
+            </el-form-item>
+
+            <el-form-item>
+              <el-button type="primary" @click="saveNotificationSettings">
+                保存设置
+              </el-button>
+            </el-form-item>
+          </el-form>
+        </el-card>
+
+        <!-- 安全设置 -->
+        <el-card v-show="activeTab === 'security'" class="settings-content" shadow="never">
+          <template #header>
+            <h3>安全设置</h3>
+          </template>
+
+          <el-form label-width="120px">
+            <el-form-item label="修改密码">
+              <el-button type="primary" @click="changePasswordDialogVisible = true">
+                修改密码
+              </el-button>
+            </el-form-item>
+          </el-form>
+        </el-card>
+
+        <!-- 配置管理 -->
+        <el-card v-show="activeTab === 'config'" class="settings-content" shadow="never">
+          <template #header>
+            <h3>配置管理</h3>
+          </template>
+
+          <div class="config-content">
+            <el-alert
+              title="配置管理"
+              type="info"
+              description="管理 LLM 配置、数据源配置和市场分类配置"
+              :closable="false"
+              style="margin-bottom: 20px;"
+            />
+            <el-button type="primary" @click="goToConfigManagement">
+              进入配置管理
+            </el-button>
+          </div>
+        </el-card>
+
+        <!-- 使用统计 -->
+        <el-card v-show="activeTab === 'usage'" class="settings-content" shadow="never">
+          <template #header>
+            <h3>使用统计</h3>
+          </template>
+
+          <div class="cache-content">
+            <el-alert
+              title="使用统计与计费"
+              type="info"
+              description="查看模型使用情况、Token 消耗和成本统计"
+              :closable="false"
+              style="margin-bottom: 20px;"
+            />
+            <el-button type="primary" @click="goToUsageStatistics">
+              查看使用统计
+            </el-button>
+          </div>
+        </el-card>
+
+        <!-- 缓存管理 -->
+        <el-card v-show="activeTab === 'cache'" class="settings-content" shadow="never">
+          <template #header>
+            <h3>缓存管理</h3>
+          </template>
+
+          <div class="settings-section">
+            <el-alert
+              title="缓存管理"
+              type="info"
+              description="管理系统缓存，清理过期数据"
+              :closable="false"
+              style="margin-bottom: 20px;"
+            />
+            <el-button type="primary" @click="goToCacheManagement">
+              进入缓存管理
+            </el-button>
+          </div>
+        </el-card>
+
+        <!-- 数据库管理 -->
+        <el-card v-show="activeTab === 'database'" class="settings-content" shadow="never">
+          <template #header>
+            <h3>数据库管理</h3>
+          </template>
+
+          <div class="database-content">
+            <el-alert
+              title="数据库管理"
+              type="info"
+              description="管理数据库连接、备份和恢复"
+              :closable="false"
+              style="margin-bottom: 20px;"
+            />
+            <el-button type="primary" @click="goToDatabaseManagement">
+              进入数据库管理
+            </el-button>
+          </div>
+        </el-card>
+
+        <!-- 操作日志 -->
+        <el-card v-show="activeTab === 'logs'" class="settings-content" shadow="never">
+          <template #header>
+            <h3>操作日志</h3>
+          </template>
+
+          <div class="logs-content">
+            <el-alert
+              title="操作日志"
+              type="info"
+              description="查看系统操作日志和审计记录"
+              :closable="false"
+              style="margin-bottom: 20px;"
+            />
+            <el-button type="primary" @click="goToOperationLogs">
+              查看操作日志
+            </el-button>
+          </div>
+        </el-card>
+
+        <!-- 多数据源同步 -->
+        <el-card v-show="activeTab === 'sync'" class="settings-content" shadow="never">
+          <template #header>
+            <h3>多数据源同步</h3>
+          </template>
+
+          <div class="sync-content">
+            <el-alert
+              title="多数据源同步"
+              type="info"
+              description="管理多个数据源的同步配置和状态"
+              :closable="false"
+              style="margin-bottom: 20px;"
+            />
+            <el-button type="primary" @click="goToMultiSourceSync">
+              进入同步管理
+            </el-button>
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <!-- 修改密码对话框 -->
+    <el-dialog
+      v-model="changePasswordDialogVisible"
+      title="修改密码"
+      width="500px"
+      :close-on-click-modal="false"
+    >
+      <el-form
+        ref="changePasswordFormRef"
+        :model="changePasswordForm"
+        :rules="changePasswordRules"
+        label-width="100px"
+      >
+        <el-form-item label="当前密码" prop="oldPassword">
+          <el-input
+            v-model="changePasswordForm.oldPassword"
+            type="password"
+            placeholder="请输入当前密码"
+            show-password
+          />
+        </el-form-item>
+
+        <el-form-item label="新密码" prop="newPassword">
+          <el-input
+            v-model="changePasswordForm.newPassword"
+            type="password"
+            placeholder="请输入新密码（至少6位）"
+            show-password
+          />
+        </el-form-item>
+
+        <el-form-item label="确认密码" prop="confirmPassword">
+          <el-input
+            v-model="changePasswordForm.confirmPassword"
+            type="password"
+            placeholder="请再次输入新密码"
+            show-password
+          />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="changePasswordDialogVisible = false">
+          取消
+        </el-button>
+        <el-button type="primary" :loading="changePasswordLoading" @click="handleChangePassword">
+          确认修改
+        </el-button>
+      </template>
+    </el-dialog>
+  </div>
+</template>
 
 <style lang="scss" scoped>
 .settings {

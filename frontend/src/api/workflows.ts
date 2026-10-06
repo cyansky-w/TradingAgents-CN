@@ -1,11 +1,11 @@
-import { ApiClient } from './request'
 import type { ApiResponse } from './request'
+import { ApiClient } from './request'
 
 export interface WorkflowNode {
   id: string
   type: 'agent' | 'subflow' | 'io'
   label?: string
-  position?: { x: number; y: number }
+  position?: { x: number, y: number }
   config?: Record<string, any>
 }
 
@@ -14,7 +14,6 @@ export interface WorkflowEdge {
   source: string
   target: string
 }
-
 
 export interface TriggerConfig {
   type: 'manual' | 'cron' | 'event'
@@ -113,7 +112,7 @@ export interface WorkflowRun {
   trigger_type: string
   input: Record<string, any>
   output?: any
-  node_executions: Array<{ node_id: string; status: string; output: any }>
+  node_executions: Array<{ node_id: string, status: string, output: any }>
   parent_run_id?: string | null
   started_at: string
   completed_at: string
@@ -149,8 +148,8 @@ export const workflowsApi = {
     return await ApiClient.delete<{ id: string }>(`/api/workflows/${id}`)
   },
 
-  async toggle(id: string, enabled: boolean): Promise<ApiResponse<{ id: string; enabled: boolean }>> {
-    return await ApiClient.put<{ id: string; enabled: boolean }>(`/api/workflows/${id}/toggle`, { enabled })
+  async toggle(id: string, enabled: boolean): Promise<ApiResponse<{ id: string, enabled: boolean }>> {
+    return await ApiClient.put<{ id: string, enabled: boolean }>(`/api/workflows/${id}/toggle`, { enabled })
   },
 
   async getTags(): Promise<ApiResponse<string[]>> {
@@ -161,8 +160,8 @@ export const workflowsApi = {
     return await ApiClient.post<WorkflowValidationResult>(`/api/workflows/${id}/validate`)
   },
 
-  async run(id: string, input_data?: Record<string, any>): Promise<ApiResponse<{ run_id: string; output: any }>> {
-    return await ApiClient.post<{ run_id: string; output: any }>(`/api/workflows/${id}/run`, { input: input_data || {} })
+  async run(id: string, input_data?: Record<string, any>): Promise<ApiResponse<{ run_id: string, output: any }>> {
+    return await ApiClient.post<{ run_id: string, output: any }>(`/api/workflows/${id}/run`, { input: input_data || {} })
   },
 
   async listRuns(workflowId: string, page = 1, pageSize = 20): Promise<ApiResponse<WorkflowRunListResult>> {
@@ -173,11 +172,11 @@ export const workflowsApi = {
     return await ApiClient.get<WorkflowRun>(`/api/workflows/runs/${runId}`)
   },
 
-  async cancelRun(runId: string): Promise<ApiResponse<{ run_id: string; status: string }>> {
-    return await ApiClient.post<{ run_id: string; status: string }>(`/api/workflows/runs/${runId}/cancel`)
+  async cancelRun(runId: string): Promise<ApiResponse<{ run_id: string, status: string }>> {
+    return await ApiClient.post<{ run_id: string, status: string }>(`/api/workflows/runs/${runId}/cancel`)
   },
 
-  async seed(): Promise<ApiResponse<{ created: number; skipped: number; failed: string[]; total: number }>> {
-    return await ApiClient.post<{ created: number; skipped: number; failed: string[]; total: number }>('/api/workflows/seed')
+  async seed(): Promise<ApiResponse<{ created: number, skipped: number, failed: string[], total: number }>> {
+    return await ApiClient.post<{ created: number, skipped: number, failed: string[], total: number }>('/api/workflows/seed')
   }
 }

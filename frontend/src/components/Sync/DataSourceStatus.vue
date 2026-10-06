@@ -1,101 +1,10 @@
-<template>
-  <div class="data-source-status">
-    <el-card class="status-card" shadow="hover">
-      <template #header>
-        <div class="card-header">
-          <el-icon class="header-icon"><Connection /></el-icon>
-          <span class="header-title">数据源状态</span>
-          <el-button 
-            type="primary" 
-            size="small" 
-            :loading="refreshing"
-            @click="refreshStatus"
-          >
-            <el-icon><Refresh /></el-icon>
-            刷新
-          </el-button>
-        </div>
-      </template>
-
-      <div v-loading="loading" class="status-content">
-        <div v-if="error" class="error-message">
-          <el-alert
-            :title="error"
-            type="error"
-            :closable="false"
-            show-icon
-          />
-        </div>
-
-        <div v-else-if="dataSources.length > 0" class="sources-list">
-          <div 
-            v-for="source in dataSources" 
-            :key="source.name"
-            class="source-item"
-            :class="{ 'available': source.available, 'unavailable': !source.available }"
-          >
-            <div class="source-header">
-              <div class="source-info">
-                <el-tag 
-                  :type="source.available ? 'success' : 'danger'"
-                  size="small"
-                  class="status-tag"
-                >
-                  {{ source.available ? '可用' : '不可用' }}
-                </el-tag>
-                <span class="source-name">{{ source.name.toUpperCase() }}</span>
-                <el-tag size="small" type="info" class="priority-tag">
-                  优先级: {{ source.priority }}
-                </el-tag>
-              </div>
-              <div class="source-actions">
-                <el-button
-                  size="small"
-                  type="primary"
-                  link
-                  @click="testSingleSource(source.name)"
-                  :loading="testingSource === source.name"
-                >
-                  <el-icon><Operation /></el-icon>
-                  测试
-                </el-button>
-              </div>
-            </div>
-            <div class="source-description">
-              {{ source.description }}
-            </div>
-            
-            <!-- 测试结果展示 -->
-            <div v-if="testResults[source.name]" class="test-results">
-              <el-divider content-position="left">
-                <span class="divider-text">最后测试结果</span>
-              </el-divider>
-              <div class="test-result-message">
-                <el-alert
-                  :title="testResults[source.name].message"
-                  :type="testResults[source.name].available ? 'success' : 'error'"
-                  :closable="false"
-                  show-icon
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div v-else class="empty-state">
-          <el-empty description="暂无数据源信息" />
-        </div>
-      </div>
-    </el-card>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import type { DataSourceStatus, DataSourceTestResult } from '@/api/sync'
+import { Connection, Operation, Refresh } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { Connection, Refresh, Operation } from '@element-plus/icons-vue'
-import { getDataSourcesStatus, testDataSources, type DataSourceStatus, type DataSourceTestResult } from '@/api/sync'
+import { onMounted, ref } from 'vue'
 import { testApiConnection } from '@/api/request'
+import { getDataSourcesStatus, testDataSources } from '@/api/sync'
 
 // 响应式数据
 const loading = ref(false)
@@ -214,6 +123,100 @@ onMounted(() => {
 })
 </script>
 
+<template>
+  <div class="data-source-status">
+    <el-card class="status-card" shadow="hover">
+      <template #header>
+        <div class="card-header">
+          <el-icon class="header-icon">
+            <Connection />
+          </el-icon>
+          <span class="header-title">数据源状态</span>
+          <el-button
+            type="primary"
+            size="small"
+            :loading="refreshing"
+            @click="refreshStatus"
+          >
+            <el-icon><Refresh /></el-icon>
+            刷新
+          </el-button>
+        </div>
+      </template>
+
+      <div v-loading="loading" class="status-content">
+        <div v-if="error" class="error-message">
+          <el-alert
+            :title="error"
+            type="error"
+            :closable="false"
+            show-icon
+          />
+        </div>
+
+        <div v-else-if="dataSources.length > 0" class="sources-list">
+          <div
+            v-for="source in dataSources"
+            :key="source.name"
+            class="source-item"
+            :class="{ available: source.available, unavailable: !source.available }"
+          >
+            <div class="source-header">
+              <div class="source-info">
+                <el-tag
+                  :type="source.available ? 'success' : 'danger'"
+                  size="small"
+                  class="status-tag"
+                >
+                  {{ source.available ? '可用' : '不可用' }}
+                </el-tag>
+                <span class="source-name">{{ source.name.toUpperCase() }}</span>
+                <el-tag size="small" type="info" class="priority-tag">
+                  优先级: {{ source.priority }}
+                </el-tag>
+              </div>
+              <div class="source-actions">
+                <el-button
+                  size="small"
+                  type="primary"
+                  link
+                  :loading="testingSource === source.name"
+                  @click="testSingleSource(source.name)"
+                >
+                  <el-icon><Operation /></el-icon>
+                  测试
+                </el-button>
+              </div>
+            </div>
+            <div class="source-description">
+              {{ source.description }}
+            </div>
+
+            <!-- 测试结果展示 -->
+            <div v-if="testResults[source.name]" class="test-results">
+              <el-divider content-position="left">
+                <span class="divider-text">最后测试结果</span>
+              </el-divider>
+              <div class="test-result-message">
+                <el-alert
+                  :title="testResults[source.name].message"
+                  :type="testResults[source.name].available ? 'success' : 'error'"
+                  :closable="false"
+                  show-icon
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-else class="empty-state">
+          <el-empty description="暂无数据源信息" />
+        </div>
+      </div>
+    </el-card>
+  </div>
+</template>
+
 <style scoped lang="scss">
 .data-source-status {
   .status-card {
@@ -221,12 +224,12 @@ onMounted(() => {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      
+
       .header-icon {
         margin-right: 8px;
         color: var(--el-color-primary);
       }
-      
+
       .header-title {
         font-weight: 600;
         flex: 1;

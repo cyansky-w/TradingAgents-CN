@@ -1,3 +1,7 @@
+<script setup lang="ts">
+// Footer组件逻辑
+</script>
+
 <template>
   <div class="app-footer">
     <div class="footer-content">
@@ -11,10 +15,6 @@
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-// Footer组件逻辑
-</script>
 
 <style lang="scss" scoped>
 .app-footer {
@@ -42,4 +42,3 @@
   }
 }
 </style>
-

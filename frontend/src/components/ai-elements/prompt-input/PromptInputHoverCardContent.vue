@@ -6,7 +6,7 @@ type PromptInputHoverCardContentProps = InstanceType<typeof HoverCardContent>['$
 interface Props extends /* @vue-ignore */ PromptInputHoverCardContentProps {}
 
 const props = withDefaults(defineProps<Props>(), {
-  align: 'start',
+  align: 'start'
 })
 
 const { align, ...restProps } = props

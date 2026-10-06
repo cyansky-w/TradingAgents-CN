@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
-import { cn } from '@/lib/utils'
 import { MicIcon } from 'lucide-vue-next'
 import { onMounted, onUnmounted, ref } from 'vue'
+import { cn } from '@/lib/utils'
 import { usePromptInput } from './context'
 import PromptInputButton from './PromptInputButton.vue'
 
@@ -114,8 +114,7 @@ function toggleListening() {
     return
   if (isListening.value) {
     recognition.value.stop()
-  }
-  else {
+  } else {
     recognition.value.start()
   }
 }

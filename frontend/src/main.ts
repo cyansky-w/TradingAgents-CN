@@ -1,22 +1,22 @@
-import { createApp } from 'vue'
-import { createPinia } from 'pinia'
-import ElementPlus from 'element-plus'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
-import 'element-plus/dist/index.css'
-import 'element-plus/theme-chalk/dark/css-vars.css'
-
-import './styles/tailwind.css'
-
-import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import dayjs from 'dayjs'
-import 'dayjs/locale/zh-cn'
+import ElementPlus from 'element-plus'
+import zhCn from 'element-plus/es/locale/lang/zh-cn'
+import { createPinia } from 'pinia'
+import { createApp } from 'vue'
 
 import App from './App.vue'
-import router from './router'
+
 import { setupGlobalComponents } from './components'
-import { useAuthStore } from './stores/auth'
+import router from './router'
 import { useAppStore } from './stores/app'
+
+import { useAuthStore } from './stores/auth'
 import { setupTokenRefreshTimer } from './utils/auth'
+import 'element-plus/dist/index.css'
+import 'element-plus/theme-chalk/dark/css-vars.css'
+import './styles/tailwind.css'
+import 'dayjs/locale/zh-cn'
 import './styles/index.scss'
 import './styles/dark-theme.scss'
 
@@ -42,8 +42,8 @@ app.use(ElementPlus, {
   message: {
     max: 3, // 最多同时显示3个消息
     grouping: true, // 启用消息分组，相同内容的消息不会重复显示
-    duration: 3000, // 默认显示时长3秒
-  },
+    duration: 3000 // 默认显示时长3秒
+  }
 })
 
 // 注册全局组件
@@ -58,11 +58,11 @@ app.config.errorHandler = (err, _vm, info) => {
     const error = err as any
     // 检查错误消息或状态码
     if (
-      error.message?.includes('认证失败') ||
-      error.message?.includes('登录已过期') ||
-      error.message?.includes('Token') ||
-      error.response?.status === 401 ||
-      error.code === 401
+      error.message?.includes('认证失败')
+      || error.message?.includes('登录已过期')
+      || error.message?.includes('Token')
+      || error.response?.status === 401
+      || error.code === 401
     ) {
       console.log('🔒 全局错误处理：检测到认证错误，跳转登录页')
       const authStore = useAuthStore()
@@ -127,7 +127,7 @@ const initApp = async () => {
       console.log('⚠️ API连接失败，跳过认证检查')
     }
   } catch (error) {
-    const err = error as { code?: string; message?: string }
+    const err = error as { code?: string, message?: string }
     console.warn('⚠️ 应用初始化失败，但应用将继续启动:', err)
     // 如果是网络错误，不影响应用启动
     if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {

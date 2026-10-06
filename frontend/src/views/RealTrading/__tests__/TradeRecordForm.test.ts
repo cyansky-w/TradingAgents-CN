@@ -1,16 +1,16 @@
+import type { CreateLedgerRecordPayload, PortfolioPosition } from '@/api/realTrades'
 import { flushPromises, mount } from '@vue/test-utils'
 import ElementPlus from 'element-plus'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import TradeRecordForm from '../components/TradeRecordForm.vue'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  realTradesApi,
-  type CreateLedgerRecordPayload,
-  type PortfolioPosition
+
+  realTradesApi
 } from '@/api/realTrades'
 import { Select, SelectItem } from '@/components/ui/select'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { closePositionKey } from '../closePositionSelection'
+import TradeRecordForm from '../components/TradeRecordForm.vue'
 
 vi.stubGlobal(
   'ResizeObserver',
@@ -89,7 +89,7 @@ beforeEach(() => {
   } as never)
 })
 
-describe('TradeRecordForm', () => {
+describe('tradeRecordForm', () => {
   it('shows step 100 and hides short controls for A-shares', async () => {
     const wrapper = mountForm()
     await flushPromises()
@@ -395,7 +395,7 @@ describe('TradeRecordForm', () => {
   it('waits for asset rules and blocks a perpetual order below the minimum quantity', async () => {
     let resolveRules!: (value: unknown) => void
     vi.mocked(realTradesApi.getAssetRules).mockReturnValueOnce(
-      new Promise((resolve) => {
+      new Promise(resolve => {
         resolveRules = resolve
       }) as never
     )

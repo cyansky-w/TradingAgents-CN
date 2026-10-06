@@ -6,12 +6,12 @@ import { cn } from '@/lib/utils'
 import { avatarVariant } from '.'
 
 const props = withDefaults(defineProps<{
-  class?: HTMLAttributes["class"]
-  size?: AvatarVariants["size"]
-  shape?: AvatarVariants["shape"]
+  class?: HTMLAttributes['class']
+  size?: AvatarVariants['size']
+  shape?: AvatarVariants['shape']
 }>(), {
   size: 'sm',
-  shape: 'circle',
+  shape: 'circle'
 })
 </script>
 

@@ -1,63 +1,9 @@
-<template>
-  <div class="multi-market-stock-search">
-    <div class="search-header">
-      <MarketSelector
-        v-model="selectedMarket"
-        size="default"
-        @change="handleMarketChange"
-      />
-      <el-input
-        v-model="searchQuery"
-        :placeholder="getPlaceholder()"
-        clearable
-        @input="handleSearch"
-        @clear="handleClear"
-        class="search-input"
-      >
-        <template #prefix>
-          <el-icon><Search /></el-icon>
-        </template>
-      </el-input>
-    </div>
-
-    <div v-if="loading" class="search-loading">
-      <el-icon class="is-loading"><Loading /></el-icon>
-      <span>搜索中...</span>
-    </div>
-
-    <div v-else-if="searchResults.length > 0" class="search-results">
-      <div
-        v-for="stock in searchResults"
-        :key="`${stock.market}-${stock.code}`"
-        class="result-item"
-        @click="handleSelectStock(stock)"
-      >
-        <div class="stock-info">
-          <div class="stock-code-name">
-            <span class="stock-code">{{ formatStockCode(stock) }}</span>
-            <span class="stock-name">{{ stock.name }}</span>
-            <span v-if="stock.name_en" class="stock-name-en">{{ stock.name_en }}</span>
-          </div>
-          <div class="stock-meta">
-            <el-tag size="small" type="info">{{ getMarketLabel(stock.market) }}</el-tag>
-            <el-tag v-if="stock.industry" size="small">{{ stock.industry }}</el-tag>
-            <span v-if="stock.pe" class="stock-pe">PE: {{ stock.pe.toFixed(2) }}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div v-else-if="searchQuery && !loading" class="no-results">
-      <el-empty description="未找到相关股票" :image-size="80" />
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref } from 'vue'
-import { Search, Loading } from '@element-plus/icons-vue'
-import { searchStocks, type StockInfo } from '@/api/multiMarket'
+import type { StockInfo } from '@/api/multiMarket'
+import { Loading, Search } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { ref } from 'vue'
+import { searchStocks } from '@/api/multiMarket'
 import MarketSelector from './MarketSelector.vue'
 
 interface Emits {
@@ -151,6 +97,67 @@ const handleSelectStock = (stock: StockInfo) => {
 }
 </script>
 
+<template>
+  <div class="multi-market-stock-search">
+    <div class="search-header">
+      <MarketSelector
+        v-model="selectedMarket"
+        size="default"
+        @change="handleMarketChange"
+      />
+      <el-input
+        v-model="searchQuery"
+        :placeholder="getPlaceholder()"
+        clearable
+        class="search-input"
+        @input="handleSearch"
+        @clear="handleClear"
+      >
+        <template #prefix>
+          <el-icon><Search /></el-icon>
+        </template>
+      </el-input>
+    </div>
+
+    <div v-if="loading" class="search-loading">
+      <el-icon class="is-loading">
+        <Loading />
+      </el-icon>
+      <span>搜索中...</span>
+    </div>
+
+    <div v-else-if="searchResults.length > 0" class="search-results">
+      <div
+        v-for="stock in searchResults"
+        :key="`${stock.market}-${stock.code}`"
+        class="result-item"
+        @click="handleSelectStock(stock)"
+      >
+        <div class="stock-info">
+          <div class="stock-code-name">
+            <span class="stock-code">{{ formatStockCode(stock) }}</span>
+            <span class="stock-name">{{ stock.name }}</span>
+            <span v-if="stock.name_en" class="stock-name-en">{{ stock.name_en }}</span>
+          </div>
+          <div class="stock-meta">
+            <el-tag size="small" type="info">
+              {{ getMarketLabel(stock.market) }}
+            </el-tag>
+            <el-tag v-if="stock.industry" size="small">
+              {{ stock.industry }}
+            </el-tag>
+            <span v-if="stock.pe" class="stock-pe">PE: {{ stock.pe.toFixed(2) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-else-if="searchQuery && !loading" class="no-results">
+      <el-empty description="未找到相关股票" :image-size="80" />
+    </div>
+  </div>
+</template>
+
 <style scoped lang="scss">
 .multi-market-stock-search {
   width: 100%;
@@ -242,4 +249,3 @@ const handleSelectStock = (stock: StockInfo) => {
   text-align: center;
 }
 </style>
-

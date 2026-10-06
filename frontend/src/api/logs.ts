@@ -2,10 +2,11 @@
  * 日志管理 API
  */
 
-import { ApiClient, type ApiResponse } from './request'
+import type { ApiResponse } from './request'
+import { ApiClient } from './request'
 
 const unwrapResponse = <T>(promise: Promise<ApiResponse<T>>): Promise<T> =>
-  promise.then((res) => res.data)
+  promise.then(res => res.data)
 
 export interface LogFileInfo {
   name: string
@@ -96,8 +97,7 @@ export const LogsApi = {
   /**
    * 删除日志文件
    */
-  deleteLogFile(filename: string): Promise<{ success: boolean; message: string }> {
-    return unwrapResponse(ApiClient.delete<{ success: boolean; message: string }>(`/api/system/system-logs/files/${filename}`))
+  deleteLogFile(filename: string): Promise<{ success: boolean, message: string }> {
+    return unwrapResponse(ApiClient.delete<{ success: boolean, message: string }>(`/api/system/system-logs/files/${filename}`))
   }
 }
-

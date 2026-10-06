@@ -1,304 +1,20 @@
-<template>
-  <div class="database-management">
-    <!-- 页面标题 -->
-    <div class="page-header">
-      <h1 class="page-title">
-        <el-icon><DataBoard /></el-icon>
-        数据库管理
-      </h1>
-      <p class="page-description">
-        MongoDB + Redis 数据库管理和监控
-      </p>
-    </div>
-
-    <!-- 连接状态 -->
-    <el-row :gutter="24">
-      <el-col :span="12">
-        <el-card class="connection-card" shadow="never">
-          <template #header>
-            <h3>🍃 MongoDB 连接状态</h3>
-          </template>
-          
-          <div class="connection-status">
-            <div class="status-indicator">
-              <el-tag :type="mongoStatus.connected ? 'success' : 'danger'" size="large">
-                {{ mongoStatus.connected ? '已连接' : '未连接' }}
-              </el-tag>
-            </div>
-            
-            <div v-if="mongoStatus.connected" class="connection-info">
-              <p><strong>服务器:</strong> {{ mongoStatus.host }}:{{ mongoStatus.port }}</p>
-              <p><strong>数据库:</strong> {{ mongoStatus.database }}</p>
-              <p><strong>版本:</strong> {{ mongoStatus.version || 'Unknown' }}</p>
-              <p v-if="mongoStatus.connected_at"><strong>连接时间:</strong> {{ formatDateTime(mongoStatus.connected_at) }}</p>
-              <p v-if="mongoStatus.uptime"><strong>运行时间:</strong> {{ formatUptime(mongoStatus.uptime) }}</p>
-            </div>
-            
-            <div class="connection-actions">
-              <el-button @click="testConnections" :loading="testing">
-                测试连接
-              </el-button>
-              <el-button @click="loadDatabaseStatus" :loading="loading" :icon="Refresh">
-                刷新状态
-              </el-button>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-
-      <el-col :span="12">
-        <el-card class="connection-card" shadow="never">
-          <template #header>
-            <h3>🔴 Redis 连接状态</h3>
-          </template>
-          
-          <div class="connection-status">
-            <div class="status-indicator">
-              <el-tag :type="redisStatus.connected ? 'success' : 'danger'" size="large">
-                {{ redisStatus.connected ? '已连接' : '未连接' }}
-              </el-tag>
-            </div>
-            
-            <div v-if="redisStatus.connected" class="connection-info">
-              <p><strong>服务器:</strong> {{ redisStatus.host }}:{{ redisStatus.port }}</p>
-              <p><strong>数据库:</strong> {{ redisStatus.database }}</p>
-              <p><strong>版本:</strong> {{ redisStatus.version || 'Unknown' }}</p>
-              <p v-if="redisStatus.memory_used"><strong>内存使用:</strong> {{ formatBytes(redisStatus.memory_used) }}</p>
-              <p v-if="redisStatus.connected_clients"><strong>连接数:</strong> {{ redisStatus.connected_clients }}</p>
-            </div>
-            
-            <div class="connection-actions">
-              <el-button @click="testConnections" :loading="testing">
-                测试连接
-              </el-button>
-              <el-button @click="loadDatabaseStatus" :loading="loading" :icon="Refresh">
-                刷新状态
-              </el-button>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <!-- 数据库统计 -->
-    <el-row :gutter="24" style="margin-top: 24px">
-      <el-col :span="8">
-        <el-card class="stat-card" shadow="never">
-          <div class="stat-content">
-            <div class="stat-value">{{ dbStats.totalCollections }}</div>
-            <div class="stat-label">MongoDB 集合数</div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="8">
-        <el-card class="stat-card" shadow="never">
-          <div class="stat-content">
-            <div class="stat-value">{{ dbStats.totalDocuments }}</div>
-            <div class="stat-label">总文档数</div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="8">
-        <el-card class="stat-card" shadow="never">
-          <div class="stat-content">
-            <div class="stat-value">{{ formatBytes(dbStats.totalSize) }}</div>
-            <div class="stat-label">数据库大小</div>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <!-- 数据管理操作 -->
-    <el-card class="operations-card" shadow="never" style="margin-top: 24px">
-      <template #header>
-        <h3>🛠️ 数据管理操作</h3>
-      </template>
-      
-      <!-- 第一行：数据导入和导出 -->
-      <el-row :gutter="24">
-        <!-- 数据导出 -->
-        <el-col :span="12">
-          <div class="operation-section">
-            <h4>📤 数据导出</h4>
-            <p>导出数据库数据到文件</p>
-
-            <el-form-item label="导出格式">
-              <el-select v-model="exportFormat" style="width: 100%">
-                <el-option label="JSON" value="json" />
-                <el-option label="CSV" value="csv" />
-                <el-option label="Excel" value="xlsx" />
-              </el-select>
-            </el-form-item>
-
-            <el-form-item label="数据集合">
-              <el-select v-model="exportCollection" style="width: 100%">
-                <el-option label="配置和报告（用于迁移）" value="config_and_reports" />
-                <el-option label="配置数据（用于演示系统，已脱敏）" value="config_only" />
-                <el-option label="分析报告" value="analysis_reports" />
-                <el-option label="用户配置" value="user_configs" />
-                <el-option label="操作日志" value="operation_logs" />
-              </el-select>
-            </el-form-item>
-
-            <el-button @click="exportData" :loading="exporting">
-              <el-icon><Download /></el-icon>
-              导出数据
-            </el-button>
-          </div>
-        </el-col>
-
-        <!-- 数据导入 -->
-        <el-col :span="12">
-          <div class="operation-section">
-            <h4>📥 数据导入</h4>
-            <p>从导出文件导入数据</p>
-
-            <el-form-item label="选择文件">
-              <el-upload
-                ref="uploadRef"
-                :auto-upload="false"
-                :limit="1"
-                :on-change="handleFileChange"
-                :on-remove="handleFileRemove"
-                accept=".json"
-                drag
-              >
-                <el-icon class="el-icon--upload"><Upload /></el-icon>
-                <div class="el-upload__text">
-                  拖拽文件到此处或<em>点击上传</em>
-                </div>
-                <template #tip>
-                  <div class="el-upload__tip">
-                    仅支持 JSON 格式的导出文件
-                  </div>
-                </template>
-              </el-upload>
-            </el-form-item>
-
-            <el-form-item label="导入选项">
-              <el-checkbox v-model="importOverwrite">
-                覆盖现有数据
-              </el-checkbox>
-              <div style="font-size: 12px; color: #909399; margin-top: 4px;">
-                ⚠️ 勾选后将删除现有数据再导入
-              </div>
-            </el-form-item>
-
-            <el-button
-              type="primary"
-              @click="importData"
-              :loading="importing"
-              :disabled="!importFile"
-            >
-              <el-icon><Upload /></el-icon>
-              导入数据
-            </el-button>
-          </div>
-        </el-col>
-      </el-row>
-
-      <!-- 第二行：数据备份和还原说明 -->
-      <el-row :gutter="24" style="margin-top: 24px">
-        <el-col :span="24">
-          <div class="operation-section">
-            <h4>💾 数据备份与还原</h4>
-            <el-alert
-              title="请使用命令行工具进行备份和还原"
-              type="info"
-              :closable="false"
-            >
-              <template #default>
-                <div style="line-height: 1.8;">
-                  <p style="margin: 8px 0;">由于数据量较大，Web 界面备份体验较差，建议使用 MongoDB 原生工具：</p>
-                  <div style="background: #f5f7fa; padding: 12px; border-radius: 4px; margin: 8px 0;">
-                    <p style="margin: 4px 0; font-weight: bold;">📦 备份命令：</p>
-                    <code style="display: block; margin: 4px 0; color: #409eff;">
-                      mongodump --uri="mongodb://localhost:27017" --db=tradingagents --out=./backup --gzip
-                    </code>
-                    <p style="margin: 12px 0 4px 0; font-weight: bold;">🔄 还原命令：</p>
-                    <code style="display: block; margin: 4px 0; color: #409eff;">
-                      mongorestore --uri="mongodb://localhost:27017" --db=tradingagents --gzip ./backup/tradingagents
-                    </code>
-                  </div>
-                  <p style="margin: 8px 0; font-size: 12px; color: #909399;">
-                    💡 提示：请根据实际的 MongoDB 连接信息修改命令中的 URI
-                  </p>
-                </div>
-              </template>
-            </el-alert>
-          </div>
-        </el-col>
-      </el-row>
-    </el-card>
-
-
-
-
-
-    <!-- 数据清理 -->
-    <el-card class="cleanup-card" shadow="never" style="margin-top: 24px">
-      <template #header>
-        <h3>🧹 数据清理</h3>
-      </template>
-      
-      <el-alert
-        title="危险操作"
-        type="warning"
-        description="以下操作将永久删除数据，请谨慎操作"
-        :closable="false"
-        style="margin-bottom: 16px"
-      />
-      
-      <el-row :gutter="24">
-        <el-col :span="12">
-          <div class="cleanup-section">
-            <h4>清理过期分析结果</h4>
-            <p>删除指定天数之前的分析结果</p>
-            <el-input-number v-model="cleanupDays" :min="1" :max="365" />
-            <span style="margin-left: 8px">天前</span>
-            <br><br>
-            <el-button type="warning" @click="cleanupAnalysisResults" :loading="cleaning">
-              清理分析结果
-            </el-button>
-          </div>
-        </el-col>
-        
-        <el-col :span="12">
-          <div class="cleanup-section">
-            <h4>清理操作日志</h4>
-            <p>删除指定天数之前的操作日志</p>
-            <el-input-number v-model="logCleanupDays" :min="1" :max="365" />
-            <span style="margin-left: 8px">天前</span>
-            <br><br>
-            <el-button type="warning" @click="cleanupOperationLogs" :loading="cleaning">
-              清理操作日志
-            </el-button>
-          </div>
-        </el-col>
-        
-
-      </el-row>
-    </el-card>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import type { DatabaseStats, DatabaseStatus } from '@/api/database'
 import {
   DataBoard,
   Download,
-  Upload,
-  Refresh
+  Refresh,
+  Upload
 } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
+import { computed, onMounted, ref } from 'vue'
 import {
   databaseApi,
+
   formatBytes,
   formatDateTime,
-  formatUptime,
-  type DatabaseStatus,
-  type DatabaseStats
+  formatUptime
 } from '@/api/database'
 
 // 响应式数据
@@ -310,7 +26,7 @@ const testing = ref(false)
 const cleaning = ref(false)
 
 const exportFormat = ref('json')
-const exportCollection = ref('config_and_reports')  // 默认选择"配置和报告"
+const exportCollection = ref('config_and_reports') // 默认选择"配置和报告"
 const importFile = ref<File | null>(null)
 const importOverwrite = ref(false)
 const uploadRef = ref()
@@ -392,7 +108,6 @@ const testConnections = async () => {
 
     // 测试成功后刷新状态显示
     await loadDatabaseStatus()
-
   } catch (error) {
     console.error('❌ 连接测试失败:', error)
     ElMessage.error('连接测试失败')
@@ -408,23 +123,23 @@ const exportData = async () => {
   try {
     // 配置数据集合列表（用于演示系统）
     const configCollections = [
-      'system_configs',      // 系统配置（包括 LLM 配置）
-      'users',               // 用户数据（脱敏模式下只导出结构，不导出实际数据）
-      'llm_providers',       // LLM 提供商
-      'market_categories',   // 市场分类
-      'user_tags',           // 用户标签
-      'user_favorites',      // 自选股
-      'datasource_groupings',// 数据源分组
-      'platform_configs',    // 平台配置
-      'user_configs',        // 用户配置
-      'model_catalog'        // 模型目录
+      'system_configs', // 系统配置（包括 LLM 配置）
+      'users', // 用户数据（脱敏模式下只导出结构，不导出实际数据）
+      'llm_providers', // LLM 提供商
+      'market_categories', // 市场分类
+      'user_tags', // 用户标签
+      'user_favorites', // 自选股
+      'datasource_groupings', // 数据源分组
+      'platform_configs', // 平台配置
+      'user_configs', // 用户配置
+      'model_catalog' // 模型目录
       // 注意: 不包含 market_quotes 和 stock_basic_info（数据量大，不适合演示系统）
     ]
 
     // 分析报告集合列表
     const reportCollections = [
-      'analysis_reports',    // 分析报告（修复：原来是 analysis_results，但数据库中实际是 analysis_reports）
-      'analysis_tasks'       // 分析任务
+      'analysis_reports', // 分析报告（修复：原来是 analysis_results，但数据库中实际是 analysis_reports）
+      'analysis_tasks' // 分析任务
       // 注意：debate_records 集合在数据库中不存在，已移除
     ]
 
@@ -435,16 +150,16 @@ const exportData = async () => {
     ]
 
     let collections: string[] = []
-    let sanitize = false  // 是否启用脱敏
-    let exportType = ''   // 导出类型（用于文件名）
+    let sanitize = false // 是否启用脱敏
+    let exportType = '' // 导出类型（用于文件名）
 
     if (exportCollection.value === 'config_only') {
       collections = configCollections // 仅导出配置数据
-      sanitize = true  // 配置数据导出时自动启用脱敏（清空 API key 等敏感字段）- 用于演示系统
+      sanitize = true // 配置数据导出时自动启用脱敏（清空 API key 等敏感字段）- 用于演示系统
       exportType = '_config'
     } else if (exportCollection.value === 'config_and_reports') {
       collections = configAndReportsCollections // 导出配置和报告
-      sanitize = false  // 不脱敏 - 用于迁移，需要保留完整数据
+      sanitize = false // 不脱敏 - 用于迁移，需要保留完整数据
       exportType = '_config_reports'
     } else {
       collections = [exportCollection.value] // 导出单个集合
@@ -454,7 +169,7 @@ const exportData = async () => {
     const blob = await databaseApi.exportData({
       collections,
       format: exportFormat.value,
-      sanitize  // 传递脱敏参数
+      sanitize // 传递脱敏参数
     })
 
     // 创建下载链接
@@ -473,7 +188,6 @@ const exportData = async () => {
     } else {
       ElMessage.success('数据导出成功')
     }
-
   } catch (error) {
     console.error('❌ 数据导出失败:', error)
     ElMessage.error('数据导出失败')
@@ -519,7 +233,7 @@ const importData = async () => {
     importing.value = true
 
     const result = await databaseApi.importData(importFile.value, {
-      collection: 'imported_data',  // 后端会自动检测多集合模式
+      collection: 'imported_data', // 后端会自动检测多集合模式
       format: 'json',
       overwrite: importOverwrite.value
     })
@@ -529,8 +243,8 @@ const importData = async () => {
     // 根据导入模式显示不同的成功消息
     if (result.data.mode === 'multi_collection') {
       ElMessage.success(
-        `数据导入成功！共导入 ${result.data.total_collections} 个集合，` +
-        `${result.data.total_inserted} 条文档`
+        `数据导入成功！共导入 ${result.data.total_collections} 个集合，`
+        + `${result.data.total_inserted} 条文档`
       )
     } else {
       ElMessage.success(
@@ -544,7 +258,6 @@ const importData = async () => {
 
     // 刷新数据库统计
     await loadDatabaseStats()
-
   } catch (error: any) {
     if (error !== 'cancel') {
       console.error('❌ 数据导入失败:', error)
@@ -571,7 +284,6 @@ const cleanupAnalysisResults = async () => {
 
     // 重新加载统计信息
     await loadDatabaseStats()
-
   } catch (error) {
     if (error !== 'cancel') {
       console.error('❌ 清理分析结果失败:', error)
@@ -597,7 +309,6 @@ const cleanupOperationLogs = async () => {
 
     // 重新加载统计信息
     await loadDatabaseStats()
-
   } catch (error) {
     if (error !== 'cancel') {
       console.error('❌ 清理操作日志失败:', error)
@@ -607,10 +318,6 @@ const cleanupOperationLogs = async () => {
     cleaning.value = false
   }
 }
-
-
-
-
 
 // 生命周期
 onMounted(async () => {
@@ -625,6 +332,312 @@ onMounted(async () => {
   console.log('✅ 数据库管理页面初始化完成')
 })
 </script>
+
+<template>
+  <div class="database-management">
+    <!-- 页面标题 -->
+    <div class="page-header">
+      <h1 class="page-title">
+        <el-icon><DataBoard /></el-icon>
+        数据库管理
+      </h1>
+      <p class="page-description">
+        MongoDB + Redis 数据库管理和监控
+      </p>
+    </div>
+
+    <!-- 连接状态 -->
+    <el-row :gutter="24">
+      <el-col :span="12">
+        <el-card class="connection-card" shadow="never">
+          <template #header>
+            <h3>🍃 MongoDB 连接状态</h3>
+          </template>
+
+          <div class="connection-status">
+            <div class="status-indicator">
+              <el-tag :type="mongoStatus.connected ? 'success' : 'danger'" size="large">
+                {{ mongoStatus.connected ? '已连接' : '未连接' }}
+              </el-tag>
+            </div>
+
+            <div v-if="mongoStatus.connected" class="connection-info">
+              <p><strong>服务器:</strong> {{ mongoStatus.host }}:{{ mongoStatus.port }}</p>
+              <p><strong>数据库:</strong> {{ mongoStatus.database }}</p>
+              <p><strong>版本:</strong> {{ mongoStatus.version || 'Unknown' }}</p>
+              <p v-if="mongoStatus.connected_at">
+                <strong>连接时间:</strong> {{ formatDateTime(mongoStatus.connected_at) }}
+              </p>
+              <p v-if="mongoStatus.uptime">
+                <strong>运行时间:</strong> {{ formatUptime(mongoStatus.uptime) }}
+              </p>
+            </div>
+
+            <div class="connection-actions">
+              <el-button :loading="testing" @click="testConnections">
+                测试连接
+              </el-button>
+              <el-button :loading="loading" :icon="Refresh" @click="loadDatabaseStatus">
+                刷新状态
+              </el-button>
+            </div>
+          </div>
+        </el-card>
+      </el-col>
+
+      <el-col :span="12">
+        <el-card class="connection-card" shadow="never">
+          <template #header>
+            <h3>🔴 Redis 连接状态</h3>
+          </template>
+
+          <div class="connection-status">
+            <div class="status-indicator">
+              <el-tag :type="redisStatus.connected ? 'success' : 'danger'" size="large">
+                {{ redisStatus.connected ? '已连接' : '未连接' }}
+              </el-tag>
+            </div>
+
+            <div v-if="redisStatus.connected" class="connection-info">
+              <p><strong>服务器:</strong> {{ redisStatus.host }}:{{ redisStatus.port }}</p>
+              <p><strong>数据库:</strong> {{ redisStatus.database }}</p>
+              <p><strong>版本:</strong> {{ redisStatus.version || 'Unknown' }}</p>
+              <p v-if="redisStatus.memory_used">
+                <strong>内存使用:</strong> {{ formatBytes(redisStatus.memory_used) }}
+              </p>
+              <p v-if="redisStatus.connected_clients">
+                <strong>连接数:</strong> {{ redisStatus.connected_clients }}
+              </p>
+            </div>
+
+            <div class="connection-actions">
+              <el-button :loading="testing" @click="testConnections">
+                测试连接
+              </el-button>
+              <el-button :loading="loading" :icon="Refresh" @click="loadDatabaseStatus">
+                刷新状态
+              </el-button>
+            </div>
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <!-- 数据库统计 -->
+    <el-row :gutter="24" style="margin-top: 24px">
+      <el-col :span="8">
+        <el-card class="stat-card" shadow="never">
+          <div class="stat-content">
+            <div class="stat-value">
+              {{ dbStats.totalCollections }}
+            </div>
+            <div class="stat-label">
+              MongoDB 集合数
+            </div>
+          </div>
+        </el-card>
+      </el-col>
+      <el-col :span="8">
+        <el-card class="stat-card" shadow="never">
+          <div class="stat-content">
+            <div class="stat-value">
+              {{ dbStats.totalDocuments }}
+            </div>
+            <div class="stat-label">
+              总文档数
+            </div>
+          </div>
+        </el-card>
+      </el-col>
+      <el-col :span="8">
+        <el-card class="stat-card" shadow="never">
+          <div class="stat-content">
+            <div class="stat-value">
+              {{ formatBytes(dbStats.totalSize) }}
+            </div>
+            <div class="stat-label">
+              数据库大小
+            </div>
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <!-- 数据管理操作 -->
+    <el-card class="operations-card" shadow="never" style="margin-top: 24px">
+      <template #header>
+        <h3>🛠️ 数据管理操作</h3>
+      </template>
+
+      <!-- 第一行：数据导入和导出 -->
+      <el-row :gutter="24">
+        <!-- 数据导出 -->
+        <el-col :span="12">
+          <div class="operation-section">
+            <h4>📤 数据导出</h4>
+            <p>导出数据库数据到文件</p>
+
+            <el-form-item label="导出格式">
+              <el-select v-model="exportFormat" style="width: 100%">
+                <el-option label="JSON" value="json" />
+                <el-option label="CSV" value="csv" />
+                <el-option label="Excel" value="xlsx" />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item label="数据集合">
+              <el-select v-model="exportCollection" style="width: 100%">
+                <el-option label="配置和报告（用于迁移）" value="config_and_reports" />
+                <el-option label="配置数据（用于演示系统，已脱敏）" value="config_only" />
+                <el-option label="分析报告" value="analysis_reports" />
+                <el-option label="用户配置" value="user_configs" />
+                <el-option label="操作日志" value="operation_logs" />
+              </el-select>
+            </el-form-item>
+
+            <el-button :loading="exporting" @click="exportData">
+              <el-icon><Download /></el-icon>
+              导出数据
+            </el-button>
+          </div>
+        </el-col>
+
+        <!-- 数据导入 -->
+        <el-col :span="12">
+          <div class="operation-section">
+            <h4>📥 数据导入</h4>
+            <p>从导出文件导入数据</p>
+
+            <el-form-item label="选择文件">
+              <el-upload
+                ref="uploadRef"
+                :auto-upload="false"
+                :limit="1"
+                :on-change="handleFileChange"
+                :on-remove="handleFileRemove"
+                accept=".json"
+                drag
+              >
+                <el-icon class="el-icon--upload">
+                  <Upload />
+                </el-icon>
+                <div class="el-upload__text">
+                  拖拽文件到此处或<em>点击上传</em>
+                </div>
+                <template #tip>
+                  <div class="el-upload__tip">
+                    仅支持 JSON 格式的导出文件
+                  </div>
+                </template>
+              </el-upload>
+            </el-form-item>
+
+            <el-form-item label="导入选项">
+              <el-checkbox v-model="importOverwrite">
+                覆盖现有数据
+              </el-checkbox>
+              <div style="font-size: 12px; color: #909399; margin-top: 4px;">
+                ⚠️ 勾选后将删除现有数据再导入
+              </div>
+            </el-form-item>
+
+            <el-button
+              type="primary"
+              :loading="importing"
+              :disabled="!importFile"
+              @click="importData"
+            >
+              <el-icon><Upload /></el-icon>
+              导入数据
+            </el-button>
+          </div>
+        </el-col>
+      </el-row>
+
+      <!-- 第二行：数据备份和还原说明 -->
+      <el-row :gutter="24" style="margin-top: 24px">
+        <el-col :span="24">
+          <div class="operation-section">
+            <h4>💾 数据备份与还原</h4>
+            <el-alert
+              title="请使用命令行工具进行备份和还原"
+              type="info"
+              :closable="false"
+            >
+              <template #default>
+                <div style="line-height: 1.8;">
+                  <p style="margin: 8px 0;">
+                    由于数据量较大，Web 界面备份体验较差，建议使用 MongoDB 原生工具：
+                  </p>
+                  <div style="background: #f5f7fa; padding: 12px; border-radius: 4px; margin: 8px 0;">
+                    <p style="margin: 4px 0; font-weight: bold;">
+                      📦 备份命令：
+                    </p>
+                    <code style="display: block; margin: 4px 0; color: #409eff;">
+                      mongodump --uri="mongodb://localhost:27017" --db=tradingagents --out=./backup --gzip
+                    </code>
+                    <p style="margin: 12px 0 4px 0; font-weight: bold;">
+                      🔄 还原命令：
+                    </p>
+                    <code style="display: block; margin: 4px 0; color: #409eff;">
+                      mongorestore --uri="mongodb://localhost:27017" --db=tradingagents --gzip ./backup/tradingagents
+                    </code>
+                  </div>
+                  <p style="margin: 8px 0; font-size: 12px; color: #909399;">
+                    💡 提示：请根据实际的 MongoDB 连接信息修改命令中的 URI
+                  </p>
+                </div>
+              </template>
+            </el-alert>
+          </div>
+        </el-col>
+      </el-row>
+    </el-card>
+
+    <!-- 数据清理 -->
+    <el-card class="cleanup-card" shadow="never" style="margin-top: 24px">
+      <template #header>
+        <h3>🧹 数据清理</h3>
+      </template>
+
+      <el-alert
+        title="危险操作"
+        type="warning"
+        description="以下操作将永久删除数据，请谨慎操作"
+        :closable="false"
+        style="margin-bottom: 16px"
+      />
+
+      <el-row :gutter="24">
+        <el-col :span="12">
+          <div class="cleanup-section">
+            <h4>清理过期分析结果</h4>
+            <p>删除指定天数之前的分析结果</p>
+            <el-input-number v-model="cleanupDays" :min="1" :max="365" />
+            <span style="margin-left: 8px">天前</span>
+            <br><br>
+            <el-button type="warning" :loading="cleaning" @click="cleanupAnalysisResults">
+              清理分析结果
+            </el-button>
+          </div>
+        </el-col>
+
+        <el-col :span="12">
+          <div class="cleanup-section">
+            <h4>清理操作日志</h4>
+            <p>删除指定天数之前的操作日志</p>
+            <el-input-number v-model="logCleanupDays" :min="1" :max="365" />
+            <span style="margin-left: 8px">天前</span>
+            <br><br>
+            <el-button type="warning" :loading="cleaning" @click="cleanupOperationLogs">
+              清理操作日志
+            </el-button>
+          </div>
+        </el-col>
+      </el-row>
+    </el-card>
+  </div>
+</template>
 
 <style lang="scss" scoped>
 .database-management {
@@ -653,16 +666,16 @@ onMounted(async () => {
         text-align: center;
         margin-bottom: 16px;
       }
-      
+
       .connection-info {
         margin-bottom: 16px;
-        
+
         p {
           margin: 4px 0;
           font-size: 14px;
         }
       }
-      
+
       .connection-actions {
         display: flex;
         gap: 8px;
@@ -674,14 +687,14 @@ onMounted(async () => {
   .stat-card {
     .stat-content {
       text-align: center;
-      
+
       .stat-value {
         font-size: 24px;
         font-weight: 600;
         color: var(--el-color-primary);
         margin-bottom: 8px;
       }
-      
+
       .stat-label {
         font-size: 14px;
         color: var(--el-text-color-regular);
@@ -695,16 +708,16 @@ onMounted(async () => {
         margin: 0 0 8px 0;
         font-size: 16px;
       }
-      
+
       p {
         margin: 0 0 16px 0;
         font-size: 14px;
         color: var(--el-text-color-regular);
       }
-      
+
       .file-info {
         margin-top: 12px;
-        
+
         p {
           margin: 0 0 8px 0;
           font-size: 14px;
@@ -713,15 +726,13 @@ onMounted(async () => {
     }
   }
 
-
-
   .cleanup-card {
     .cleanup-section {
       h4 {
         margin: 0 0 8px 0;
         font-size: 16px;
       }
-      
+
       p {
         margin: 0 0 12px 0;
         font-size: 14px;

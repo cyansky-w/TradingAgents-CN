@@ -21,9 +21,9 @@ it('shows original and converted fee amounts', () => {
         fee_currency: 'BNB',
         base_fee_amount: '2.5',
         base_fee_currency: 'CNY',
-        fee_conversion_error: null,
-      }],
-    },
+        fee_conversion_error: null
+      }]
+    }
   })
 
   expect(wrapper.text()).toContain('0.01 BNB')
@@ -32,7 +32,7 @@ it('shows original and converted fee amounts', () => {
 
 it('uses the responsive filter layout hook', () => {
   const wrapper = mount(TradeRecordsDialog, {
-    props: { modelValue: true, total: 0, records: [] },
+    props: { modelValue: true, total: 0, records: [] }
   })
 
   expect(wrapper.find('.filters.responsive-filters').exists()).toBe(true)

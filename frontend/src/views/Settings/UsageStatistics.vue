@@ -1,153 +1,14 @@
-<template>
-  <div class="usage-statistics-container">
-    <el-card class="header-card">
-      <template #header>
-        <div class="card-header">
-          <span class="title">
-            <el-icon><DataAnalysis /></el-icon>
-            使用统计与计费
-          </span>
-          <div class="header-actions">
-            <el-select v-model="selectedDays" @change="loadData" style="width: 120px; margin-right: 10px;">
-              <el-option label="最近7天" :value="7" />
-              <el-option label="最近30天" :value="30" />
-              <el-option label="最近90天" :value="90" />
-            </el-select>
-            <el-button type="primary" :icon="Refresh" @click="loadData">刷新</el-button>
-          </div>
-        </div>
-      </template>
-
-      <!-- 统计概览 -->
-      <el-row :gutter="20" class="stats-overview">
-        <el-col :span="6">
-          <el-statistic title="总请求数" :value="statistics.total_requests">
-            <template #prefix>
-              <el-icon><Document /></el-icon>
-            </template>
-          </el-statistic>
-        </el-col>
-        <el-col :span="6">
-          <el-statistic title="总输入 Token" :value="statistics.total_input_tokens">
-            <template #prefix>
-              <el-icon><Upload /></el-icon>
-            </template>
-          </el-statistic>
-        </el-col>
-        <el-col :span="6">
-          <el-statistic title="总输出 Token" :value="statistics.total_output_tokens">
-            <template #prefix>
-              <el-icon><Download /></el-icon>
-            </template>
-          </el-statistic>
-        </el-col>
-        <el-col :span="6">
-          <div class="cost-statistic">
-            <div class="cost-label">
-              <el-icon><Money /></el-icon>
-              <span>总成本</span>
-            </div>
-            <div class="cost-values">
-              <div v-for="(cost, currency) in statistics.cost_by_currency" :key="currency" class="cost-item">
-                <span class="cost-amount">{{ cost.toFixed(4) }}</span>
-                <span class="cost-currency">{{ getCurrencySymbol(currency) }}</span>
-              </div>
-              <div v-if="Object.keys(statistics.cost_by_currency || {}).length === 0" class="cost-item">
-                <span class="cost-amount">0.0000</span>
-                <span class="cost-currency">元</span>
-              </div>
-            </div>
-          </div>
-        </el-col>
-      </el-row>
-    </el-card>
-
-    <!-- 图表区域 -->
-    <el-row :gutter="20" style="margin-top: 20px;">
-      <el-col :span="12">
-        <el-card>
-          <template #header>
-            <span>按供应商统计</span>
-          </template>
-          <div ref="providerChartRef" style="height: 300px;"></div>
-        </el-card>
-      </el-col>
-      <el-col :span="12">
-        <el-card>
-          <template #header>
-            <span>按模型统计</span>
-          </template>
-          <div ref="modelChartRef" style="height: 300px;"></div>
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <el-row :gutter="20" style="margin-top: 20px;">
-      <el-col :span="24">
-        <el-card>
-          <template #header>
-            <span>每日成本趋势</span>
-          </template>
-          <div ref="dailyChartRef" style="height: 300px;"></div>
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <!-- 使用记录表格 -->
-    <el-card style="margin-top: 20px;">
-      <template #header>
-        <div class="card-header">
-          <span>使用记录</span>
-          <el-button type="danger" size="small" @click="handleDeleteOldRecords">
-            清理旧记录
-          </el-button>
-        </div>
-      </template>
-
-      <el-table :data="records" style="width: 100%" v-loading="loading">
-        <el-table-column prop="timestamp" label="时间" width="180">
-          <template #default="{ row }">
-            {{ formatTimestamp(row.timestamp) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="provider" label="供应商" width="120" />
-        <el-table-column prop="model_name" label="模型" width="180" />
-        <el-table-column prop="input_tokens" label="输入 Token" width="120" align="right" />
-        <el-table-column prop="output_tokens" label="输出 Token" width="120" align="right" />
-        <el-table-column prop="cost" label="成本" width="140" align="right">
-          <template #default="{ row }">
-            {{ row.cost.toFixed(4) }} {{ getCurrencySymbol(row.currency || 'CNY') }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="analysis_type" label="分析类型" width="150" />
-        <el-table-column prop="session_id" label="会话ID" show-overflow-tooltip />
-      </el-table>
-
-      <el-pagination
-        v-model:current-page="currentPage"
-        v-model:page-size="pageSize"
-        :total="totalRecords"
-        :page-sizes="[10, 20, 50, 100]"
-        layout="total, sizes, prev, pager, next, jumper"
-        @size-change="loadRecords"
-        @current-change="loadRecords"
-        style="margin-top: 20px; justify-content: center;"
-      />
-    </el-card>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { DataAnalysis, Refresh, Document, Upload, Download, Money } from '@element-plus/icons-vue'
+import type { UsageRecord, UsageStatistics } from '@/api/usage'
+import { DataAnalysis, Document, Download, Money, Refresh, Upload } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { nextTick, onMounted, ref } from 'vue'
 import {
-  getUsageRecords,
-  getUsageStatistics,
   deleteOldRecords,
-  type UsageRecord,
-  type UsageStatistics
+  getUsageRecords,
+  getUsageStatistics
+
 } from '@/api/usage'
 
 // 数据
@@ -186,11 +47,11 @@ const formatTimestamp = (timestamp: string) => {
 // 获取货币符号
 const getCurrencySymbol = (currency: string) => {
   const symbols: Record<string, string> = {
-    'CNY': '元',
-    'USD': '$',
-    'EUR': '€',
-    'GBP': '£',
-    'JPY': '¥'
+    CNY: '元',
+    USD: '$',
+    EUR: '€',
+    GBP: '£',
+    JPY: '¥'
   }
   return symbols[currency] || currency
 }
@@ -243,7 +104,8 @@ const renderCharts = () => {
 
 // 渲染供应商图表
 const renderProviderChart = () => {
-  if (!providerChartRef.value) return
+  if (!providerChartRef.value)
+    return
 
   if (!providerChart) {
     providerChart = echarts.init(providerChartRef.value)
@@ -285,7 +147,8 @@ const renderProviderChart = () => {
 
 // 渲染模型图表
 const renderModelChart = () => {
-  if (!modelChartRef.value) return
+  if (!modelChartRef.value)
+    return
 
   if (!modelChart) {
     modelChart = echarts.init(modelChartRef.value)
@@ -334,7 +197,8 @@ const renderModelChart = () => {
 
 // 渲染每日成本图表
 const renderDailyChart = () => {
-  if (!dailyChartRef.value) return
+  if (!dailyChartRef.value)
+    return
 
   if (!dailyChart) {
     dailyChart = echarts.init(dailyChartRef.value)
@@ -404,6 +268,147 @@ onMounted(() => {
   loadData()
 })
 </script>
+
+<template>
+  <div class="usage-statistics-container">
+    <el-card class="header-card">
+      <template #header>
+        <div class="card-header">
+          <span class="title">
+            <el-icon><DataAnalysis /></el-icon>
+            使用统计与计费
+          </span>
+          <div class="header-actions">
+            <el-select v-model="selectedDays" style="width: 120px; margin-right: 10px;" @change="loadData">
+              <el-option label="最近7天" :value="7" />
+              <el-option label="最近30天" :value="30" />
+              <el-option label="最近90天" :value="90" />
+            </el-select>
+            <el-button type="primary" :icon="Refresh" @click="loadData">
+              刷新
+            </el-button>
+          </div>
+        </div>
+      </template>
+
+      <!-- 统计概览 -->
+      <el-row :gutter="20" class="stats-overview">
+        <el-col :span="6">
+          <el-statistic title="总请求数" :value="statistics.total_requests">
+            <template #prefix>
+              <el-icon><Document /></el-icon>
+            </template>
+          </el-statistic>
+        </el-col>
+        <el-col :span="6">
+          <el-statistic title="总输入 Token" :value="statistics.total_input_tokens">
+            <template #prefix>
+              <el-icon><Upload /></el-icon>
+            </template>
+          </el-statistic>
+        </el-col>
+        <el-col :span="6">
+          <el-statistic title="总输出 Token" :value="statistics.total_output_tokens">
+            <template #prefix>
+              <el-icon><Download /></el-icon>
+            </template>
+          </el-statistic>
+        </el-col>
+        <el-col :span="6">
+          <div class="cost-statistic">
+            <div class="cost-label">
+              <el-icon><Money /></el-icon>
+              <span>总成本</span>
+            </div>
+            <div class="cost-values">
+              <div v-for="(cost, currency) in statistics.cost_by_currency" :key="currency" class="cost-item">
+                <span class="cost-amount">{{ cost.toFixed(4) }}</span>
+                <span class="cost-currency">{{ getCurrencySymbol(currency) }}</span>
+              </div>
+              <div v-if="Object.keys(statistics.cost_by_currency || {}).length === 0" class="cost-item">
+                <span class="cost-amount">0.0000</span>
+                <span class="cost-currency">元</span>
+              </div>
+            </div>
+          </div>
+        </el-col>
+      </el-row>
+    </el-card>
+
+    <!-- 图表区域 -->
+    <el-row :gutter="20" style="margin-top: 20px;">
+      <el-col :span="12">
+        <el-card>
+          <template #header>
+            <span>按供应商统计</span>
+          </template>
+          <div ref="providerChartRef" style="height: 300px;" />
+        </el-card>
+      </el-col>
+      <el-col :span="12">
+        <el-card>
+          <template #header>
+            <span>按模型统计</span>
+          </template>
+          <div ref="modelChartRef" style="height: 300px;" />
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <el-row :gutter="20" style="margin-top: 20px;">
+      <el-col :span="24">
+        <el-card>
+          <template #header>
+            <span>每日成本趋势</span>
+          </template>
+          <div ref="dailyChartRef" style="height: 300px;" />
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <!-- 使用记录表格 -->
+    <el-card style="margin-top: 20px;">
+      <template #header>
+        <div class="card-header">
+          <span>使用记录</span>
+          <el-button type="danger" size="small" @click="handleDeleteOldRecords">
+            清理旧记录
+          </el-button>
+        </div>
+      </template>
+
+      <el-table v-loading="loading" :data="records" style="width: 100%">
+        <el-table-column prop="timestamp" label="时间" width="180">
+          <template #default="{ row }">
+            {{ formatTimestamp(row.timestamp) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="provider" label="供应商" width="120" />
+        <el-table-column prop="model_name" label="模型" width="180" />
+        <el-table-column prop="input_tokens" label="输入 Token" width="120" align="right" />
+        <el-table-column prop="output_tokens" label="输出 Token" width="120" align="right" />
+        <el-table-column prop="cost" label="成本" width="140" align="right">
+          <template #default="{ row }">
+            {{ row.cost.toFixed(4) }} {{ getCurrencySymbol(row.currency || 'CNY') }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="analysis_type" label="分析类型" width="150" />
+        <el-table-column prop="session_id" label="会话ID" show-overflow-tooltip />
+      </el-table>
+
+      <el-pagination
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :total="totalRecords"
+        :page-sizes="[10, 20, 50, 100]"
+        layout="total, sizes, prev, pager, next, jumper"
+        style="margin-top: 20px; justify-content: center;"
+        @size-change="loadRecords"
+        @current-change="loadRecords"
+      />
+    </el-card>
+  </div>
+</template>
 
 <style scoped lang="scss">
 .usage-statistics-container {
@@ -477,4 +482,3 @@ onMounted(() => {
   align-items: center;
 }
 </style>
-

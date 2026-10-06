@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { onMounted, computed, watch } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { useChatStore } from '@/stores/chat'
 import {
   Conversation,
   ConversationContent,
-  ConversationScrollButton,
+  ConversationScrollButton
 } from '@/components/ai-elements/conversation'
-import ChatSidebar from './components/ChatSidebar.vue'
-import ChatMessageItem from './components/ChatMessageItem.vue'
+import { useChatStore } from '@/stores/chat'
 import ChatInputArea from './components/ChatInputArea.vue'
+import ChatMessageItem from './components/ChatMessageItem.vue'
+import ChatSidebar from './components/ChatSidebar.vue'
 import ChatWelcome from './components/ChatWelcome.vue'
 
 const route = useRoute()
@@ -27,7 +27,7 @@ onMounted(async () => {
   }
 })
 
-watch(() => route.params.id, async (newId) => {
+watch(() => route.params.id, async newId => {
   if (newId && typeof newId === 'string') {
     await chatStore.selectConversation(newId)
   }
@@ -45,7 +45,9 @@ watch(() => route.params.id, async (newId) => {
     <div class="flex flex-1 flex-col min-w-0">
       <!-- Header -->
       <header class="flex items-center h-12 px-4 border-b border-border shrink-0">
-        <h1 class="font-semibold text-sm truncate">{{ activeTitle }}</h1>
+        <h1 class="font-semibold text-sm truncate">
+          {{ activeTitle }}
+        </h1>
       </header>
 
       <!-- Messages -->

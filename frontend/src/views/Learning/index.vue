@@ -1,111 +1,3 @@
-<template>
-  <div class="learning-center">
-    <div class="learning-header">
-      <h1>📚 学习中心</h1>
-      <p class="subtitle">了解AI、大模型和智能股票分析</p>
-    </div>
-
-    <el-row :gutter="20" class="learning-categories">
-      <!-- AI基础知识 -->
-      <el-col :xs="24" :sm="12" :md="8" :lg="6">
-        <el-card class="category-card" shadow="hover" @click="navigateTo('ai-basics')">
-          <div class="card-icon">🤖</div>
-          <h3>AI基础知识</h3>
-          <p>什么是AI？什么是大模型？了解人工智能的基本概念</p>
-          <el-tag type="primary" size="small">1篇文章</el-tag>
-        </el-card>
-      </el-col>
-
-      <!-- 提示词工程 -->
-      <el-col :xs="24" :sm="12" :md="8" :lg="6">
-        <el-card class="category-card" shadow="hover" @click="navigateTo('prompt-engineering')">
-          <div class="card-icon">✍️</div>
-          <h3>提示词工程</h3>
-          <p>学习如何编写有效的提示词，让AI更好地理解你的需求</p>
-          <el-tag type="success" size="small">2篇文章</el-tag>
-        </el-card>
-      </el-col>
-
-      <!-- 模型选择指南 -->
-      <el-col :xs="24" :sm="12" :md="8" :lg="6">
-        <el-card class="category-card" shadow="hover" @click="navigateTo('model-selection')">
-          <div class="card-icon">🎯</div>
-          <h3>模型选择指南</h3>
-          <p>了解不同大模型的特点，选择最适合你的模型</p>
-          <el-tag type="warning" size="small">1篇文章</el-tag>
-        </el-card>
-      </el-col>
-
-      <!-- AI分析股票原理 -->
-      <el-col :xs="24" :sm="12" :md="8" :lg="6">
-        <el-card class="category-card" shadow="hover" @click="navigateTo('analysis-principles')">
-          <div class="card-icon">📊</div>
-          <h3>AI分析股票原理</h3>
-          <p>深入了解多智能体如何协作分析股票</p>
-          <el-tag type="info" size="small">1篇文章</el-tag>
-        </el-card>
-      </el-col>
-
-      <!-- 风险与局限性 -->
-      <el-col :xs="24" :sm="12" :md="8" :lg="6">
-        <el-card class="category-card" shadow="hover" @click="navigateTo('risks-limitations')">
-          <div class="card-icon">⚠️</div>
-          <h3>风险与局限性</h3>
-          <p>了解AI的潜在问题和正确使用方式</p>
-          <el-tag type="danger" size="small">1篇文章</el-tag>
-        </el-card>
-      </el-col>
-
-      <!-- 源项目与论文 -->
-      <el-col :xs="24" :sm="12" :md="8" :lg="6">
-        <el-card class="category-card" shadow="hover" @click="navigateTo('resources')">
-          <div class="card-icon">📖</div>
-          <h3>源项目与论文</h3>
-          <p>TradingAgents项目介绍和学术论文资源</p>
-          <el-tag type="primary" size="small">2篇文章</el-tag>
-        </el-card>
-      </el-col>
-
-      <!-- 实战教程 -->
-      <el-col :xs="24" :sm="12" :md="8" :lg="6">
-        <el-card class="category-card" shadow="hover" @click="navigateTo('tutorials')">
-          <div class="card-icon">🎓</div>
-          <h3>实战教程</h3>
-          <p>通过实际案例学习如何使用本工具</p>
-          <el-tag type="success" size="small">2篇文章</el-tag>
-        </el-card>
-      </el-col>
-
-      <!-- 常见问题 -->
-      <el-col :xs="24" :sm="12" :md="8" :lg="6">
-        <el-card class="category-card" shadow="hover" @click="navigateTo('faq')">
-          <div class="card-icon">❓</div>
-          <h3>常见问题</h3>
-          <p>快速找到常见问题的答案</p>
-          <el-tag type="info" size="small">1篇文章</el-tag>
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <!-- 推荐文章 -->
-    <div class="recommended-section">
-      <h2>🌟 推荐阅读</h2>
-      <el-row :gutter="20">
-        <el-col :xs="24" :sm="12" :md="8" v-for="article in recommendedArticles" :key="article.id">
-          <el-card class="article-card" shadow="hover" @click="openArticle(article.id)">
-            <div class="article-meta">
-              <el-tag :type="article.tagType" size="small">{{ article.category }}</el-tag>
-              <span class="read-time">{{ article.readTime }}</span>
-            </div>
-            <h4>{{ article.title }}</h4>
-            <p>{{ article.description }}</p>
-          </el-card>
-        </el-col>
-      </el-row>
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
@@ -170,6 +62,150 @@ const openArticle = (articleId: string) => {
   router.push(`/learning/article/${articleId}`)
 }
 </script>
+
+<template>
+  <div class="learning-center">
+    <div class="learning-header">
+      <h1>📚 学习中心</h1>
+      <p class="subtitle">
+        了解AI、大模型和智能股票分析
+      </p>
+    </div>
+
+    <el-row :gutter="20" class="learning-categories">
+      <!-- AI基础知识 -->
+      <el-col :xs="24" :sm="12" :md="8" :lg="6">
+        <el-card class="category-card" shadow="hover" @click="navigateTo('ai-basics')">
+          <div class="card-icon">
+            🤖
+          </div>
+          <h3>AI基础知识</h3>
+          <p>什么是AI？什么是大模型？了解人工智能的基本概念</p>
+          <el-tag type="primary" size="small">
+            1篇文章
+          </el-tag>
+        </el-card>
+      </el-col>
+
+      <!-- 提示词工程 -->
+      <el-col :xs="24" :sm="12" :md="8" :lg="6">
+        <el-card class="category-card" shadow="hover" @click="navigateTo('prompt-engineering')">
+          <div class="card-icon">
+            ✍️
+          </div>
+          <h3>提示词工程</h3>
+          <p>学习如何编写有效的提示词，让AI更好地理解你的需求</p>
+          <el-tag type="success" size="small">
+            2篇文章
+          </el-tag>
+        </el-card>
+      </el-col>
+
+      <!-- 模型选择指南 -->
+      <el-col :xs="24" :sm="12" :md="8" :lg="6">
+        <el-card class="category-card" shadow="hover" @click="navigateTo('model-selection')">
+          <div class="card-icon">
+            🎯
+          </div>
+          <h3>模型选择指南</h3>
+          <p>了解不同大模型的特点，选择最适合你的模型</p>
+          <el-tag type="warning" size="small">
+            1篇文章
+          </el-tag>
+        </el-card>
+      </el-col>
+
+      <!-- AI分析股票原理 -->
+      <el-col :xs="24" :sm="12" :md="8" :lg="6">
+        <el-card class="category-card" shadow="hover" @click="navigateTo('analysis-principles')">
+          <div class="card-icon">
+            📊
+          </div>
+          <h3>AI分析股票原理</h3>
+          <p>深入了解多智能体如何协作分析股票</p>
+          <el-tag type="info" size="small">
+            1篇文章
+          </el-tag>
+        </el-card>
+      </el-col>
+
+      <!-- 风险与局限性 -->
+      <el-col :xs="24" :sm="12" :md="8" :lg="6">
+        <el-card class="category-card" shadow="hover" @click="navigateTo('risks-limitations')">
+          <div class="card-icon">
+            ⚠️
+          </div>
+          <h3>风险与局限性</h3>
+          <p>了解AI的潜在问题和正确使用方式</p>
+          <el-tag type="danger" size="small">
+            1篇文章
+          </el-tag>
+        </el-card>
+      </el-col>
+
+      <!-- 源项目与论文 -->
+      <el-col :xs="24" :sm="12" :md="8" :lg="6">
+        <el-card class="category-card" shadow="hover" @click="navigateTo('resources')">
+          <div class="card-icon">
+            📖
+          </div>
+          <h3>源项目与论文</h3>
+          <p>TradingAgents项目介绍和学术论文资源</p>
+          <el-tag type="primary" size="small">
+            2篇文章
+          </el-tag>
+        </el-card>
+      </el-col>
+
+      <!-- 实战教程 -->
+      <el-col :xs="24" :sm="12" :md="8" :lg="6">
+        <el-card class="category-card" shadow="hover" @click="navigateTo('tutorials')">
+          <div class="card-icon">
+            🎓
+          </div>
+          <h3>实战教程</h3>
+          <p>通过实际案例学习如何使用本工具</p>
+          <el-tag type="success" size="small">
+            2篇文章
+          </el-tag>
+        </el-card>
+      </el-col>
+
+      <!-- 常见问题 -->
+      <el-col :xs="24" :sm="12" :md="8" :lg="6">
+        <el-card class="category-card" shadow="hover" @click="navigateTo('faq')">
+          <div class="card-icon">
+            ❓
+          </div>
+          <h3>常见问题</h3>
+          <p>快速找到常见问题的答案</p>
+          <el-tag type="info" size="small">
+            1篇文章
+          </el-tag>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <!-- 推荐文章 -->
+    <div class="recommended-section">
+      <h2>🌟 推荐阅读</h2>
+      <el-row :gutter="20">
+        <el-col v-for="article in recommendedArticles" :key="article.id" :xs="24" :sm="12" :md="8">
+          <el-card class="article-card" shadow="hover" @click="openArticle(article.id)">
+            <div class="article-meta">
+              <el-tag :type="article.tagType" size="small">
+                {{ article.category }}
+              </el-tag>
+              <span class="read-time">{{ article.readTime }}</span>
+            </div>
+            <h4>{{ article.title }}</h4>
+            <p>{{ article.description }}</p>
+          </el-card>
+        </el-col>
+      </el-row>
+    </div>
+  </div>
+</template>
 
 <style scoped lang="scss">
 .learning-center {
@@ -342,4 +378,3 @@ const openArticle = (articleId: string) => {
   }
 }
 </style>
-

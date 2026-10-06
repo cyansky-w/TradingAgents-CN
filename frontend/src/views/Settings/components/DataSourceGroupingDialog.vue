@@ -1,3 +1,179 @@
+<script setup lang="ts">
+import type { DataSourceGrouping, MarketCategory } from '@/api/config'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { computed, onMounted, ref, watch } from 'vue'
+import {
+  configApi
+
+} from '@/api/config'
+
+// Props
+interface Props {
+  visible: boolean
+  dataSourceName: string
+}
+
+const props = defineProps<Props>()
+
+// Emits
+const emit = defineEmits<{
+  'update:visible': [value: boolean]
+  'success': []
+}>()
+
+// Refs
+const saving = ref(false)
+const categories = ref<MarketCategory[]>([])
+const allGroupings = ref<DataSourceGrouping[]>([])
+const categoryPriorities = ref<Record<string, number>>({})
+
+// Computed
+const currentGroupings = computed(() => {
+  return allGroupings.value.filter(g => g.data_source_name === props.dataSourceName)
+})
+
+const availableCategories = computed(() => {
+  const assignedCategoryIds = currentGroupings.value.map(g => g.market_category_id)
+  return categories.value.filter(c => !assignedCategoryIds.includes(c.id))
+})
+
+// 获取分类显示名称
+const getCategoryDisplayName = (categoryId: string) => {
+  const category = categories.value.find(c => c.id === categoryId)
+  return category?.display_name || categoryId
+}
+
+// 加载数据
+const loadData = async () => {
+  try {
+    const [categoriesData, groupingsData] = await Promise.all([
+      configApi.getMarketCategories(),
+      configApi.getDataSourceGroupings()
+    ])
+
+    categories.value = categoriesData.filter(c => c.enabled)
+    allGroupings.value = groupingsData
+
+    // 初始化优先级
+    categories.value.forEach(category => {
+      categoryPriorities.value[category.id] = 0
+    })
+  } catch (error) {
+    console.error('加载数据失败:', error)
+    ElMessage.error('加载数据失败')
+  }
+}
+
+// 添加到分类
+const addToCategory = async (categoryId: string) => {
+  try {
+    const priority = categoryPriorities.value[categoryId] || 0
+    await configApi.addDataSourceToCategory(props.dataSourceName, categoryId, priority)
+
+    // 更新本地数据
+    allGroupings.value.push({
+      data_source_name: props.dataSourceName,
+      market_category_id: categoryId,
+      priority,
+      enabled: true
+    })
+
+    ElMessage.success('添加到分类成功')
+  } catch (error) {
+    console.error('添加到分类失败:', error)
+    ElMessage.error('添加到分类失败')
+  }
+}
+
+// 从分类中移除
+const removeFromCategory = async (categoryId: string) => {
+  try {
+    await ElMessageBox.confirm(
+      '确定要从该分类中移除此数据源吗？',
+      '确认移除',
+      { type: 'warning' }
+    )
+
+    await configApi.removeDataSourceFromCategory(props.dataSourceName, categoryId)
+
+    // 更新本地数据
+    const index = allGroupings.value.findIndex(
+      g => g.data_source_name === props.dataSourceName && g.market_category_id === categoryId
+    )
+    if (index > -1) {
+      allGroupings.value.splice(index, 1)
+    }
+
+    ElMessage.success('从分类中移除成功')
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('移除失败:', error)
+      ElMessage.error('移除失败')
+    }
+  }
+}
+
+// 切换分组状态
+const toggleGrouping = async (grouping: DataSourceGrouping) => {
+  try {
+    const newEnabled = !grouping.enabled
+    await configApi.updateDataSourceGrouping(
+      grouping.data_source_name,
+      grouping.market_category_id,
+      { enabled: newEnabled }
+    )
+
+    grouping.enabled = newEnabled
+    ElMessage.success(`分组已${newEnabled ? '启用' : '禁用'}`)
+  } catch (error) {
+    console.error('切换分组状态失败:', error)
+    ElMessage.error('切换分组状态失败')
+  }
+}
+
+// 更新分组优先级
+const updateGroupingPriority = async (grouping: DataSourceGrouping) => {
+  try {
+    await configApi.updateDataSourceGrouping(
+      grouping.data_source_name,
+      grouping.market_category_id,
+      { priority: grouping.priority }
+    )
+  } catch (error) {
+    console.error('更新优先级失败:', error)
+    ElMessage.error('更新优先级失败')
+  }
+}
+
+// 监听visible变化
+watch(
+  () => props.visible,
+  visible => {
+    if (visible) {
+      loadData()
+    }
+  }
+)
+
+// 处理关闭
+const handleClose = () => {
+  emit('update:visible', false)
+}
+
+// 处理保存
+const handleSave = () => {
+  emit('success')
+  handleClose()
+}
+
+// 生命周期
+onMounted(() => {
+  if (props.visible) {
+    loadData()
+  }
+})
+</script>
+
 <template>
   <el-dialog
     :model-value="visible"
@@ -34,8 +210,8 @@
               <el-button
                 size="small"
                 type="primary"
-                @click="addToCategory(category.id)"
                 :disabled="!category.enabled"
+                @click="addToCategory(category.id)"
               >
                 添加
               </el-button>
@@ -89,7 +265,7 @@
               </el-button>
             </div>
           </div>
-          
+
           <div v-if="currentGroupings.length === 0" class="empty-state">
             <el-empty description="该数据源尚未加入任何市场分类" :image-size="80" />
           </div>
@@ -99,190 +275,16 @@
 
     <template #footer>
       <div class="dialog-footer">
-        <el-button @click="handleClose">关闭</el-button>
-        <el-button type="primary" @click="handleSave" :loading="saving">
+        <el-button @click="handleClose">
+          关闭
+        </el-button>
+        <el-button type="primary" :loading="saving" @click="handleSave">
           保存更改
         </el-button>
       </div>
     </template>
   </el-dialog>
 </template>
-
-<script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { 
-  configApi, 
-  type MarketCategory, 
-  type DataSourceGrouping 
-} from '@/api/config'
-
-// Props
-interface Props {
-  visible: boolean
-  dataSourceName: string
-}
-
-const props = defineProps<Props>()
-
-// Emits
-const emit = defineEmits<{
-  'update:visible': [value: boolean]
-  'success': []
-}>()
-
-// Refs
-const saving = ref(false)
-const categories = ref<MarketCategory[]>([])
-const allGroupings = ref<DataSourceGrouping[]>([])
-const categoryPriorities = ref<Record<string, number>>({})
-
-// Computed
-const currentGroupings = computed(() => {
-  return allGroupings.value.filter(g => g.data_source_name === props.dataSourceName)
-})
-
-const availableCategories = computed(() => {
-  const assignedCategoryIds = currentGroupings.value.map(g => g.market_category_id)
-  return categories.value.filter(c => !assignedCategoryIds.includes(c.id))
-})
-
-// 获取分类显示名称
-const getCategoryDisplayName = (categoryId: string) => {
-  const category = categories.value.find(c => c.id === categoryId)
-  return category?.display_name || categoryId
-}
-
-// 加载数据
-const loadData = async () => {
-  try {
-    const [categoriesData, groupingsData] = await Promise.all([
-      configApi.getMarketCategories(),
-      configApi.getDataSourceGroupings()
-    ])
-    
-    categories.value = categoriesData.filter(c => c.enabled)
-    allGroupings.value = groupingsData
-    
-    // 初始化优先级
-    categories.value.forEach(category => {
-      categoryPriorities.value[category.id] = 0
-    })
-  } catch (error) {
-    console.error('加载数据失败:', error)
-    ElMessage.error('加载数据失败')
-  }
-}
-
-// 添加到分类
-const addToCategory = async (categoryId: string) => {
-  try {
-    const priority = categoryPriorities.value[categoryId] || 0
-    await configApi.addDataSourceToCategory(props.dataSourceName, categoryId, priority)
-    
-    // 更新本地数据
-    allGroupings.value.push({
-      data_source_name: props.dataSourceName,
-      market_category_id: categoryId,
-      priority: priority,
-      enabled: true
-    })
-    
-    ElMessage.success('添加到分类成功')
-  } catch (error) {
-    console.error('添加到分类失败:', error)
-    ElMessage.error('添加到分类失败')
-  }
-}
-
-// 从分类中移除
-const removeFromCategory = async (categoryId: string) => {
-  try {
-    await ElMessageBox.confirm(
-      '确定要从该分类中移除此数据源吗？',
-      '确认移除',
-      { type: 'warning' }
-    )
-
-    await configApi.removeDataSourceFromCategory(props.dataSourceName, categoryId)
-    
-    // 更新本地数据
-    const index = allGroupings.value.findIndex(
-      g => g.data_source_name === props.dataSourceName && g.market_category_id === categoryId
-    )
-    if (index > -1) {
-      allGroupings.value.splice(index, 1)
-    }
-    
-    ElMessage.success('从分类中移除成功')
-  } catch (error) {
-    if (error !== 'cancel') {
-      console.error('移除失败:', error)
-      ElMessage.error('移除失败')
-    }
-  }
-}
-
-// 切换分组状态
-const toggleGrouping = async (grouping: DataSourceGrouping) => {
-  try {
-    const newEnabled = !grouping.enabled
-    await configApi.updateDataSourceGrouping(
-      grouping.data_source_name,
-      grouping.market_category_id,
-      { enabled: newEnabled }
-    )
-    
-    grouping.enabled = newEnabled
-    ElMessage.success(`分组已${newEnabled ? '启用' : '禁用'}`)
-  } catch (error) {
-    console.error('切换分组状态失败:', error)
-    ElMessage.error('切换分组状态失败')
-  }
-}
-
-// 更新分组优先级
-const updateGroupingPriority = async (grouping: DataSourceGrouping) => {
-  try {
-    await configApi.updateDataSourceGrouping(
-      grouping.data_source_name,
-      grouping.market_category_id,
-      { priority: grouping.priority }
-    )
-  } catch (error) {
-    console.error('更新优先级失败:', error)
-    ElMessage.error('更新优先级失败')
-  }
-}
-
-// 监听visible变化
-watch(
-  () => props.visible,
-  (visible) => {
-    if (visible) {
-      loadData()
-    }
-  }
-)
-
-// 处理关闭
-const handleClose = () => {
-  emit('update:visible', false)
-}
-
-// 处理保存
-const handleSave = () => {
-  emit('success')
-  handleClose()
-}
-
-// 生命周期
-onMounted(() => {
-  if (props.visible) {
-    loadData()
-  }
-})
-</script>
 
 <style lang="scss" scoped>
 .grouping-content {

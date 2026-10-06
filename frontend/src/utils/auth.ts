@@ -3,15 +3,16 @@
  * 统一处理认证相关的逻辑
  */
 
-import { useAuthStore } from '@/stores/auth'
-import router from '@/router'
 import { ElMessage } from 'element-plus'
+import router from '@/router'
+import { useAuthStore } from '@/stores/auth'
 
 /**
  * 检查是否是认证错误
  */
 export const isAuthError = (error: any): boolean => {
-  if (!error) return false
+  if (!error)
+    return false
 
   // 检查 HTTP 状态码
   if (error.response?.status === 401) {
@@ -91,7 +92,7 @@ export const isTokenValid = (token: string | null): boolean => {
   // 尝试解析 token payload
   try {
     const payload = JSON.parse(atob(parts[1]))
-    
+
     // 检查是否过期
     if (payload.exp) {
       const now = Math.floor(Date.now() / 1000)
@@ -191,4 +192,3 @@ export const setupTokenRefreshTimer = (): void => {
 
   console.log('✅ Token 自动刷新定时器已启动')
 }
-

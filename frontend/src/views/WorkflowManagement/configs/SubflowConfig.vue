@@ -1,39 +1,7 @@
-<template>
-  <div class="config-panel" v-if="node">
-    <h4>子流程配置</h4>
-    <el-form label-width="80px" size="small">
-      <el-form-item label="标签">
-        <el-input :model-value="node!.label" @update:model-value="(v: string) => { node!.label = v; emitChange() }" />
-      </el-form-item>
-      <el-form-item label="绑定工作流">
-        <el-select :model-value="node!.data.workflow_id" filterable placeholder="选择工作流" @update:model-value="onWorkflowChange">
-          <el-option v-for="wf in workflowOptions" :key="wf.id" :label="wf.name" :value="wf.id" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="输入映射">
-        <div class="mapping-list">
-          <div v-for="(val, key) in mappingEntries" :key="key" class="mapping-row">
-            <el-input :model-value="key" disabled size="small" style="width: 120px" />
-            <span class="mapping-arrow">=</span>
-            <el-input :model-value="val" @change="(v: string) => updateMapping(String(key), v)" size="small" />
-            <el-button size="small" text type="danger" @click="removeMapping(String(key))">x</el-button>
-          </div>
-          <div class="mapping-add">
-            <el-input v-model="newMappingKey" size="small" placeholder="变量名" style="width: 120px" />
-            <span class="mapping-arrow">=</span>
-            <el-input v-model="newMappingVal" size="small" placeholder="{{input.xxx}}" />
-            <el-button size="small" text type="primary" @click="addMapping">+</el-button>
-          </div>
-        </div>
-      </el-form-item>
-    </el-form>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { computed, ref } from 'vue'
 import type { FlowNode } from '../composables/useWorkflowSync'
 import type { Workflow } from '@/api/workflows'
+import { computed, ref } from 'vue'
 
 const props = defineProps<{
   node: FlowNode | null
@@ -60,7 +28,8 @@ function onWorkflowChange(wfId: string) {
 
 function updateMapping(key: string, val: string) {
   if (props.node) {
-    if (!props.node.data.input_mapping) props.node.data.input_mapping = {}
+    if (!props.node.data.input_mapping)
+      props.node.data.input_mapping = {}
     props.node.data.input_mapping[key] = val
     emitChange()
   }
@@ -74,14 +43,52 @@ function removeMapping(key: string) {
 }
 
 function addMapping() {
-  if (!newMappingKey.value || !props.node) return
-  if (!props.node.data.input_mapping) props.node.data.input_mapping = {}
+  if (!newMappingKey.value || !props.node)
+    return
+  if (!props.node.data.input_mapping)
+    props.node.data.input_mapping = {}
   props.node.data.input_mapping[newMappingKey.value] = newMappingVal.value
   newMappingKey.value = ''
   newMappingVal.value = ''
   emitChange()
 }
 </script>
+
+<template>
+  <div v-if="node" class="config-panel">
+    <h4>子流程配置</h4>
+    <el-form label-width="80px" size="small">
+      <el-form-item label="标签">
+        <el-input :model-value="node!.label" @update:model-value="(v: string) => { node!.label = v; emitChange() }" />
+      </el-form-item>
+      <el-form-item label="绑定工作流">
+        <el-select :model-value="node!.data.workflow_id" filterable placeholder="选择工作流" @update:model-value="onWorkflowChange">
+          <el-option v-for="wf in workflowOptions" :key="wf.id" :label="wf.name" :value="wf.id" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="输入映射">
+        <div class="mapping-list">
+          <div v-for="(val, key) in mappingEntries" :key="key" class="mapping-row">
+            <el-input :model-value="key" disabled size="small" style="width: 120px" />
+            <span class="mapping-arrow">=</span>
+            <el-input :model-value="val" size="small" @change="(v: string) => updateMapping(String(key), v)" />
+            <el-button size="small" text type="danger" @click="removeMapping(String(key))">
+              x
+            </el-button>
+          </div>
+          <div class="mapping-add">
+            <el-input v-model="newMappingKey" size="small" placeholder="变量名" style="width: 120px" />
+            <span class="mapping-arrow">=</span>
+            <el-input v-model="newMappingVal" size="small" placeholder="{{input.xxx}}" />
+            <el-button size="small" text type="primary" @click="addMapping">
+              +
+            </el-button>
+          </div>
+        </div>
+      </el-form-item>
+    </el-form>
+  </div>
+</template>
 
 <style scoped>
 .config-panel { padding: 12px; }

@@ -1,5 +1,5 @@
-import { ApiClient } from './request'
 import type { ApiResponse } from './request'
+import { ApiClient } from './request'
 
 export type PromptBlockType = 'text' | 'messages_placeholder'
 export type PromptType = 'chat' | 'workflow'
@@ -138,8 +138,8 @@ export const promptsApi = {
     return await ApiClient.delete<{ code: string }>(`/api/prompts/code/${code}`)
   },
 
-  async toggle(id: string, enabled: boolean): Promise<ApiResponse<{ id: string; enabled: boolean }>> {
-    return await ApiClient.put<{ id: string; enabled: boolean }>(`/api/prompts/${id}/toggle`, { enabled })
+  async toggle(id: string, enabled: boolean): Promise<ApiResponse<{ id: string, enabled: boolean }>> {
+    return await ApiClient.put<{ id: string, enabled: boolean }>(`/api/prompts/${id}/toggle`, { enabled })
   },
 
   async render(id: string, payload: RenderRequest): Promise<ApiResponse<RenderResult>> {
@@ -161,12 +161,13 @@ export const promptsApi = {
   }
 }
 
-export const VARIABLE_REGEX = /\{\{\s*([A-Za-z_][\w.-]*)\s*\}\}/g
+export const VARIABLE_REGEX = /\{\{\s*([A-Z_][\w.-]*)\s*\}\}/gi
 
 export function extractVariables(blocks: PromptBlock[]): string[] {
   const set = new Set<string>()
   for (const block of blocks) {
-    if (block.type !== 'text' || !block.content) continue
+    if (block.type !== 'text' || !block.content)
+      continue
     let match: RegExpExecArray | null
     const re = new RegExp(VARIABLE_REGEX.source, 'g')
     while ((match = re.exec(block.content)) !== null) {

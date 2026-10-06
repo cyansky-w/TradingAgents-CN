@@ -12,13 +12,13 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   variant: 'ghost',
-  size: 'icon-sm',
+  size: 'icon-sm'
 })
 
 const buttonProps = {
   variant: props.variant,
   size: props.size,
-  type: 'button' as const,
+  type: 'button' as const
 }
 </script>
 

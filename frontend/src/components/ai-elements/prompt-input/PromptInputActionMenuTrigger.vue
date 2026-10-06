@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
-import { DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { PlusIcon } from 'lucide-vue-next'
+import { DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import PromptInputButton from './PromptInputButton.vue'
 
 type DropdownMenuTriggerProps = InstanceType<typeof DropdownMenuTrigger>['$props']

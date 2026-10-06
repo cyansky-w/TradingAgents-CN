@@ -1,187 +1,10 @@
-<template>
-  <el-dialog
-    :model-value="visible"
-    :title="isEdit ? '编辑厂家信息' : '添加厂家'"
-    width="600px"
-    @update:model-value="handleVisibleChange"
-    @close="handleClose"
-  >
-    <el-form
-      ref="formRef"
-      :model="formData"
-      :rules="rules"
-      label-width="120px"
-    >
-      <!-- 预设厂家选择 -->
-      <el-form-item v-if="!isEdit" label="快速选择">
-        <el-select
-          v-model="selectedPreset"
-          placeholder="选择预设厂家或手动填写"
-          clearable
-          @change="handlePresetChange"
-        >
-          <el-option
-            v-for="preset in presetProviders"
-            :key="preset.name"
-            :label="preset.display_name"
-            :value="preset.name"
-          />
-        </el-select>
-      </el-form-item>
-
-      <!-- 🆕 注册引导提示 -->
-      <el-alert
-        v-if="selectedPreset && currentPresetInfo?.register_url"
-        :title="`📝 ${currentPresetInfo.display_name} 注册引导`"
-        type="info"
-        :closable="false"
-        class="mb-4"
-      >
-        <template #default>
-          <div class="register-guide">
-            <p>{{ currentPresetInfo.register_guide || '如果您还没有账号，请先注册：' }}</p>
-            <el-button
-              type="primary"
-              size="small"
-              link
-              @click="openRegisterUrl"
-            >
-              <el-icon><Link /></el-icon>
-              前往注册 {{ currentPresetInfo.display_name }}
-            </el-button>
-          </div>
-        </template>
-      </el-alert>
-
-      <el-form-item label="厂家ID" prop="name">
-        <el-input 
-          v-model="formData.name" 
-          placeholder="如: openai, anthropic"
-          :disabled="isEdit"
-        />
-        <div class="form-tip">厂家的唯一标识符，创建后不可修改</div>
-      </el-form-item>
-
-      <el-form-item label="显示名称" prop="display_name">
-        <el-input 
-          v-model="formData.display_name" 
-          placeholder="如: OpenAI, Anthropic"
-        />
-      </el-form-item>
-
-      <el-form-item label="描述" prop="description">
-        <el-input 
-          v-model="formData.description" 
-          type="textarea"
-          :rows="3"
-          placeholder="厂家简介和特点"
-        />
-      </el-form-item>
-
-      <el-form-item label="官网" prop="website">
-        <el-input 
-          v-model="formData.website" 
-          placeholder="https://openai.com"
-        />
-      </el-form-item>
-
-      <el-form-item label="API文档" prop="api_doc_url">
-        <el-input 
-          v-model="formData.api_doc_url" 
-          placeholder="https://platform.openai.com/docs"
-        />
-      </el-form-item>
-
-      <el-form-item label="默认API地址" prop="default_base_url">
-        <el-input
-          v-model="formData.default_base_url"
-          placeholder="https://api.openai.com/v1"
-        />
-      </el-form-item>
-
-      <el-alert
-        title="🔒 安全提示"
-        type="info"
-        description="敏感密钥保存后不会在列表中明文展示；你也可以留空并改用 .env 环境变量注入。"
-        show-icon
-        :closable="false"
-        class="mb-2"
-      />
-      <el-form-item label="密钥状态">
-        <el-tag :type="(props.provider?.extra_config?.has_api_key ? 'success' : 'danger')" size="small">
-          {{ props.provider?.extra_config?.has_api_key ? '已配置' : '未配置' }}
-        </el-tag>
-        <el-tag v-if="props.provider?.extra_config?.has_api_key" :type="props.provider?.extra_config?.source === 'environment' ? 'warning' : 'success'" size="small" class="ml-2">
-          {{ props.provider?.extra_config?.source === 'environment' ? 'ENV' : '已配置' }}
-        </el-tag>
-      </el-form-item>
-
-      <!-- 🔥 新增：API Key 输入框 -->
-      <el-form-item label="API Key" prop="api_key">
-        <el-input
-          v-model="formData.api_key"
-          type="password"
-          placeholder="输入 API Key（可选，留空则使用环境变量）"
-          show-password
-          clearable
-        />
-        <div class="form-tip">
-          优先级：数据库配置 > 环境变量。留空则使用 .env 文件中的配置
-        </div>
-      </el-form-item>
-
-      <!-- 🔥 新增：API Secret 输入框（某些厂家需要） -->
-      <el-form-item v-if="needsApiSecret" label="API Secret" prop="api_secret">
-        <el-input
-          v-model="formData.api_secret"
-          type="password"
-          placeholder="输入 API Secret（可选）"
-          show-password
-          clearable
-        />
-        <div class="form-tip">
-          某些厂家（如百度千帆）需要额外的 Secret Key
-        </div>
-      </el-form-item>
-
-      <el-form-item label="支持功能" prop="supported_features">
-        <el-checkbox-group v-model="formData.supported_features">
-          <el-checkbox label="chat">对话</el-checkbox>
-          <el-checkbox label="completion">文本补全</el-checkbox>
-          <el-checkbox label="embedding">向量化</el-checkbox>
-          <el-checkbox label="image">图像生成</el-checkbox>
-          <el-checkbox label="vision">图像理解</el-checkbox>
-          <el-checkbox label="function_calling">函数调用</el-checkbox>
-          <el-checkbox label="streaming">流式输出</el-checkbox>
-        </el-checkbox-group>
-      </el-form-item>
-
-      <el-form-item label="状态">
-        <el-switch 
-          v-model="formData.is_active"
-          active-text="启用"
-          inactive-text="禁用"
-        />
-      </el-form-item>
-    </el-form>
-
-    <template #footer>
-      <div class="dialog-footer">
-        <el-button @click="handleClose">取消</el-button>
-        <el-button type="primary" @click="handleSubmit" :loading="submitting">
-          {{ isEdit ? '更新' : '添加' }}
-        </el-button>
-      </div>
-    </template>
-  </el-dialog>
-</template>
-
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import { ElMessage } from 'element-plus'
-import { Link } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
-import { configApi, type LLMProvider } from '@/api/config'
+import type { LLMProvider } from '@/api/config'
+import { Link } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { computed, ref, watch } from 'vue'
+import { configApi } from '@/api/config'
 
 // 表单数据类型（扩展 LLMProvider，添加临时字段）
 interface ProviderFormData extends Partial<LLMProvider> {
@@ -219,7 +42,8 @@ const needsApiSecret = computed(() => {
 
 // 当前选中的预设厂家信息
 const currentPresetInfo = computed(() => {
-  if (!selectedPreset.value) return null
+  if (!selectedPreset.value)
+    return null
   return presetProviders.find(p => p.name === selectedPreset.value)
 })
 
@@ -390,7 +214,7 @@ const resetForm = () => {
 }
 
 // 监听props变化，更新表单数据
-watch(() => props.provider, (newProvider) => {
+watch(() => props.provider, newProvider => {
   if (newProvider && Object.keys(newProvider).length > 0) {
     formData.value = { ...newProvider }
   } else {
@@ -400,7 +224,8 @@ watch(() => props.provider, (newProvider) => {
 
 // 处理预设选择
 const handlePresetChange = (presetName: string) => {
-  if (!presetName) return
+  if (!presetName)
+    return
 
   const preset = presetProviders.find(p => p.name === presetName)
   if (preset) {
@@ -474,6 +299,202 @@ const handleSubmit = async () => {
   }
 }
 </script>
+
+<template>
+  <el-dialog
+    :model-value="visible"
+    :title="isEdit ? '编辑厂家信息' : '添加厂家'"
+    width="600px"
+    @update:model-value="handleVisibleChange"
+    @close="handleClose"
+  >
+    <el-form
+      ref="formRef"
+      :model="formData"
+      :rules="rules"
+      label-width="120px"
+    >
+      <!-- 预设厂家选择 -->
+      <el-form-item v-if="!isEdit" label="快速选择">
+        <el-select
+          v-model="selectedPreset"
+          placeholder="选择预设厂家或手动填写"
+          clearable
+          @change="handlePresetChange"
+        >
+          <el-option
+            v-for="preset in presetProviders"
+            :key="preset.name"
+            :label="preset.display_name"
+            :value="preset.name"
+          />
+        </el-select>
+      </el-form-item>
+
+      <!-- 🆕 注册引导提示 -->
+      <el-alert
+        v-if="selectedPreset && currentPresetInfo?.register_url"
+        :title="`📝 ${currentPresetInfo.display_name} 注册引导`"
+        type="info"
+        :closable="false"
+        class="mb-4"
+      >
+        <template #default>
+          <div class="register-guide">
+            <p>{{ currentPresetInfo.register_guide || '如果您还没有账号，请先注册：' }}</p>
+            <el-button
+              type="primary"
+              size="small"
+              link
+              @click="openRegisterUrl"
+            >
+              <el-icon><Link /></el-icon>
+              前往注册 {{ currentPresetInfo.display_name }}
+            </el-button>
+          </div>
+        </template>
+      </el-alert>
+
+      <el-form-item label="厂家ID" prop="name">
+        <el-input
+          v-model="formData.name"
+          placeholder="如: openai, anthropic"
+          :disabled="isEdit"
+        />
+        <div class="form-tip">
+          厂家的唯一标识符，创建后不可修改
+        </div>
+      </el-form-item>
+
+      <el-form-item label="显示名称" prop="display_name">
+        <el-input
+          v-model="formData.display_name"
+          placeholder="如: OpenAI, Anthropic"
+        />
+      </el-form-item>
+
+      <el-form-item label="描述" prop="description">
+        <el-input
+          v-model="formData.description"
+          type="textarea"
+          :rows="3"
+          placeholder="厂家简介和特点"
+        />
+      </el-form-item>
+
+      <el-form-item label="官网" prop="website">
+        <el-input
+          v-model="formData.website"
+          placeholder="https://openai.com"
+        />
+      </el-form-item>
+
+      <el-form-item label="API文档" prop="api_doc_url">
+        <el-input
+          v-model="formData.api_doc_url"
+          placeholder="https://platform.openai.com/docs"
+        />
+      </el-form-item>
+
+      <el-form-item label="默认API地址" prop="default_base_url">
+        <el-input
+          v-model="formData.default_base_url"
+          placeholder="https://api.openai.com/v1"
+        />
+      </el-form-item>
+
+      <el-alert
+        title="🔒 安全提示"
+        type="info"
+        description="敏感密钥保存后不会在列表中明文展示；你也可以留空并改用 .env 环境变量注入。"
+        show-icon
+        :closable="false"
+        class="mb-2"
+      />
+      <el-form-item label="密钥状态">
+        <el-tag :type="(props.provider?.extra_config?.has_api_key ? 'success' : 'danger')" size="small">
+          {{ props.provider?.extra_config?.has_api_key ? '已配置' : '未配置' }}
+        </el-tag>
+        <el-tag v-if="props.provider?.extra_config?.has_api_key" :type="props.provider?.extra_config?.source === 'environment' ? 'warning' : 'success'" size="small" class="ml-2">
+          {{ props.provider?.extra_config?.source === 'environment' ? 'ENV' : '已配置' }}
+        </el-tag>
+      </el-form-item>
+
+      <!-- 🔥 新增：API Key 输入框 -->
+      <el-form-item label="API Key" prop="api_key">
+        <el-input
+          v-model="formData.api_key"
+          type="password"
+          placeholder="输入 API Key（可选，留空则使用环境变量）"
+          show-password
+          clearable
+        />
+        <div class="form-tip">
+          优先级：数据库配置 > 环境变量。留空则使用 .env 文件中的配置
+        </div>
+      </el-form-item>
+
+      <!-- 🔥 新增：API Secret 输入框（某些厂家需要） -->
+      <el-form-item v-if="needsApiSecret" label="API Secret" prop="api_secret">
+        <el-input
+          v-model="formData.api_secret"
+          type="password"
+          placeholder="输入 API Secret（可选）"
+          show-password
+          clearable
+        />
+        <div class="form-tip">
+          某些厂家（如百度千帆）需要额外的 Secret Key
+        </div>
+      </el-form-item>
+
+      <el-form-item label="支持功能" prop="supported_features">
+        <el-checkbox-group v-model="formData.supported_features">
+          <el-checkbox label="chat">
+            对话
+          </el-checkbox>
+          <el-checkbox label="completion">
+            文本补全
+          </el-checkbox>
+          <el-checkbox label="embedding">
+            向量化
+          </el-checkbox>
+          <el-checkbox label="image">
+            图像生成
+          </el-checkbox>
+          <el-checkbox label="vision">
+            图像理解
+          </el-checkbox>
+          <el-checkbox label="function_calling">
+            函数调用
+          </el-checkbox>
+          <el-checkbox label="streaming">
+            流式输出
+          </el-checkbox>
+        </el-checkbox-group>
+      </el-form-item>
+
+      <el-form-item label="状态">
+        <el-switch
+          v-model="formData.is_active"
+          active-text="启用"
+          inactive-text="禁用"
+        />
+      </el-form-item>
+    </el-form>
+
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button @click="handleClose">
+          取消
+        </el-button>
+        <el-button type="primary" :loading="submitting" @click="handleSubmit">
+          {{ isEdit ? '更新' : '添加' }}
+        </el-button>
+      </div>
+    </template>
+  </el-dialog>
+</template>
 
 <style lang="scss" scoped>
 .form-tip {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { ImageIcon } from 'lucide-vue-next'
+import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { usePromptInput } from './context'
 
 type PromptInputActionAddAttachmentsProps = InstanceType<typeof DropdownMenuItem>['$props']

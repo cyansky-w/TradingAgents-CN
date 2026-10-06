@@ -1,269 +1,12 @@
-<template>
-  <el-dialog
-    :model-value="visible"
-    :title="isEdit ? '编辑数据源' : '添加数据源'"
-    width="600px"
-    @update:model-value="$emit('update:visible', $event)"
-    @close="handleClose"
-  >
-    <el-form
-      ref="formRef"
-      :model="formData"
-      :rules="rules"
-      label-width="120px"
-      label-position="left"
-    >
-      <!-- 基本信息 -->
-      <el-form-item label="数据源类型" prop="type">
-        <el-select
-          v-model="formData.type"
-          placeholder="请选择数据源类型"
-          style="width: 100%"
-          :disabled="isEdit"
-          @change="handleTypeChange"
-        >
-          <el-option
-            v-for="option in dataSourceTypes"
-            :key="option.value"
-            :label="option.label"
-            :value="option.value"
-          />
-        </el-select>
-        <div class="form-tip">
-          ⚠️ 数据源类型一旦选择后不可修改，请谨慎选择
-        </div>
-      </el-form-item>
-
-      <el-form-item label="数据源名称" prop="name">
-        <el-input
-          v-model="formData.name"
-          placeholder="自动生成（基于数据源类型）"
-          disabled
-        />
-        <div class="form-tip">
-          📌 数据源名称由系统自动生成，用于后端识别，不可修改
-        </div>
-      </el-form-item>
-
-      <el-form-item label="显示名称" prop="display_name">
-        <el-input
-          v-model="formData.display_name"
-          placeholder="请输入显示名称（用于界面展示）"
-        />
-        <div class="form-tip">
-          💡 显示名称可以自定义，用于在界面上展示，例如："Alpha Vantage - 美股数据"
-        </div>
-      </el-form-item>
-
-      <!-- 🆕 注册引导提示 -->
-      <el-alert
-        v-if="formData.type && currentDataSourceInfo?.register_url"
-        :title="`📝 ${currentDataSourceInfo.label} 注册引导`"
-        type="info"
-        :closable="false"
-        class="mb-4"
-      >
-        <template #default>
-          <div class="register-guide">
-            <p>{{ currentDataSourceInfo.register_guide || '如果您还没有账号，请先注册：' }}</p>
-            <el-button
-              type="primary"
-              size="small"
-              link
-              @click="openRegisterUrl"
-            >
-              <el-icon><Link /></el-icon>
-              前往注册 {{ currentDataSourceInfo.label }}
-            </el-button>
-          </div>
-        </template>
-      </el-alert>
-
-      <el-form-item label="数据提供商" prop="provider">
-        <el-input
-          v-model="formData.provider"
-          placeholder="请输入数据提供商"
-        />
-      </el-form-item>
-
-      <!-- 连接配置 -->
-      <el-divider content-position="left">连接配置</el-divider>
-
-      <el-form-item label="API端点" prop="endpoint">
-        <el-input
-          v-model="formData.endpoint"
-          placeholder="请输入API端点URL"
-        />
-      </el-form-item>
-
-      <!-- API Key 输入框 -->
-      <el-form-item label="API Key" prop="api_key">
-        <el-input
-          v-model="formData.api_key"
-          type="password"
-          placeholder="输入 API Key（可选，留空则使用环境变量）"
-          show-password
-          clearable
-        />
-        <div class="form-tip">
-          优先级：数据库配置 > 环境变量。留空则使用 .env 文件中的配置
-        </div>
-      </el-form-item>
-
-      <!-- API Secret 输入框（某些数据源需要） -->
-      <el-form-item v-if="needsApiSecret" label="API Secret" prop="api_secret">
-        <el-input
-          v-model="formData.api_secret"
-          type="password"
-          placeholder="输入 API Secret（可选）"
-          show-password
-          clearable
-        />
-        <div class="form-tip">
-          某些数据源（如 Alpha Vantage）需要额外的 Secret Key
-        </div>
-      </el-form-item>
-
-      <!-- 性能配置 -->
-      <el-divider content-position="left">性能配置</el-divider>
-
-      <el-row :gutter="16">
-        <el-col :span="12">
-          <el-form-item label="超时时间" prop="timeout">
-            <el-input-number
-              v-model="formData.timeout"
-              :min="1"
-              :max="300"
-              controls-position="right"
-              style="width: 100%"
-            />
-            <span class="form-help">秒</span>
-          </el-form-item>
-        </el-col>
-        <el-col :span="12">
-          <el-form-item label="速率限制" prop="rate_limit">
-            <el-input-number
-              v-model="formData.rate_limit"
-              :min="1"
-              :max="10000"
-              controls-position="right"
-              style="width: 100%"
-            />
-            <span class="form-help">请求/分钟</span>
-          </el-form-item>
-        </el-col>
-      </el-row>
-
-      <el-form-item label="优先级" prop="priority">
-        <el-input-number
-          v-model="formData.priority"
-          :min="0"
-          :max="100"
-          controls-position="right"
-          style="width: 200px"
-        />
-        <span class="form-help">数值越大优先级越高</span>
-      </el-form-item>
-
-      <!-- 市场分类 -->
-      <el-divider content-position="left">市场分类</el-divider>
-
-      <el-form-item label="所属市场" prop="market_categories">
-        <el-checkbox-group v-model="formData.market_categories">
-          <el-checkbox
-            v-for="category in marketCategories"
-            :key="category.id"
-            :label="category.id"
-            :disabled="!category.enabled"
-          >
-            {{ category.display_name }}
-          </el-checkbox>
-        </el-checkbox-group>
-      </el-form-item>
-
-      <!-- 高级设置 -->
-      <el-divider content-position="left">高级设置</el-divider>
-
-      <el-form-item label="启用状态">
-        <el-switch v-model="formData.enabled" />
-      </el-form-item>
-
-      <el-form-item label="描述" prop="description">
-        <el-input
-          v-model="formData.description"
-          type="textarea"
-          :rows="3"
-          placeholder="请输入数据源描述"
-        />
-      </el-form-item>
-
-      <!-- 自定义参数 -->
-      <el-form-item label="自定义参数">
-        <div class="config-params">
-          <div
-            v-for="(_value, key, index) in formData.config_params"
-            :key="index"
-            class="param-item"
-          >
-            <el-input
-              v-model="paramKeys[index]"
-              placeholder="参数名"
-              style="width: 40%"
-              @blur="updateParamKey(index, paramKeys[index])"
-            />
-            <el-input
-              v-model="formData.config_params[key]"
-              placeholder="参数值"
-              style="width: 40%; margin-left: 8px"
-            />
-            <el-button
-              type="danger"
-              size="small"
-              icon="Delete"
-              style="margin-left: 8px"
-              @click="removeParam(key)"
-            />
-          </div>
-          <el-button
-            type="primary"
-            size="small"
-            icon="Plus"
-            @click="addParam"
-          >
-            添加参数
-          </el-button>
-        </div>
-      </el-form-item>
-    </el-form>
-
-    <template #footer>
-      <div class="dialog-footer">
-        <el-button @click="handleClose">取消</el-button>
-        <el-button type="primary" :loading="loading" @click="handleSubmit">
-          {{ isEdit ? '更新' : '创建' }}
-        </el-button>
-        <el-button
-          v-if="formData.name"
-          type="success"
-          :loading="testing"
-          @click="handleTest"
-        >
-          测试连接
-        </el-button>
-      </div>
-    </template>
-  </el-dialog>
-</template>
-
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import { Link } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
+import type { DataSourceConfig, MarketCategory } from '@/api/config'
+import { Link } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { computed, onMounted, ref, watch } from 'vue'
 import {
-  configApi,
-  type DataSourceConfig,
-  type MarketCategory
+  configApi
+
 } from '@/api/config'
 
 // Props
@@ -300,7 +43,8 @@ const needsApiSecret = computed(() => {
 
 // 当前选中的数据源信息
 const currentDataSourceInfo = computed(() => {
-  if (!formData.value.type) return null
+  if (!formData.value.type)
+    return null
   return dataSourceTypes.find(ds => ds.value === formData.value.type)
 })
 
@@ -512,7 +256,7 @@ const loadMarketCategories = async () => {
 // 监听配置变化
 watch(
   () => props.config,
-  (config) => {
+  config => {
     if (config) {
       // 编辑模式：合并默认值和传入的配置
       formData.value = {
@@ -534,7 +278,7 @@ watch(
 // 监听visible变化
 watch(
   () => props.visible,
-  (visible) => {
+  visible => {
     if (visible) {
       loadMarketCategories()
       if (props.config) {
@@ -561,7 +305,8 @@ const handleClose = () => {
 
 // 处理提交
 const handleSubmit = async () => {
-  if (!formRef.value) return
+  if (!formRef.value)
+    return
 
   try {
     await formRef.value.validate()
@@ -641,7 +386,8 @@ const handleSubmit = async () => {
 
 // 处理测试连接
 const handleTest = async () => {
-  if (!formRef.value) return
+  if (!formRef.value)
+    return
 
   try {
     await formRef.value.validate()
@@ -687,6 +433,273 @@ onMounted(() => {
   loadMarketCategories()
 })
 </script>
+
+<template>
+  <el-dialog
+    :model-value="visible"
+    :title="isEdit ? '编辑数据源' : '添加数据源'"
+    width="600px"
+    @update:model-value="$emit('update:visible', $event)"
+    @close="handleClose"
+  >
+    <el-form
+      ref="formRef"
+      :model="formData"
+      :rules="rules"
+      label-width="120px"
+      label-position="left"
+    >
+      <!-- 基本信息 -->
+      <el-form-item label="数据源类型" prop="type">
+        <el-select
+          v-model="formData.type"
+          placeholder="请选择数据源类型"
+          style="width: 100%"
+          :disabled="isEdit"
+          @change="handleTypeChange"
+        >
+          <el-option
+            v-for="option in dataSourceTypes"
+            :key="option.value"
+            :label="option.label"
+            :value="option.value"
+          />
+        </el-select>
+        <div class="form-tip">
+          ⚠️ 数据源类型一旦选择后不可修改，请谨慎选择
+        </div>
+      </el-form-item>
+
+      <el-form-item label="数据源名称" prop="name">
+        <el-input
+          v-model="formData.name"
+          placeholder="自动生成（基于数据源类型）"
+          disabled
+        />
+        <div class="form-tip">
+          📌 数据源名称由系统自动生成，用于后端识别，不可修改
+        </div>
+      </el-form-item>
+
+      <el-form-item label="显示名称" prop="display_name">
+        <el-input
+          v-model="formData.display_name"
+          placeholder="请输入显示名称（用于界面展示）"
+        />
+        <div class="form-tip">
+          💡 显示名称可以自定义，用于在界面上展示，例如："Alpha Vantage - 美股数据"
+        </div>
+      </el-form-item>
+
+      <!-- 🆕 注册引导提示 -->
+      <el-alert
+        v-if="formData.type && currentDataSourceInfo?.register_url"
+        :title="`📝 ${currentDataSourceInfo.label} 注册引导`"
+        type="info"
+        :closable="false"
+        class="mb-4"
+      >
+        <template #default>
+          <div class="register-guide">
+            <p>{{ currentDataSourceInfo.register_guide || '如果您还没有账号，请先注册：' }}</p>
+            <el-button
+              type="primary"
+              size="small"
+              link
+              @click="openRegisterUrl"
+            >
+              <el-icon><Link /></el-icon>
+              前往注册 {{ currentDataSourceInfo.label }}
+            </el-button>
+          </div>
+        </template>
+      </el-alert>
+
+      <el-form-item label="数据提供商" prop="provider">
+        <el-input
+          v-model="formData.provider"
+          placeholder="请输入数据提供商"
+        />
+      </el-form-item>
+
+      <!-- 连接配置 -->
+      <el-divider content-position="left">
+        连接配置
+      </el-divider>
+
+      <el-form-item label="API端点" prop="endpoint">
+        <el-input
+          v-model="formData.endpoint"
+          placeholder="请输入API端点URL"
+        />
+      </el-form-item>
+
+      <!-- API Key 输入框 -->
+      <el-form-item label="API Key" prop="api_key">
+        <el-input
+          v-model="formData.api_key"
+          type="password"
+          placeholder="输入 API Key（可选，留空则使用环境变量）"
+          show-password
+          clearable
+        />
+        <div class="form-tip">
+          优先级：数据库配置 > 环境变量。留空则使用 .env 文件中的配置
+        </div>
+      </el-form-item>
+
+      <!-- API Secret 输入框（某些数据源需要） -->
+      <el-form-item v-if="needsApiSecret" label="API Secret" prop="api_secret">
+        <el-input
+          v-model="formData.api_secret"
+          type="password"
+          placeholder="输入 API Secret（可选）"
+          show-password
+          clearable
+        />
+        <div class="form-tip">
+          某些数据源（如 Alpha Vantage）需要额外的 Secret Key
+        </div>
+      </el-form-item>
+
+      <!-- 性能配置 -->
+      <el-divider content-position="left">
+        性能配置
+      </el-divider>
+
+      <el-row :gutter="16">
+        <el-col :span="12">
+          <el-form-item label="超时时间" prop="timeout">
+            <el-input-number
+              v-model="formData.timeout"
+              :min="1"
+              :max="300"
+              controls-position="right"
+              style="width: 100%"
+            />
+            <span class="form-help">秒</span>
+          </el-form-item>
+        </el-col>
+        <el-col :span="12">
+          <el-form-item label="速率限制" prop="rate_limit">
+            <el-input-number
+              v-model="formData.rate_limit"
+              :min="1"
+              :max="10000"
+              controls-position="right"
+              style="width: 100%"
+            />
+            <span class="form-help">请求/分钟</span>
+          </el-form-item>
+        </el-col>
+      </el-row>
+
+      <el-form-item label="优先级" prop="priority">
+        <el-input-number
+          v-model="formData.priority"
+          :min="0"
+          :max="100"
+          controls-position="right"
+          style="width: 200px"
+        />
+        <span class="form-help">数值越大优先级越高</span>
+      </el-form-item>
+
+      <!-- 市场分类 -->
+      <el-divider content-position="left">
+        市场分类
+      </el-divider>
+
+      <el-form-item label="所属市场" prop="market_categories">
+        <el-checkbox-group v-model="formData.market_categories">
+          <el-checkbox
+            v-for="category in marketCategories"
+            :key="category.id"
+            :label="category.id"
+            :disabled="!category.enabled"
+          >
+            {{ category.display_name }}
+          </el-checkbox>
+        </el-checkbox-group>
+      </el-form-item>
+
+      <!-- 高级设置 -->
+      <el-divider content-position="left">
+        高级设置
+      </el-divider>
+
+      <el-form-item label="启用状态">
+        <el-switch v-model="formData.enabled" />
+      </el-form-item>
+
+      <el-form-item label="描述" prop="description">
+        <el-input
+          v-model="formData.description"
+          type="textarea"
+          :rows="3"
+          placeholder="请输入数据源描述"
+        />
+      </el-form-item>
+
+      <!-- 自定义参数 -->
+      <el-form-item label="自定义参数">
+        <div class="config-params">
+          <div
+            v-for="(_value, key, index) in formData.config_params"
+            :key="index"
+            class="param-item"
+          >
+            <el-input
+              v-model="paramKeys[index]"
+              placeholder="参数名"
+              style="width: 40%"
+              @blur="updateParamKey(index, paramKeys[index])"
+            />
+            <el-input
+              v-model="formData.config_params[key]"
+              placeholder="参数值"
+              style="width: 40%; margin-left: 8px"
+            />
+            <el-button
+              type="danger"
+              size="small"
+              icon="Delete"
+              style="margin-left: 8px"
+              @click="removeParam(key)"
+            />
+          </div>
+          <el-button
+            type="primary"
+            size="small"
+            icon="Plus"
+            @click="addParam"
+          >
+            添加参数
+          </el-button>
+        </div>
+      </el-form-item>
+    </el-form>
+
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button @click="handleClose">
+          取消
+        </el-button>
+        <el-button type="primary" :loading="loading" @click="handleSubmit">
+          {{ isEdit ? '更新' : '创建' }}
+        </el-button>
+        <el-button
+          v-if="formData.name"
+          type="success"
+          :loading="testing"
+          @click="handleTest"
+        >
+          测试连接
+        </el-button>
+      </div>
+    </template>
+  </el-dialog>
+</template>
 
 <style lang="scss" scoped>
 .form-help {

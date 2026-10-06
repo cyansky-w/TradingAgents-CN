@@ -1,298 +1,39 @@
-<template>
-  <div class="report-detail">
-    <!-- 加载状态 -->
-    <div v-if="loading" class="loading-container">
-      <el-skeleton :rows="10" animated />
-    </div>
-
-    <!-- 报告内容 -->
-    <div v-else-if="report" class="report-content">
-      <!-- 报告头部 -->
-      <el-card class="report-header" shadow="never">
-        <div class="header-content">
-          <div class="title-section">
-            <h1 class="report-title">
-              <el-icon><Document /></el-icon>
-              {{ report.stock_name || report.stock_symbol }} 分析报告
-            </h1>
-            <div class="report-meta">
-              <el-tag type="primary">{{ report.stock_symbol }}</el-tag>
-              <el-tag v-if="report.stock_name && report.stock_name !== report.stock_symbol" type="info">{{ report.stock_name }}</el-tag>
-              <el-tag type="success">{{ getStatusText(report.status) }}</el-tag>
-              <span class="meta-item">
-                <el-icon><Calendar /></el-icon>
-                {{ formatTime(report.created_at) }}
-              </span>
-              <span class="meta-item">
-                <el-icon><User /></el-icon>
-                {{ formatAnalysts(report.analysts) }}
-              </span>
-              <span v-if="report.model_info && report.model_info !== 'Unknown'" class="meta-item">
-                <el-icon><Cpu /></el-icon>
-                <el-tooltip :content="getModelDescription(report.model_info)" placement="top">
-                  <el-tag type="info" style="cursor: help;">{{ report.model_info }}</el-tag>
-                </el-tooltip>
-              </span>
-            </div>
-          </div>
-          
-          <div class="action-section">
-            <el-button
-              v-if="canApplyToTrading"
-              type="success"
-              @click="applyToTrading"
-            >
-              <el-icon><ShoppingCart /></el-icon>
-              应用到交易
-            </el-button>
-            <el-dropdown trigger="click" @command="downloadReport">
-              <el-button type="primary">
-                <el-icon><Download /></el-icon>
-                下载报告
-                <el-icon class="el-icon--right"><arrow-down /></el-icon>
-              </el-button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="markdown">
-                    <el-icon><document /></el-icon> Markdown
-                  </el-dropdown-item>
-                  <el-dropdown-item command="docx">
-                    <el-icon><document /></el-icon> Word 文档
-                  </el-dropdown-item>
-                  <el-dropdown-item command="pdf">
-                    <el-icon><document /></el-icon> PDF
-                  </el-dropdown-item>
-                  <el-dropdown-item command="json" divided>
-                    <el-icon><document /></el-icon> JSON (原始数据)
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-            <el-button @click="goBack">
-              <el-icon><Back /></el-icon>
-              返回
-            </el-button>
-          </div>
-        </div>
-      </el-card>
-
-      <!-- 风险提示 -->
-      <div class="risk-disclaimer">
-        <el-alert
-          type="warning"
-          :closable="false"
-          show-icon
-        >
-          <template #title>
-            <div class="disclaimer-content">
-              <el-icon class="disclaimer-icon"><WarningFilled /></el-icon>
-              <div class="disclaimer-text">
-                <p style="margin: 0 0 8px 0;"><strong>⚠️ 重要风险提示与免责声明</strong></p>
-                <ul style="margin: 0; padding-left: 20px; line-height: 1.8;">
-                  <li><strong>工具性质：</strong>本系统为股票分析辅助工具，使用AI技术对公开市场数据进行分析，不具备证券投资咨询资质。</li>
-                  <li><strong>非投资建议：</strong>所有分析结果、评分、建议仅为技术分析参考，不构成任何买卖建议或投资决策依据。</li>
-                  <li><strong>数据局限性：</strong>分析基于历史数据和公开信息，可能存在延迟、不完整或不准确的情况，无法预测未来市场走势。</li>
-                  <li><strong>投资风险：</strong>股票投资存在市场风险、流动性风险、政策风险等多种风险，可能导致本金损失。</li>
-                  <li><strong>独立决策：</strong>投资者应基于自身风险承受能力、投资目标和财务状况独立做出投资决策。</li>
-                  <li><strong>专业咨询：</strong>重大投资决策建议咨询具有合法资质的专业投资顾问或金融机构。</li>
-                  <li><strong>责任声明：</strong>使用本工具产生的任何投资决策及其后果由投资者自行承担，本系统不承担任何责任。</li>
-                </ul>
-              </div>
-            </div>
-          </template>
-        </el-alert>
-      </div>
-
-      <!-- 关键指标 -->
-      <el-card class="metrics-card" shadow="never">
-        <template #header>
-          <div class="card-header">
-            <el-icon><TrendCharts /></el-icon>
-            <span>关键指标</span>
-          </div>
-        </template>
-        <div class="metrics-content">
-          <el-row :gutter="24">
-            <!-- 分析参考 -->
-            <el-col :span="8">
-              <div class="metric-item">
-                <div class="metric-label">
-                  <el-icon><TrendCharts /></el-icon>
-                  分析参考
-                  <el-tooltip content="基于AI模型的分析倾向，仅供参考，不构成投资建议" placement="top">
-                    <el-icon style="margin-left: 4px; cursor: help; font-size: 14px;"><QuestionFilled /></el-icon>
-                  </el-tooltip>
-                </div>
-                <div class="metric-value recommendation-value markdown-content" v-html="renderMarkdown(report.recommendation || '暂无')"></div>
-                <el-tag type="info" size="small" style="margin-top: 8px;">仅供参考</el-tag>
-              </div>
-            </el-col>
-
-            <!-- 风险评估 -->
-            <el-col :span="8">
-              <div class="metric-item risk-item">
-                <div class="metric-label">
-                  <el-icon><Warning /></el-icon>
-                  风险评估
-                  <el-tooltip content="基于历史数据的风险评估，实际风险可能更高" placement="top">
-                    <el-icon style="margin-left: 4px; cursor: help; font-size: 14px;"><QuestionFilled /></el-icon>
-                  </el-tooltip>
-                </div>
-                <div class="risk-display">
-                  <div class="risk-stars">
-                    <el-icon
-                      v-for="star in 5"
-                      :key="star"
-                      class="star-icon"
-                      :class="{ active: star <= getRiskStars(report.risk_level || '中等') }"
-                    >
-                      <StarFilled />
-                    </el-icon>
-                  </div>
-                  <div class="risk-label" :style="{ color: getRiskColor(report.risk_level || '中等') }">
-                    {{ report.risk_level || '中等' }}风险
-                  </div>
-                </div>
-              </div>
-            </el-col>
-
-            <!-- 模型置信度 -->
-            <el-col :span="8">
-              <div class="metric-item confidence-item">
-                <div class="metric-label">
-                  <el-icon><DataAnalysis /></el-icon>
-                  模型置信度
-                  <el-tooltip content="基于AI模型计算的置信度，不代表实际投资成功率" placement="top">
-                    <el-icon style="margin-left: 4px; cursor: help; font-size: 14px;"><QuestionFilled /></el-icon>
-                  </el-tooltip>
-                </div>
-                <div class="confidence-display">
-                  <el-progress
-                    type="circle"
-                    :percentage="normalizeConfidenceScore(report.confidence_score || 0)"
-                    :width="120"
-                    :stroke-width="10"
-                    :color="getConfidenceColor(normalizeConfidenceScore(report.confidence_score || 0))"
-                  >
-                    <template #default="{ percentage }">
-                      <span class="confidence-text">
-                        <span class="confidence-number">{{ percentage }}</span>
-                        <span class="confidence-unit">分</span>
-                      </span>
-                    </template>
-                  </el-progress>
-                  <div class="confidence-label">{{ getConfidenceLabel(normalizeConfidenceScore(report.confidence_score || 0)) }}</div>
-                </div>
-              </div>
-            </el-col>
-          </el-row>
-
-          <!-- 关键要点 -->
-          <div v-if="report.key_points && report.key_points.length > 0" class="key-points">
-            <h4>
-              <el-icon><List /></el-icon>
-              关键要点
-            </h4>
-            <ul>
-              <li v-for="(point, index) in report.key_points" :key="index">
-                <el-icon class="point-icon"><Check /></el-icon>
-                {{ point }}
-              </li>
-            </ul>
-          </div>
-        </div>
-      </el-card>
-
-      <!-- 报告摘要 -->
-      <el-card v-if="report.summary" class="summary-card" shadow="never">
-        <template #header>
-          <div class="card-header">
-            <el-icon><InfoFilled /></el-icon>
-            <span>执行摘要</span>
-          </div>
-        </template>
-        <div class="summary-content markdown-content" v-html="renderMarkdown(report.summary)"></div>
-      </el-card>
-
-      <!-- 报告模块 -->
-      <el-card class="modules-card" shadow="never">
-        <template #header>
-          <div class="card-header">
-            <el-icon><Files /></el-icon>
-            <span>分析报告</span>
-          </div>
-        </template>
-        
-        <el-tabs v-model="activeModule" type="border-card">
-          <el-tab-pane
-            v-for="moduleName in reportModuleKeys"
-            :key="moduleName"
-            :label="getModuleDisplayName(moduleName)"
-            :name="moduleName"
-          >
-            <div class="module-content">
-              <div v-if="typeof report.reports[moduleName] === 'string'" class="markdown-content">
-                <div v-html="renderMarkdown(report.reports[moduleName] as string)"></div>
-              </div>
-              <div v-else class="json-content">
-                <pre>{{ JSON.stringify(report.reports[moduleName], null, 2) }}</pre>
-              </div>
-            </div>
-          </el-tab-pane>
-        </el-tabs>
-      </el-card>
-    </div>
-
-    <!-- 错误状态 -->
-    <div v-else class="error-container">
-      <el-result
-        icon="error"
-        title="报告加载失败"
-        sub-title="请检查报告ID是否正确或稍后重试"
-      >
-        <template #extra>
-          <el-button type="primary" @click="goBack">返回列表</el-button>
-        </template>
-      </el-result>
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref, computed, h, reactive, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox, ElInputNumber } from 'element-plus'
-import { paperApi } from '@/api/paper'
-import { stocksApi } from '@/api/stocks'
-import { configApi, type LLMConfig } from '@/api/config'
+import type { LLMConfig } from '@/api/config'
+import type { CurrencyAmount } from '@/api/paper'
 import {
-  Document,
-  Calendar,
-  User,
-  Download,
+  ArrowDown,
   Back,
-  InfoFilled,
-  TrendCharts,
-  Files,
-  ShoppingCart,
-  WarningFilled,
-  DataAnalysis,
-  Warning,
-  StarFilled,
-  List,
+  Calendar,
   Check,
   Cpu,
+  DataAnalysis,
+  Document,
+  Download,
+  Files,
+  InfoFilled,
+  List,
   QuestionFilled,
-  ArrowDown
+  ShoppingCart,
+  StarFilled,
+  TrendCharts,
+  User,
+  Warning,
+  WarningFilled
 } from '@element-plus/icons-vue'
-import { useAuthStore } from '@/stores/auth'
+import { ElInputNumber, ElMessage, ElMessageBox } from 'element-plus'
 import { marked } from 'marked'
+import { computed, h, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { configApi } from '@/api/config'
+import { paperApi } from '@/api/paper'
+import { stocksApi } from '@/api/stocks'
+import { useAuthStore } from '@/stores/auth'
 import { getMarketByStockCode } from '@/utils/market'
-import type { CurrencyAmount } from '@/api/paper'
 
 type ReportModuleContent = string | Record<string, unknown>
 
-type ReportDetailData = {
+interface ReportDetailData {
   id: string
   analysis_id?: string
   stock_symbol: string
@@ -377,7 +118,8 @@ const fetchReportDetail = async () => {
 // 下载报告
 const downloadReport = async (format: string = 'markdown') => {
   try {
-    if (!report.value) return
+    if (!report.value)
+      return
     const currentReport = report.value
 
     // 显示加载提示
@@ -389,7 +131,7 @@ const downloadReport = async (format: string = 'markdown') => {
 
     const response = await fetch(`/api/reports/${currentReport.id}/download?format=${format}`, {
       headers: {
-        'Authorization': `Bearer ${authStore.token}`
+        Authorization: `Bearer ${authStore.token}`
       }
     })
 
@@ -433,10 +175,10 @@ const downloadReport = async (format: string = 'markdown') => {
 // 辅助函数：获取格式名称
 const getFormatName = (format: string): string => {
   const names: Record<string, string> = {
-    'markdown': 'Markdown',
-    'docx': 'Word',
-    'pdf': 'PDF',
-    'json': 'JSON'
+    markdown: 'Markdown',
+    docx: 'Word',
+    pdf: 'PDF',
+    json: 'JSON'
   }
   return names[format] || format
 }
@@ -444,17 +186,18 @@ const getFormatName = (format: string): string => {
 // 辅助函数：获取文件扩展名
 const getFileExtension = (format: string): string => {
   const extensions: Record<string, string> = {
-    'markdown': 'md',
-    'docx': 'docx',
-    'pdf': 'pdf',
-    'json': 'json'
+    markdown: 'md',
+    docx: 'docx',
+    pdf: 'pdf',
+    json: 'json'
   }
   return extensions[format] || 'txt'
 }
 
 // 判断是否可以应用到交易
 const canApplyToTrading = computed(() => {
-  if (!report.value) return false
+  if (!report.value)
+    return false
   const rec = report.value.recommendation || ''
   // 检查是否包含买入或卖出建议
   return rec.includes('买入') || rec.includes('卖出') || rec.toLowerCase().includes('buy') || rec.toLowerCase().includes('sell')
@@ -462,7 +205,8 @@ const canApplyToTrading = computed(() => {
 
 // 解析投资建议
 const parseRecommendation = () => {
-  if (!report.value) return null
+  if (!report.value)
+    return null
 
   const rec = report.value.recommendation || ''
   const traderPlan = report.value.reports?.trader_investment_plan || ''
@@ -475,15 +219,16 @@ const parseRecommendation = () => {
     action = 'sell'
   }
 
-  if (!action) return null
+  if (!action)
+    return null
 
   // 解析目标价格（从recommendation或trader_investment_plan中提取）
   let targetPrice: number | null = null
   const traderPlanText = typeof traderPlan === 'string' ? traderPlan : ''
-  const priceMatch = rec.match(/目标价[格]?[：:]\s*([0-9.]+)/) ||
-                     traderPlanText.match(/目标价[格]?[：:]\s*([0-9.]+)/)
+  const priceMatch = rec.match(/目标价格?[：:]\s*([0-9.]+)/)
+    || traderPlanText.match(/目标价格?[：:]\s*([0-9.]+)/)
   if (priceMatch) {
-    targetPrice = parseFloat(priceMatch[1])
+    targetPrice = Number.parseFloat(priceMatch[1])
   }
 
   return {
@@ -510,9 +255,9 @@ const getCashByCurrency = (account: any, stockSymbol: string): number => {
 
     // 映射市场类型到货币
     const currencyMap: Record<string, keyof CurrencyAmount> = {
-      'A股': 'CNY',
-      '港股': 'HKD',
-      '美股': 'USD'
+      A股: 'CNY',
+      港股: 'HKD',
+      美股: 'USD'
     }
 
     const currency = currencyMap[marketType] || 'CNY'
@@ -529,7 +274,8 @@ const applyToTrading = async () => {
     ElMessage.warning('无法解析投资建议，请检查报告内容')
     return
   }
-  if (!report.value) return
+  if (!report.value)
+    return
   const currentReport = report.value
 
   try {
@@ -623,11 +369,13 @@ const applyToTrading = async () => {
             h('strong', '操作类型：'),
             h('span', { style: `color: ${actionColor}; font-weight: bold;` }, actionText)
           ]),
-          recommendation.targetPrice ? h('p', [
-            h('strong', '目标价格：'),
-            h('span', { style: 'color: #E6A23C;' }, `${recommendation.targetPrice.toFixed(2)}元`),
-            h('span', { style: 'color: #909399; font-size: 12px; margin-left: 8px;' }, '(仅供参考)')
-          ]) : null,
+          recommendation.targetPrice
+            ? h('p', [
+                h('strong', '目标价格：'),
+                h('span', { style: 'color: #E6A23C;' }, `${recommendation.targetPrice.toFixed(2)}元`),
+                h('span', { style: 'color: #909399; font-size: 12px; margin-left: 8px;' }, '(仅供参考)')
+              ])
+            : null,
           h('p', [
             h('strong', '当前价格：'),
             h('span', `${currentPrice.toFixed(2)}元`)
@@ -638,14 +386,14 @@ const applyToTrading = async () => {
               h('span', { style: 'color: #909399; font-size: 12px; margin-left: 8px;' }, '(可修改)')
             ]),
             h(ElInputNumber, {
-              modelValue: tradeForm.price,
+              'modelValue': tradeForm.price,
               'onUpdate:modelValue': (val?: number) => { tradeForm.price = val ?? tradeForm.price },
-              min: 0.01,
-              max: 9999,
-              precision: 2,
-              step: 0.01,
-              style: 'width: 200px;',
-              controls: true
+              'min': 0.01,
+              'max': 9999,
+              'precision': 2,
+              'step': 0.01,
+              'style': 'width: 200px;',
+              'controls': true
             })
           ]),
           h('div', { style: 'margin: 16px 0;' }, [
@@ -654,13 +402,13 @@ const applyToTrading = async () => {
               h('span', { style: 'color: #909399; font-size: 12px; margin-left: 8px;' }, '(可修改，100股为单位)')
             ]),
             h(ElInputNumber, {
-              modelValue: tradeForm.quantity,
+              'modelValue': tradeForm.quantity,
               'onUpdate:modelValue': (val?: number) => { tradeForm.quantity = val ?? tradeForm.quantity },
-              min: 100,
-              max: maxQuantity,
-              step: 100,
-              style: 'width: 200px;',
-              controls: true
+              'min': 100,
+              'max': maxQuantity,
+              'step': 100,
+              'style': 'width: 200px;',
+              'controls': true
             })
           ]),
           h('p', [
@@ -677,12 +425,12 @@ const applyToTrading = async () => {
             h('span', recommendation.riskLevel),
             h('span', { style: 'color: #909399; font-size: 12px; margin-left: 8px;' }, '(实际风险可能更高)')
           ]),
-          recommendation.action === 'buy' ? h('p', { style: 'color: #909399; font-size: 12px; margin-top: 12px;' },
-            `可用资金：${availableCash.toFixed(2)}元，最大可买：${maxQuantity}股`
-          ) : null,
-          recommendation.action === 'sell' ? h('p', { style: 'color: #909399; font-size: 12px; margin-top: 12px;' },
-            `当前持仓：${maxQuantity}股`
-          ) : null
+          recommendation.action === 'buy'
+            ? h('p', { style: 'color: #909399; font-size: 12px; margin-top: 12px;' }, `可用资金：${availableCash.toFixed(2)}元，最大可买：${maxQuantity}股`)
+            : null,
+          recommendation.action === 'sell'
+            ? h('p', { style: 'color: #909399; font-size: 12px; margin-top: 12px;' }, `当前持仓：${maxQuantity}股`)
+            : null
         ])
       }
     }
@@ -739,7 +487,6 @@ const applyToTrading = async () => {
     } else {
       ElMessage.error(orderRes.message || '下单失败')
     }
-
   } catch (error: any) {
     if (error !== 'cancel') {
       console.error('应用到交易失败:', error)
@@ -770,12 +517,12 @@ const formatTime = (time: string) => {
 // 将分析师英文名称转换为中文
 const formatAnalysts = (analysts: string[]) => {
   const analystNameMap: Record<string, string> = {
-    'market': '市场分析师',
-    'fundamentals': '基本面分析师',
-    'news': '新闻分析师',
-    'social': '社媒分析师',
-    'sentiment': '情绪分析师',
-    'technical': '技术分析师'
+    market: '市场分析师',
+    fundamentals: '基本面分析师',
+    news: '新闻分析师',
+    social: '社媒分析师',
+    sentiment: '情绪分析师',
+    technical: '技术分析师'
   }
 
   return analysts.map(analyst => analystNameMap[analyst] || analyst).join('、')
@@ -795,8 +542,8 @@ const getModelDescription = (modelInfo: string) => {
 
   // 2. 尝试模糊匹配（处理版本号等变化）
   const fuzzyConfig = llmConfigs.value.find(c =>
-    modelInfo.toLowerCase().includes(c.model_name.toLowerCase()) ||
-    c.model_name.toLowerCase().includes(modelInfo.toLowerCase())
+    modelInfo.toLowerCase().includes(c.model_name.toLowerCase())
+    || c.model_name.toLowerCase().includes(modelInfo.toLowerCase())
   )
   if (fuzzyConfig?.description) {
     return fuzzyConfig.description
@@ -865,7 +612,8 @@ const getModuleDisplayName = (moduleName: string) => {
 }
 
 const renderMarkdown = (content: string) => {
-  if (!content) return ''
+  if (!content)
+    return ''
   try {
     return String(marked.parse(content))
   } catch (e) {
@@ -885,38 +633,44 @@ const normalizeConfidenceScore = (score: number) => {
 }
 
 const getConfidenceColor = (score: number) => {
-  if (score >= 80) return '#67C23A' // 较高 - 绿色
-  if (score >= 60) return '#409EFF' // 中上 - 蓝色
-  if (score >= 40) return '#E6A23C' // 中等 - 橙色
+  if (score >= 80)
+    return '#67C23A' // 较高 - 绿色
+  if (score >= 60)
+    return '#409EFF' // 中上 - 蓝色
+  if (score >= 40)
+    return '#E6A23C' // 中等 - 橙色
   return '#F56C6C' // 较低 - 红色
 }
 
 const getConfidenceLabel = (score: number) => {
-  if (score >= 80) return '较高'
-  if (score >= 60) return '中上'
-  if (score >= 40) return '中等'
+  if (score >= 80)
+    return '较高'
+  if (score >= 60)
+    return '中上'
+  if (score >= 40)
+    return '中等'
   return '较低'
 }
 
 // 风险等级相关函数
 const getRiskStars = (riskLevel: string) => {
   const riskMap: Record<string, number> = {
-    '低': 1,
-    '中低': 2,
-    '中等': 3,
-    '中高': 4,
-    '高': 5
+    低: 1,
+    中低: 2,
+    中等: 3,
+    中高: 4,
+    高: 5
   }
   return riskMap[riskLevel] || 3
 }
 
 const getRiskColor = (riskLevel: string) => {
   const colorMap: Record<string, string> = {
-    '低': '#67C23A',      // 绿色
-    '中低': '#95D475',    // 浅绿色
-    '中等': '#E6A23C',    // 橙色
-    '中高': '#F56C6C',    // 红色
-    '高': '#F56C6C'       // 深红色
+    低: '#67C23A', // 绿色
+    中低: '#95D475', // 浅绿色
+    中等: '#E6A23C', // 橙色
+    中高: '#F56C6C', // 红色
+    高: '#F56C6C' // 深红色
   }
   return colorMap[riskLevel] || '#E6A23C'
 }
@@ -932,6 +686,292 @@ watch(
   { immediate: true }
 )
 </script>
+
+<template>
+  <div class="report-detail">
+    <!-- 加载状态 -->
+    <div v-if="loading" class="loading-container">
+      <el-skeleton :rows="10" animated />
+    </div>
+
+    <!-- 报告内容 -->
+    <div v-else-if="report" class="report-content">
+      <!-- 报告头部 -->
+      <el-card class="report-header" shadow="never">
+        <div class="header-content">
+          <div class="title-section">
+            <h1 class="report-title">
+              <el-icon><Document /></el-icon>
+              {{ report.stock_name || report.stock_symbol }} 分析报告
+            </h1>
+            <div class="report-meta">
+              <el-tag type="primary">
+                {{ report.stock_symbol }}
+              </el-tag>
+              <el-tag v-if="report.stock_name && report.stock_name !== report.stock_symbol" type="info">
+                {{ report.stock_name }}
+              </el-tag>
+              <el-tag type="success">
+                {{ getStatusText(report.status) }}
+              </el-tag>
+              <span class="meta-item">
+                <el-icon><Calendar /></el-icon>
+                {{ formatTime(report.created_at) }}
+              </span>
+              <span class="meta-item">
+                <el-icon><User /></el-icon>
+                {{ formatAnalysts(report.analysts) }}
+              </span>
+              <span v-if="report.model_info && report.model_info !== 'Unknown'" class="meta-item">
+                <el-icon><Cpu /></el-icon>
+                <el-tooltip :content="getModelDescription(report.model_info)" placement="top">
+                  <el-tag type="info" style="cursor: help;">{{ report.model_info }}</el-tag>
+                </el-tooltip>
+              </span>
+            </div>
+          </div>
+
+          <div class="action-section">
+            <el-button
+              v-if="canApplyToTrading"
+              type="success"
+              @click="applyToTrading"
+            >
+              <el-icon><ShoppingCart /></el-icon>
+              应用到交易
+            </el-button>
+            <el-dropdown trigger="click" @command="downloadReport">
+              <el-button type="primary">
+                <el-icon><Download /></el-icon>
+                下载报告
+                <el-icon class="el-icon--right">
+                  <ArrowDown />
+                </el-icon>
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="markdown">
+                    <el-icon><Document /></el-icon> Markdown
+                  </el-dropdown-item>
+                  <el-dropdown-item command="docx">
+                    <el-icon><Document /></el-icon> Word 文档
+                  </el-dropdown-item>
+                  <el-dropdown-item command="pdf">
+                    <el-icon><Document /></el-icon> PDF
+                  </el-dropdown-item>
+                  <el-dropdown-item command="json" divided>
+                    <el-icon><Document /></el-icon> JSON (原始数据)
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+            <el-button @click="goBack">
+              <el-icon><Back /></el-icon>
+              返回
+            </el-button>
+          </div>
+        </div>
+      </el-card>
+
+      <!-- 风险提示 -->
+      <div class="risk-disclaimer">
+        <el-alert
+          type="warning"
+          :closable="false"
+          show-icon
+        >
+          <template #title>
+            <div class="disclaimer-content">
+              <el-icon class="disclaimer-icon">
+                <WarningFilled />
+              </el-icon>
+              <div class="disclaimer-text">
+                <p style="margin: 0 0 8px 0;">
+                  <strong>⚠️ 重要风险提示与免责声明</strong>
+                </p>
+                <ul style="margin: 0; padding-left: 20px; line-height: 1.8;">
+                  <li><strong>工具性质：</strong>本系统为股票分析辅助工具，使用AI技术对公开市场数据进行分析，不具备证券投资咨询资质。</li>
+                  <li><strong>非投资建议：</strong>所有分析结果、评分、建议仅为技术分析参考，不构成任何买卖建议或投资决策依据。</li>
+                  <li><strong>数据局限性：</strong>分析基于历史数据和公开信息，可能存在延迟、不完整或不准确的情况，无法预测未来市场走势。</li>
+                  <li><strong>投资风险：</strong>股票投资存在市场风险、流动性风险、政策风险等多种风险，可能导致本金损失。</li>
+                  <li><strong>独立决策：</strong>投资者应基于自身风险承受能力、投资目标和财务状况独立做出投资决策。</li>
+                  <li><strong>专业咨询：</strong>重大投资决策建议咨询具有合法资质的专业投资顾问或金融机构。</li>
+                  <li><strong>责任声明：</strong>使用本工具产生的任何投资决策及其后果由投资者自行承担，本系统不承担任何责任。</li>
+                </ul>
+              </div>
+            </div>
+          </template>
+        </el-alert>
+      </div>
+
+      <!-- 关键指标 -->
+      <el-card class="metrics-card" shadow="never">
+        <template #header>
+          <div class="card-header">
+            <el-icon><TrendCharts /></el-icon>
+            <span>关键指标</span>
+          </div>
+        </template>
+        <div class="metrics-content">
+          <el-row :gutter="24">
+            <!-- 分析参考 -->
+            <el-col :span="8">
+              <div class="metric-item">
+                <div class="metric-label">
+                  <el-icon><TrendCharts /></el-icon>
+                  分析参考
+                  <el-tooltip content="基于AI模型的分析倾向，仅供参考，不构成投资建议" placement="top">
+                    <el-icon style="margin-left: 4px; cursor: help; font-size: 14px;">
+                      <QuestionFilled />
+                    </el-icon>
+                  </el-tooltip>
+                </div>
+                <div class="metric-value recommendation-value markdown-content" v-html="renderMarkdown(report.recommendation || '暂无')" />
+                <el-tag type="info" size="small" style="margin-top: 8px;">
+                  仅供参考
+                </el-tag>
+              </div>
+            </el-col>
+
+            <!-- 风险评估 -->
+            <el-col :span="8">
+              <div class="metric-item risk-item">
+                <div class="metric-label">
+                  <el-icon><Warning /></el-icon>
+                  风险评估
+                  <el-tooltip content="基于历史数据的风险评估，实际风险可能更高" placement="top">
+                    <el-icon style="margin-left: 4px; cursor: help; font-size: 14px;">
+                      <QuestionFilled />
+                    </el-icon>
+                  </el-tooltip>
+                </div>
+                <div class="risk-display">
+                  <div class="risk-stars">
+                    <el-icon
+                      v-for="star in 5"
+                      :key="star"
+                      class="star-icon"
+                      :class="{ active: star <= getRiskStars(report.risk_level || '中等') }"
+                    >
+                      <StarFilled />
+                    </el-icon>
+                  </div>
+                  <div class="risk-label" :style="{ color: getRiskColor(report.risk_level || '中等') }">
+                    {{ report.risk_level || '中等' }}风险
+                  </div>
+                </div>
+              </div>
+            </el-col>
+
+            <!-- 模型置信度 -->
+            <el-col :span="8">
+              <div class="metric-item confidence-item">
+                <div class="metric-label">
+                  <el-icon><DataAnalysis /></el-icon>
+                  模型置信度
+                  <el-tooltip content="基于AI模型计算的置信度，不代表实际投资成功率" placement="top">
+                    <el-icon style="margin-left: 4px; cursor: help; font-size: 14px;">
+                      <QuestionFilled />
+                    </el-icon>
+                  </el-tooltip>
+                </div>
+                <div class="confidence-display">
+                  <el-progress
+                    type="circle"
+                    :percentage="normalizeConfidenceScore(report.confidence_score || 0)"
+                    :width="120"
+                    :stroke-width="10"
+                    :color="getConfidenceColor(normalizeConfidenceScore(report.confidence_score || 0))"
+                  >
+                    <template #default="{ percentage }">
+                      <span class="confidence-text">
+                        <span class="confidence-number">{{ percentage }}</span>
+                        <span class="confidence-unit">分</span>
+                      </span>
+                    </template>
+                  </el-progress>
+                  <div class="confidence-label">
+                    {{ getConfidenceLabel(normalizeConfidenceScore(report.confidence_score || 0)) }}
+                  </div>
+                </div>
+              </div>
+            </el-col>
+          </el-row>
+
+          <!-- 关键要点 -->
+          <div v-if="report.key_points && report.key_points.length > 0" class="key-points">
+            <h4>
+              <el-icon><List /></el-icon>
+              关键要点
+            </h4>
+            <ul>
+              <li v-for="(point, index) in report.key_points" :key="index">
+                <el-icon class="point-icon">
+                  <Check />
+                </el-icon>
+                {{ point }}
+              </li>
+            </ul>
+          </div>
+        </div>
+      </el-card>
+
+      <!-- 报告摘要 -->
+      <el-card v-if="report.summary" class="summary-card" shadow="never">
+        <template #header>
+          <div class="card-header">
+            <el-icon><InfoFilled /></el-icon>
+            <span>执行摘要</span>
+          </div>
+        </template>
+        <div class="summary-content markdown-content" v-html="renderMarkdown(report.summary)" />
+      </el-card>
+
+      <!-- 报告模块 -->
+      <el-card class="modules-card" shadow="never">
+        <template #header>
+          <div class="card-header">
+            <el-icon><Files /></el-icon>
+            <span>分析报告</span>
+          </div>
+        </template>
+
+        <el-tabs v-model="activeModule" type="border-card">
+          <el-tab-pane
+            v-for="moduleName in reportModuleKeys"
+            :key="moduleName"
+            :label="getModuleDisplayName(moduleName)"
+            :name="moduleName"
+          >
+            <div class="module-content">
+              <div v-if="typeof report.reports[moduleName] === 'string'" class="markdown-content">
+                <div v-html="renderMarkdown(report.reports[moduleName] as string)" />
+              </div>
+              <div v-else class="json-content">
+                <pre>{{ JSON.stringify(report.reports[moduleName], null, 2) }}</pre>
+              </div>
+            </div>
+          </el-tab-pane>
+        </el-tabs>
+      </el-card>
+    </div>
+
+    <!-- 错误状态 -->
+    <div v-else class="error-container">
+      <el-result
+        icon="error"
+        title="报告加载失败"
+        sub-title="请检查报告ID是否正确或稍后重试"
+      >
+        <template #extra>
+          <el-button type="primary" @click="goBack">
+            返回列表
+          </el-button>
+        </template>
+      </el-result>
+    </div>
+  </div>
+</template>
 
 <style lang="scss" scoped>
 .report-detail {
@@ -1251,7 +1291,7 @@ watch(
     .module-content {
       .markdown-content {
         line-height: 1.6;
-        
+
         :deep(h1), :deep(h2), :deep(h3) {
           margin: 16px 0 8px 0;
           color: var(--el-text-color-primary);

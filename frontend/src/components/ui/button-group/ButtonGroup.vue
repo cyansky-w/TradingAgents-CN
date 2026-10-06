@@ -5,8 +5,8 @@ import { cn } from '@/lib/utils'
 import { buttonGroupVariants } from '.'
 
 const props = defineProps<{
-  class?: HTMLAttributes["class"]
-  orientation?: ButtonGroupVariants["orientation"]
+  class?: HTMLAttributes['class']
+  orientation?: ButtonGroupVariants['orientation']
 }>()
 </script>
 

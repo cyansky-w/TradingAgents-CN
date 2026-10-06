@@ -1,3 +1,189 @@
+<script setup lang="ts">
+import type { LogContentResponse, LogFileInfo, LogStatistics } from '@/api/logs'
+import { Delete, Download, Refresh, Search, View } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { computed, onMounted, ref } from 'vue'
+import { LogsApi } from '@/api/logs'
+
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
+
+// 数据
+const loading = ref(false)
+const viewLoading = ref(false)
+const exportLoading = ref(false)
+const logFiles = ref<LogFileInfo[]>([])
+const searchKeyword = ref('')
+const statistics = ref<LogStatistics>({
+  total_files: 0,
+  total_size_mb: 0,
+  error_files: 0,
+  recent_errors: [],
+  log_types: {}
+})
+
+// 查看日志
+const viewDialogVisible = ref(false)
+const currentLogFile = ref<LogFileInfo | null>(null)
+const logContent = ref<LogContentResponse | null>(null)
+const viewFilter = ref({
+  level: undefined as string | undefined,
+  keyword: '',
+  lines: 1000
+})
+
+// 导出日志
+const exportDialogVisible = ref(false)
+const exportForm = ref({
+  filenames: [] as string[],
+  level: undefined as string | undefined,
+  format: 'zip' as 'zip' | 'txt'
+})
+
+// 计算属性
+const filteredLogFiles = computed(() => {
+  if (!searchKeyword.value)
+    return logFiles.value
+  return logFiles.value.filter(file =>
+    file.name.toLowerCase().includes(searchKeyword.value.toLowerCase())
+  )
+})
+
+// 方法
+const loadLogFiles = async () => {
+  loading.value = true
+  try {
+    logFiles.value = await LogsApi.listLogFiles()
+    ElMessage.success('日志文件列表加载成功')
+  } catch (error: any) {
+    ElMessage.error(`加载失败: ${error.message || error}`)
+  } finally {
+    loading.value = false
+  }
+}
+
+const loadStatistics = async () => {
+  try {
+    statistics.value = await LogsApi.getStatistics(7)
+  } catch (error: any) {
+    ElMessage.error(`加载统计失败: ${error.message || error}`)
+  }
+}
+
+const viewLog = async (file: LogFileInfo) => {
+  currentLogFile.value = file
+  viewDialogVisible.value = true
+  await loadLogContent()
+}
+
+const loadLogContent = async () => {
+  if (!currentLogFile.value)
+    return
+
+  viewLoading.value = true
+  try {
+    logContent.value = await LogsApi.readLogFile({
+      filename: currentLogFile.value.name,
+      lines: viewFilter.value.lines,
+      level: viewFilter.value.level as any,
+      keyword: viewFilter.value.keyword || undefined
+    })
+  } catch (error: any) {
+    ElMessage.error(`加载日志内容失败: ${error.message || error}`)
+  } finally {
+    viewLoading.value = false
+  }
+}
+
+const downloadLog = async (file: LogFileInfo) => {
+  try {
+    const blob = await LogsApi.exportLogs({
+      filenames: [file.name],
+      format: 'zip'
+    })
+
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${file.name}.zip`
+    document.body.appendChild(a)
+    a.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+
+    ElMessage.success('日志下载成功')
+  } catch (error: any) {
+    ElMessage.error(`下载失败: ${error.message || error}`)
+  }
+}
+
+const deleteLog = async (file: LogFileInfo) => {
+  try {
+    await LogsApi.deleteLogFile(file.name)
+    ElMessage.success('日志文件已删除')
+    await loadLogFiles()
+  } catch (error: any) {
+    ElMessage.error(`删除失败: ${error.message || error}`)
+  }
+}
+
+const showExportDialog = () => {
+  exportForm.value = {
+    filenames: [],
+    level: undefined,
+    format: 'zip'
+  }
+  exportDialogVisible.value = true
+}
+
+const exportLogs = async () => {
+  exportLoading.value = true
+  try {
+    const blob = await LogsApi.exportLogs({
+      filenames: exportForm.value.filenames.length > 0 ? exportForm.value.filenames : undefined,
+      level: exportForm.value.level as any,
+      format: exportForm.value.format
+    })
+
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
+    a.download = `logs_export_${timestamp}.${exportForm.value.format}`
+    document.body.appendChild(a)
+    a.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+
+    ElMessage.success('日志导出成功')
+    exportDialogVisible.value = false
+  } catch (error: any) {
+    ElMessage.error(`导出失败: ${error.message || error}`)
+  } finally {
+    exportLoading.value = false
+  }
+}
+
+const getLogTypeColor = (type: string): TagType | undefined => {
+  const colors: Partial<Record<string, TagType>> = {
+    error: 'danger',
+    webapi: 'primary',
+    worker: 'success',
+    access: 'info'
+  }
+  return colors[type]
+}
+
+const formatDate = (dateStr: string) => {
+  return new Date(dateStr).toLocaleString('zh-CN')
+}
+
+// 生命周期
+onMounted(() => {
+  loadLogFiles()
+  loadStatistics()
+})
+</script>
+
 <template>
   <div class="log-management">
     <el-card class="header-card">
@@ -5,7 +191,7 @@
         <div class="card-header">
           <span>📋 日志管理</span>
           <div class="header-actions">
-            <el-button type="primary" :icon="Refresh" @click="loadLogFiles" :loading="loading">
+            <el-button type="primary" :icon="Refresh" :loading="loading" @click="loadLogFiles">
               刷新
             </el-button>
             <el-button type="success" :icon="Download" @click="showExportDialog">
@@ -27,7 +213,9 @@
           <el-statistic title="错误日志文件" :value="statistics.error_files" />
         </el-col>
         <el-col :span="6">
-          <el-button type="primary" @click="loadStatistics">刷新统计</el-button>
+          <el-button type="primary" @click="loadStatistics">
+            刷新统计
+          </el-button>
         </el-col>
       </el-row>
     </el-card>
@@ -48,8 +236,8 @@
       </template>
 
       <el-table
-        :data="filteredLogFiles"
         v-loading="loading"
+        :data="filteredLogFiles"
         stripe
         style="width: 100%"
       >
@@ -119,7 +307,7 @@
             <el-input-number v-model="viewFilter.lines" :min="100" :max="10000" :step="100" style="width: 150px" />
           </el-form-item>
           <el-form-item>
-            <el-button type="primary" @click="loadLogContent" :loading="viewLoading">
+            <el-button type="primary" :loading="viewLoading" @click="loadLogContent">
               应用过滤
             </el-button>
           </el-form-item>
@@ -127,18 +315,26 @@
 
         <!-- 统计信息 -->
         <el-descriptions v-if="logContent" :column="4" border size="small" class="log-stats">
-          <el-descriptions-item label="总行数">{{ logContent.stats.total_lines }}</el-descriptions-item>
-          <el-descriptions-item label="过滤后">{{ logContent.stats.filtered_lines }}</el-descriptions-item>
+          <el-descriptions-item label="总行数">
+            {{ logContent.stats.total_lines }}
+          </el-descriptions-item>
+          <el-descriptions-item label="过滤后">
+            {{ logContent.stats.filtered_lines }}
+          </el-descriptions-item>
           <el-descriptions-item label="ERROR">
-            <el-tag type="danger" size="small">{{ logContent.stats.error_count }}</el-tag>
+            <el-tag type="danger" size="small">
+              {{ logContent.stats.error_count }}
+            </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="WARNING">
-            <el-tag type="warning" size="small">{{ logContent.stats.warning_count }}</el-tag>
+            <el-tag type="warning" size="small">
+              {{ logContent.stats.warning_count }}
+            </el-tag>
           </el-descriptions-item>
         </el-descriptions>
 
         <!-- 日志内容 -->
-        <div class="log-content" v-loading="viewLoading">
+        <div v-loading="viewLoading" class="log-content">
           <pre v-if="logContent">{{ logContent.lines.join('\n') }}</pre>
           <el-empty v-else description="暂无日志内容" />
         </div>
@@ -178,203 +374,26 @@
         </el-form-item>
         <el-form-item label="导出格式">
           <el-radio-group v-model="exportForm.format">
-            <el-radio label="zip">ZIP 压缩包</el-radio>
-            <el-radio label="txt">合并文本文件</el-radio>
+            <el-radio label="zip">
+              ZIP 压缩包
+            </el-radio>
+            <el-radio label="txt">
+              合并文本文件
+            </el-radio>
           </el-radio-group>
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="exportDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="exportLogs" :loading="exportLoading">
+        <el-button @click="exportDialogVisible = false">
+          取消
+        </el-button>
+        <el-button type="primary" :loading="exportLoading" @click="exportLogs">
           导出
         </el-button>
       </template>
     </el-dialog>
   </div>
 </template>
-
-<script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import { Refresh, Download, Search, View, Delete } from '@element-plus/icons-vue'
-import { LogsApi, type LogFileInfo, type LogContentResponse, type LogStatistics } from '@/api/logs'
-
-type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
-
-// 数据
-const loading = ref(false)
-const viewLoading = ref(false)
-const exportLoading = ref(false)
-const logFiles = ref<LogFileInfo[]>([])
-const searchKeyword = ref('')
-const statistics = ref<LogStatistics>({
-  total_files: 0,
-  total_size_mb: 0,
-  error_files: 0,
-  recent_errors: [],
-  log_types: {}
-})
-
-// 查看日志
-const viewDialogVisible = ref(false)
-const currentLogFile = ref<LogFileInfo | null>(null)
-const logContent = ref<LogContentResponse | null>(null)
-const viewFilter = ref({
-  level: undefined as string | undefined,
-  keyword: '',
-  lines: 1000
-})
-
-// 导出日志
-const exportDialogVisible = ref(false)
-const exportForm = ref({
-  filenames: [] as string[],
-  level: undefined as string | undefined,
-  format: 'zip' as 'zip' | 'txt'
-})
-
-// 计算属性
-const filteredLogFiles = computed(() => {
-  if (!searchKeyword.value) return logFiles.value
-  return logFiles.value.filter(file =>
-    file.name.toLowerCase().includes(searchKeyword.value.toLowerCase())
-  )
-})
-
-// 方法
-const loadLogFiles = async () => {
-  loading.value = true
-  try {
-    logFiles.value = await LogsApi.listLogFiles()
-    ElMessage.success('日志文件列表加载成功')
-  } catch (error: any) {
-    ElMessage.error(`加载失败: ${error.message || error}`)
-  } finally {
-    loading.value = false
-  }
-}
-
-const loadStatistics = async () => {
-  try {
-    statistics.value = await LogsApi.getStatistics(7)
-  } catch (error: any) {
-    ElMessage.error(`加载统计失败: ${error.message || error}`)
-  }
-}
-
-const viewLog = async (file: LogFileInfo) => {
-  currentLogFile.value = file
-  viewDialogVisible.value = true
-  await loadLogContent()
-}
-
-const loadLogContent = async () => {
-  if (!currentLogFile.value) return
-  
-  viewLoading.value = true
-  try {
-    logContent.value = await LogsApi.readLogFile({
-      filename: currentLogFile.value.name,
-      lines: viewFilter.value.lines,
-      level: viewFilter.value.level as any,
-      keyword: viewFilter.value.keyword || undefined
-    })
-  } catch (error: any) {
-    ElMessage.error(`加载日志内容失败: ${error.message || error}`)
-  } finally {
-    viewLoading.value = false
-  }
-}
-
-const downloadLog = async (file: LogFileInfo) => {
-  try {
-    const blob = await LogsApi.exportLogs({
-      filenames: [file.name],
-      format: 'zip'
-    })
-    
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${file.name}.zip`
-    document.body.appendChild(a)
-    a.click()
-    window.URL.revokeObjectURL(url)
-    document.body.removeChild(a)
-    
-    ElMessage.success('日志下载成功')
-  } catch (error: any) {
-    ElMessage.error(`下载失败: ${error.message || error}`)
-  }
-}
-
-const deleteLog = async (file: LogFileInfo) => {
-  try {
-    await LogsApi.deleteLogFile(file.name)
-    ElMessage.success('日志文件已删除')
-    await loadLogFiles()
-  } catch (error: any) {
-    ElMessage.error(`删除失败: ${error.message || error}`)
-  }
-}
-
-const showExportDialog = () => {
-  exportForm.value = {
-    filenames: [],
-    level: undefined,
-    format: 'zip'
-  }
-  exportDialogVisible.value = true
-}
-
-const exportLogs = async () => {
-  exportLoading.value = true
-  try {
-    const blob = await LogsApi.exportLogs({
-      filenames: exportForm.value.filenames.length > 0 ? exportForm.value.filenames : undefined,
-      level: exportForm.value.level as any,
-      format: exportForm.value.format
-    })
-    
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
-    a.download = `logs_export_${timestamp}.${exportForm.value.format}`
-    document.body.appendChild(a)
-    a.click()
-    window.URL.revokeObjectURL(url)
-    document.body.removeChild(a)
-    
-    ElMessage.success('日志导出成功')
-    exportDialogVisible.value = false
-  } catch (error: any) {
-    ElMessage.error(`导出失败: ${error.message || error}`)
-  } finally {
-    exportLoading.value = false
-  }
-}
-
-const getLogTypeColor = (type: string): TagType | undefined => {
-  const colors: Partial<Record<string, TagType>> = {
-    error: 'danger',
-    webapi: 'primary',
-    worker: 'success',
-    access: 'info'
-  }
-  return colors[type]
-}
-
-const formatDate = (dateStr: string) => {
-  return new Date(dateStr).toLocaleString('zh-CN')
-}
-
-// 生命周期
-onMounted(() => {
-  loadLogFiles()
-  loadStatistics()
-})
-</script>
 
 <style scoped lang="scss">
 .log-management {
@@ -435,4 +454,3 @@ onMounted(() => {
   }
 }
 </style>
-

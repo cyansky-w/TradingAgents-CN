@@ -1,66 +1,9 @@
-<template>
-  <div class="learning-article-wrapper">
-    <!-- 页面头部 -->
-    <el-page-header @back="goBack" :content="article.title">
-      <template #extra>
-        <el-button type="primary" :icon="Download" @click="downloadArticle">下载</el-button>
-      </template>
-    </el-page-header>
-
-    <!-- 主容器：文章 + 侧边栏 -->
-    <div class="learning-article">
-      <div class="article-container">
-        <div class="article-meta">
-          <el-tag :type="article.categoryType" size="small">{{ article.category }}</el-tag>
-          <span class="read-time">
-            <el-icon><Clock /></el-icon>
-            {{ article.readTime }}
-          </span>
-          <span class="views">
-            <el-icon><View /></el-icon>
-            {{ article.views }}
-          </span>
-          <span class="update-time">更新于 {{ article.updateTime }}</span>
-        </div>
-
-        <div class="article-content" v-html="article.content"></div>
-
-        <div class="article-footer">
-          <el-divider />
-          <div class="navigation">
-            <el-button v-if="prevArticle" @click="navigateToArticle(prevArticle.id)">
-              <el-icon><ArrowLeft /></el-icon>
-              上一篇：{{ prevArticle.title }}
-            </el-button>
-            <el-button v-if="nextArticle" @click="navigateToArticle(nextArticle.id)">
-              下一篇：{{ nextArticle.title }}
-              <el-icon><ArrowRight /></el-icon>
-            </el-button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 侧边栏目录 -->
-      <div class="article-toc">
-        <div class="toc-title">目录</div>
-        <ul class="toc-list">
-          <li v-for="heading in tableOfContents" :key="heading.id"
-              :class="['toc-item', `toc-level-${heading.level}`]"
-              @click="scrollToHeading(heading.id)">
-            {{ heading.text }}
-          </li>
-        </ul>
-      </div>
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { Download, Clock, View, ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, Clock, Download, View } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { marked } from 'marked'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
 const router = useRouter()
@@ -70,7 +13,7 @@ const articleId = computed(() => route.params.id as string)
 // 回退：不集成 Mermaid
 
 // 文章注册表：支持本地 Markdown 或外链（externalUrl）
-type ArticleInfo = {
+interface ArticleInfo {
   title: string
   category: string
   categoryType: any
@@ -125,17 +68,18 @@ const article = ref({
 })
 
 // 目录
-const tableOfContents = ref<{ id: string; text: string; level: number }[]>([])
+const tableOfContents = ref<{ id: string, text: string, level: number }[]>([])
 
-const prevArticle = ref<{ id: string; title: string } | null>(null)
-const nextArticle = ref<{ id: string; title: string } | null>(null)
+const prevArticle = ref<{ id: string, title: string } | null>(null)
+const nextArticle = ref<{ id: string, title: string } | null>(null)
 
 const goBack = () => {
   router.back()
 }
 
 const downloadArticle = async () => {
-  if (!article.value.id) return
+  if (!article.value.id)
+    return
   const info = registry[article.value.id]
   if (!info) {
     ElMessage.warning('未找到文章资源')
@@ -227,7 +171,8 @@ function rewriteImageSrc(html: string): string {
   for (const img of imgs) {
     const src = img.getAttribute('src') || ''
     // 对以 / 开头的绝对路径（如 /assets/...）不做改写，交给 public 静态资源处理
-    if (src.startsWith('/')) continue
+    if (src.startsWith('/'))
+      continue
     for (const key in assetMap) {
       if (src.endsWith(key)) {
         img.setAttribute('src', assetMap[key])
@@ -292,7 +237,7 @@ async function loadArticle(id: string) {
       const plain = (htmlText || '').replace(/<[^>]+>/g, '')
       const id = plain
         .toLowerCase()
-        .replace(/[^\w\u4e00-\u9fa5]+/g, '-')
+        .replace(/[^\w\u4E00-\u9FA5]+/g, '-')
         .replace(/^-+|-+$/g, '')
       return `<h${depth} class="article-heading" id="${id}">${htmlText}</h${depth}>`
     }
@@ -329,11 +274,12 @@ function buildTOCFromHTML(html: string) {
 function setupInternalLinks() {
   nextTick(() => {
     const container = document.querySelector('.article-content')
-    if (!container) return
+    if (!container)
+      return
 
     const links = container.querySelectorAll('a[data-internal="true"]')
     for (const link of links) {
-      link.addEventListener('click', (e) => {
+      link.addEventListener('click', e => {
         e.preventDefault()
         const href = link.getAttribute('href')
         if (href) {
@@ -354,10 +300,75 @@ onMounted(() => {
   loadArticle(articleId.value)
 })
 
-watch(articleId, (id) => {
+watch(articleId, id => {
   loadArticle(id)
 })
 </script>
+
+<template>
+  <div class="learning-article-wrapper">
+    <!-- 页面头部 -->
+    <el-page-header :content="article.title" @back="goBack">
+      <template #extra>
+        <el-button type="primary" :icon="Download" @click="downloadArticle">
+          下载
+        </el-button>
+      </template>
+    </el-page-header>
+
+    <!-- 主容器：文章 + 侧边栏 -->
+    <div class="learning-article">
+      <div class="article-container">
+        <div class="article-meta">
+          <el-tag :type="article.categoryType" size="small">
+            {{ article.category }}
+          </el-tag>
+          <span class="read-time">
+            <el-icon><Clock /></el-icon>
+            {{ article.readTime }}
+          </span>
+          <span class="views">
+            <el-icon><View /></el-icon>
+            {{ article.views }}
+          </span>
+          <span class="update-time">更新于 {{ article.updateTime }}</span>
+        </div>
+
+        <div class="article-content" v-html="article.content" />
+
+        <div class="article-footer">
+          <el-divider />
+          <div class="navigation">
+            <el-button v-if="prevArticle" @click="navigateToArticle(prevArticle.id)">
+              <el-icon><ArrowLeft /></el-icon>
+              上一篇：{{ prevArticle.title }}
+            </el-button>
+            <el-button v-if="nextArticle" @click="navigateToArticle(nextArticle.id)">
+              下一篇：{{ nextArticle.title }}
+              <el-icon><ArrowRight /></el-icon>
+            </el-button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 侧边栏目录 -->
+      <div class="article-toc">
+        <div class="toc-title">
+          目录
+        </div>
+        <ul class="toc-list">
+          <li
+            v-for="heading in tableOfContents" :key="heading.id"
+            class="toc-item" :class="[`toc-level-${heading.level}`]"
+            @click="scrollToHeading(heading.id)"
+          >
+            {{ heading.text }}
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</template>
 
 <style scoped lang="scss">
 .learning-article-wrapper {
@@ -491,7 +502,6 @@ watch(articleId, (id) => {
             color: inherit;
           }
         }
-
 
         :deep(blockquote) {
           border-left: 4px solid var(--el-color-primary);
@@ -718,4 +728,3 @@ watch(articleId, (id) => {
   }
 }
 </style>
-

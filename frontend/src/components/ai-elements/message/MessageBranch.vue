@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { HTMLAttributes, VNode } from 'vue'
 import type { MessageBranchContextType } from './context'
-import { cn } from '@/lib/utils'
 import { provide, readonly, ref } from 'vue'
+import { cn } from '@/lib/utils'
 import { MessageBranchKey } from './context'
 
 interface Props {
@@ -10,7 +10,7 @@ interface Props {
   class?: HTMLAttributes['class']
 }
 const props = withDefaults(defineProps<Props>(), {
-  defaultBranch: 0,
+  defaultBranch: 0
 })
 
 const emits = defineEmits<{
@@ -50,7 +50,7 @@ const contextValue: MessageBranchContextType = {
   goToPrevious,
   goToNext,
   branches,
-  setBranches,
+  setBranches
 }
 
 provide(MessageBranchKey, contextValue)

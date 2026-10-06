@@ -1,6 +1,7 @@
+import type { NotificationItem } from '@/api/notifications'
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import { notificationsApi, type NotificationItem } from '@/api/notifications'
+import { computed, ref } from 'vue'
+import { notificationsApi } from '@/api/notifications'
 import { useAuthStore } from '@/stores/auth'
 
 export const useNotificationStore = defineStore('notifications', () => {
@@ -14,7 +15,7 @@ export const useNotificationStore = defineStore('notifications', () => {
   const wsConnected = ref(false)
   let wsReconnectTimer: any = null
   let wsReconnectAttempts = 0
-  const maxReconnectAttempts = 10  // 增加重连次数
+  const maxReconnectAttempts = 10 // 增加重连次数
 
   // 连接状态
   const connected = computed(() => wsConnected.value)
@@ -45,8 +46,10 @@ export const useNotificationStore = defineStore('notifications', () => {
   async function markRead(id: string) {
     await notificationsApi.markRead(id)
     const idx = items.value.findIndex(x => x.id === id)
-    if (idx !== -1) items.value[idx].status = 'read'
-    if (unreadCount.value > 0) unreadCount.value -= 1
+    if (idx !== -1)
+      items.value[idx].status = 'read'
+    if (unreadCount.value > 0)
+      unreadCount.value -= 1
   }
 
   async function markAllRead() {
@@ -55,7 +58,7 @@ export const useNotificationStore = defineStore('notifications', () => {
     unreadCount.value = 0
   }
 
-  function addNotification(n: Omit<NotificationItem, 'id' | 'status' | 'created_at'> & { id?: string; created_at?: string; status?: 'unread' | 'read' }) {
+  function addNotification(n: Omit<NotificationItem, 'id' | 'status' | 'created_at'> & { id?: string, created_at?: string, status?: 'unread' | 'read' }) {
     const id = n.id || `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
     const created_at = n.created_at || new Date().toISOString()
     const item: NotificationItem = {
@@ -69,7 +72,8 @@ export const useNotificationStore = defineStore('notifications', () => {
       source: n.source
     }
     items.value.unshift(item)
-    if (item.status === 'unread') unreadCount.value += 1
+    if (item.status === 'unread')
+      unreadCount.value += 1
   }
 
   // 🔥 连接 WebSocket（优先）
@@ -106,14 +110,14 @@ export const useNotificationStore = defineStore('notifications', () => {
         wsReconnectAttempts = 0
       }
 
-      socket.onclose = (event) => {
+      socket.onclose = event => {
         console.log('[WS] 连接关闭:', event.code, event.reason)
         wsConnected.value = false
         ws.value = null
 
         // 自动重连
         if (wsReconnectAttempts < maxReconnectAttempts) {
-          const delay = Math.min(1000 * Math.pow(2, wsReconnectAttempts), 30000)
+          const delay = Math.min(1000 * 2 ** wsReconnectAttempts, 30000)
           console.log(`[WS] ${delay}ms 后重连 (尝试 ${wsReconnectAttempts + 1}/${maxReconnectAttempts})`)
 
           wsReconnectTimer = setTimeout(() => {
@@ -125,12 +129,12 @@ export const useNotificationStore = defineStore('notifications', () => {
         }
       }
 
-      socket.onerror = (error) => {
+      socket.onerror = error => {
         console.error('[WS] 连接错误:', error)
         wsConnected.value = false
       }
 
-      socket.onmessage = (event) => {
+      socket.onmessage = event => {
         try {
           const message = JSON.parse(event.data)
           handleWebSocketMessage(message)

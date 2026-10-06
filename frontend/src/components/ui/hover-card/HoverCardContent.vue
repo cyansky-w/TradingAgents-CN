@@ -5,15 +5,15 @@ import { reactiveOmit } from '@vueuse/core'
 import {
   HoverCardContent,
   HoverCardPortal,
-  useForwardProps,
+  useForwardProps
 } from 'reka-ui'
 import { cn } from '@/lib/utils'
 
 const props = withDefaults(
-  defineProps<HoverCardContentProps & { class?: HTMLAttributes["class"] }>(),
+  defineProps<HoverCardContentProps & { class?: HTMLAttributes['class'] }>(),
   {
-    sideOffset: 4,
-  },
+    sideOffset: 4
+  }
 )
 
 const delegatedProps = reactiveOmit(props, 'class')

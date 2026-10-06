@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
+import { computed, ref } from 'vue'
 import { InputGroupTextarea } from '@/components/ui/input-group'
 import { cn } from '@/lib/utils'
-import { computed, ref } from 'vue'
 import { usePromptInput } from './context'
 
 type PromptInputTextareaProps = InstanceType<typeof InputGroupTextarea>['$props']
@@ -64,7 +64,7 @@ function handlePaste(e: ClipboardEvent) {
 
 const modelValue = computed({
   get: () => textInput.value,
-  set: val => setTextInput(val),
+  set: val => setTextInput(val)
 })
 </script>
 

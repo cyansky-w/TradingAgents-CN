@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { getMarketByStockCode } from '../market'
 
 describe('getMarketByStockCode', () => {
-  describe('A股识别', () => {
+  describe('a股识别', () => {
     it('应该识别6位数字为A股', () => {
       expect(getMarketByStockCode('000001')).toBe('A股')
       expect(getMarketByStockCode('600519')).toBe('A股')
@@ -71,4 +71,3 @@ describe('getMarketByStockCode', () => {
     })
   })
 })
-

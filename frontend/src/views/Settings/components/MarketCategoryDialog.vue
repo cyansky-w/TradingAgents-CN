@@ -1,85 +1,9 @@
-<template>
-  <el-dialog
-    :model-value="visible"
-    :title="isEdit ? '编辑市场分类' : '添加市场分类'"
-    width="500px"
-    @update:model-value="$emit('update:visible', $event)"
-    @close="handleClose"
-  >
-    <el-form
-      ref="formRef"
-      :model="formData"
-      :rules="rules"
-      label-width="100px"
-      label-position="left"
-    >
-      <el-form-item label="分类ID" prop="id">
-        <el-input
-          v-model="formData.id"
-          placeholder="请输入分类ID（英文）"
-          :disabled="isEdit"
-        />
-        <div class="form-help">用于系统内部标识，建议使用英文</div>
-      </el-form-item>
-
-      <el-form-item label="分类名称" prop="name">
-        <el-input
-          v-model="formData.name"
-          placeholder="请输入分类名称"
-          :disabled="isEdit"
-        />
-        <div class="form-help">系统内部名称，通常与ID相同</div>
-      </el-form-item>
-
-      <el-form-item label="显示名称" prop="display_name">
-        <el-input
-          v-model="formData.display_name"
-          placeholder="请输入显示名称"
-        />
-        <div class="form-help">用户界面显示的名称</div>
-      </el-form-item>
-
-      <el-form-item label="排序顺序" prop="sort_order">
-        <el-input-number
-          v-model="formData.sort_order"
-          :min="1"
-          :max="100"
-          controls-position="right"
-          style="width: 200px"
-        />
-        <div class="form-help">数值越小排序越靠前</div>
-      </el-form-item>
-
-      <el-form-item label="启用状态">
-        <el-switch v-model="formData.enabled" />
-      </el-form-item>
-
-      <el-form-item label="描述" prop="description">
-        <el-input
-          v-model="formData.description"
-          type="textarea"
-          :rows="3"
-          placeholder="请输入分类描述"
-        />
-      </el-form-item>
-    </el-form>
-
-    <template #footer>
-      <div class="dialog-footer">
-        <el-button @click="handleClose">取消</el-button>
-        <el-button type="primary" :loading="loading" @click="handleSubmit">
-          {{ isEdit ? '更新' : '创建' }}
-        </el-button>
-      </div>
-    </template>
-  </el-dialog>
-</template>
-
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
-import { configApi, type MarketCategory } from '@/api/config'
+import type { MarketCategory } from '@/api/config'
+import { ElMessage } from 'element-plus'
+import { computed, ref, watch } from 'vue'
+import { configApi } from '@/api/config'
 
 // Props
 interface Props {
@@ -114,7 +38,7 @@ const defaultFormData = {
   sort_order: 1
 }
 
-type MarketCategoryFormData = {
+interface MarketCategoryFormData {
   id: string
   name: string
   display_name: string
@@ -148,7 +72,7 @@ const rules: FormRules = {
 // 监听分类变化
 watch(
   () => props.category,
-  (category) => {
+  category => {
     formData.value = normalizeCategory(category)
   },
   { immediate: true }
@@ -157,7 +81,7 @@ watch(
 // 监听visible变化
 watch(
   () => props.visible,
-  (visible) => {
+  visible => {
     if (visible) {
       formData.value = normalizeCategory(props.category)
     }
@@ -171,7 +95,8 @@ const handleClose = () => {
 
 // 处理提交
 const handleSubmit = async () => {
-  if (!formRef.value) return
+  if (!formRef.value)
+    return
 
   try {
     await formRef.value.validate()
@@ -197,6 +122,93 @@ const handleSubmit = async () => {
   }
 }
 </script>
+
+<template>
+  <el-dialog
+    :model-value="visible"
+    :title="isEdit ? '编辑市场分类' : '添加市场分类'"
+    width="500px"
+    @update:model-value="$emit('update:visible', $event)"
+    @close="handleClose"
+  >
+    <el-form
+      ref="formRef"
+      :model="formData"
+      :rules="rules"
+      label-width="100px"
+      label-position="left"
+    >
+      <el-form-item label="分类ID" prop="id">
+        <el-input
+          v-model="formData.id"
+          placeholder="请输入分类ID（英文）"
+          :disabled="isEdit"
+        />
+        <div class="form-help">
+          用于系统内部标识，建议使用英文
+        </div>
+      </el-form-item>
+
+      <el-form-item label="分类名称" prop="name">
+        <el-input
+          v-model="formData.name"
+          placeholder="请输入分类名称"
+          :disabled="isEdit"
+        />
+        <div class="form-help">
+          系统内部名称，通常与ID相同
+        </div>
+      </el-form-item>
+
+      <el-form-item label="显示名称" prop="display_name">
+        <el-input
+          v-model="formData.display_name"
+          placeholder="请输入显示名称"
+        />
+        <div class="form-help">
+          用户界面显示的名称
+        </div>
+      </el-form-item>
+
+      <el-form-item label="排序顺序" prop="sort_order">
+        <el-input-number
+          v-model="formData.sort_order"
+          :min="1"
+          :max="100"
+          controls-position="right"
+          style="width: 200px"
+        />
+        <div class="form-help">
+          数值越小排序越靠前
+        </div>
+      </el-form-item>
+
+      <el-form-item label="启用状态">
+        <el-switch v-model="formData.enabled" />
+      </el-form-item>
+
+      <el-form-item label="描述" prop="description">
+        <el-input
+          v-model="formData.description"
+          type="textarea"
+          :rows="3"
+          placeholder="请输入分类描述"
+        />
+      </el-form-item>
+    </el-form>
+
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button @click="handleClose">
+          取消
+        </el-button>
+        <el-button type="primary" :loading="loading" @click="handleSubmit">
+          {{ isEdit ? '更新' : '创建' }}
+        </el-button>
+      </div>
+    </template>
+  </el-dialog>
+</template>
 
 <style lang="scss" scoped>
 .form-help {

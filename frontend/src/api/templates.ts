@@ -33,7 +33,7 @@ export const TemplatesApi = {
   },
 
   update(id: string, payload: UpdateTemplatePayload) {
-    return ApiClient.put<TemplateItem>(`/api/templates/${id}` , payload)
+    return ApiClient.put<TemplateItem>(`/api/templates/${id}`, payload)
   },
 
   remove(id: string) {

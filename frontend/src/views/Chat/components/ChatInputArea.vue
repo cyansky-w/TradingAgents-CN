@@ -1,24 +1,26 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useChatStore } from '@/stores/chat'
 import type { ChatStatus } from 'ai'
+import { ElButton } from 'element-plus'
+import { PaperclipIcon } from 'lucide-vue-next'
+import { computed } from 'vue'
 import {
   PromptInput,
   PromptInputBody,
+  PromptInputButton,
   PromptInputFooter,
   PromptInputSubmit,
   PromptInputTextarea,
-  PromptInputTools,
-  PromptInputButton,
+  PromptInputTools
 } from '@/components/ai-elements/prompt-input'
-import { PaperclipIcon } from 'lucide-vue-next'
-import { ElButton } from 'element-plus'
+import { useChatStore } from '@/stores/chat'
 
 const chatStore = useChatStore()
 
 const status = computed<ChatStatus>(() => {
-  if (chatStore.isStreaming) return 'streaming'
-  if (chatStore.isSending) return 'submitted'
+  if (chatStore.isStreaming)
+    return 'streaming'
+  if (chatStore.isSending)
+    return 'submitted'
   return 'ready'
 })
 
@@ -26,8 +28,9 @@ const isDisabled = computed(() => {
   return !chatStore.activeConversationId || chatStore.isStreaming
 })
 
-function handleSubmit({ text }: { text: string; files: any[] }) {
-  if (!text.trim()) return
+function handleSubmit({ text }: { text: string, files: any[] }) {
+  if (!text.trim())
+    return
   chatStore.sendMessage(text)
 }
 
@@ -39,7 +42,7 @@ function handleCancel() {
 <template>
   <div class="border-t border-border bg-background p-4">
     <PromptInput
-      :initial-input="''"
+      initial-input=""
       :global-drop="false"
       @submit="handleSubmit"
     >

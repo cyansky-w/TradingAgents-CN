@@ -1,530 +1,45 @@
-<template>
-  <div class="favorites">
-    <div class="page-header">
-      <h1 class="page-title">
-        <el-icon><Star /></el-icon>
-        我的自选股
-      </h1>
-      <p class="page-description">
-        管理您关注的股票
-      </p>
-    </div>
-
-    <!-- 操作栏 -->
-    <el-card class="action-card" shadow="never">
-      <el-row :gutter="16" align="middle" style="margin-bottom: 16px;">
-        <el-col :span="8">
-          <el-input
-            v-model="searchKeyword"
-            placeholder="搜索股票代码或名称"
-            clearable
-          >
-            <template #prefix>
-              <el-icon><Search /></el-icon>
-            </template>
-          </el-input>
-        </el-col>
-
-        <el-col :span="4">
-          <el-select v-model="selectedMarket" placeholder="市场" clearable>
-            <el-option label="A股" value="A股" />
-            <el-option label="港股" value="港股" />
-            <el-option label="美股" value="美股" />
-          </el-select>
-        </el-col>
-
-        <el-col :span="4">
-          <el-select v-model="selectedBoard" placeholder="板块" clearable>
-            <el-option label="主板" value="主板" />
-            <el-option label="创业板" value="创业板" />
-            <el-option label="科创板" value="科创板" />
-            <el-option label="北交所" value="北交所" />
-          </el-select>
-        </el-col>
-
-        <el-col :span="4">
-          <el-select v-model="selectedExchange" placeholder="交易所" clearable>
-            <el-option label="上海证券交易所" value="上海证券交易所" />
-            <el-option label="深圳证券交易所" value="深圳证券交易所" />
-            <el-option label="北京证券交易所" value="北京证券交易所" />
-          </el-select>
-        </el-col>
-
-        <el-col :span="4">
-          <el-select v-model="selectedTag" placeholder="标签" clearable>
-            <el-option
-              v-for="tag in userTags"
-              :key="tag"
-              :label="tag"
-              :value="tag"
-            />
-          </el-select>
-        </el-col>
-      </el-row>
-
-      <el-row :gutter="16" align="middle">
-        <el-col :span="24">
-          <div class="action-buttons">
-            <el-button @click="refreshData">
-              <el-icon><Refresh /></el-icon>
-              刷新
-            </el-button>
-            <!-- 只有有A股自选股时才显示同步实时行情按钮 -->
-            <el-button
-              v-if="hasAStocks"
-              type="success"
-              @click="syncAllRealtime"
-              :loading="syncRealtimeLoading"
-            >
-              <el-icon><Refresh /></el-icon>
-              同步实时行情
-            </el-button>
-            <!-- 只有选中的股票都是A股时才显示批量同步按钮 -->
-            <el-button
-              v-if="selectedStocksAreAllAShares"
-              type="primary"
-              @click="showBatchSyncDialog"
-            >
-              <el-icon><Download /></el-icon>
-              批量同步数据
-            </el-button>
-            <el-button @click="openTagManager">
-              标签管理
-            </el-button>
-            <el-button type="primary" @click="showAddDialog">
-              <el-icon><Plus /></el-icon>
-              添加自选股
-            </el-button>
-          </div>
-        </el-col>
-      </el-row>
-    </el-card>
-
-    <!-- 自选股列表 -->
-    <el-card class="favorites-list-card" shadow="never">
-      <el-table
-        :data="filteredFavorites"
-        v-loading="loading"
-        style="width: 100%"
-        @selection-change="handleSelectionChange"
-      >
-        <el-table-column type="selection" width="55" />
-        <el-table-column prop="stock_code" label="股票代码" width="120">
-          <template #default="{ row }">
-            <el-link type="primary" @click="viewStockDetail(row)">
-              {{ row.stock_code }}
-            </el-link>
-          </template>
-        </el-table-column>
-
-        <el-table-column prop="stock_name" label="股票名称" width="150" />
-        <el-table-column prop="market" label="市场" width="80">
-          <template #default="{ row }">
-            {{ row.market || 'A股' }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="board" label="板块" width="100">
-          <template #default="{ row }">
-            {{ row.board || '-' }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="exchange" label="交易所" width="140">
-          <template #default="{ row }">
-            {{ row.exchange || '-' }}
-          </template>
-        </el-table-column>
-
-        <el-table-column prop="current_price" label="当前价格" width="100">
-          <template #default="{ row }">
-            <span v-if="row.current_price !== null && row.current_price !== undefined">¥{{ formatPrice(row.current_price) }}</span>
-            <span v-else>-</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column prop="change_percent" label="涨跌幅" width="100">
-          <template #default="{ row }">
-            <span
-              v-if="row.change_percent !== null && row.change_percent !== undefined"
-              :class="getChangeClass(row.change_percent)"
-            >
-              {{ formatPercent(row.change_percent) }}
-            </span>
-            <span v-else>-</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column prop="tags" label="标签" width="150">
-          <template #default="{ row }">
-            <el-tag
-              v-for="tag in row.tags"
-              :key="tag"
-              size="small"
-              :color="getTagColor(tag)"
-              effect="dark"
-              :style="{ marginRight: '4px' }"
-            >
-              {{ tag }}
-            </el-tag>
-          </template>
-        </el-table-column>
-
-        <el-table-column prop="added_at" label="添加时间" width="120">
-          <template #default="{ row }">
-            {{ formatDate(row.added_at) }}
-          </template>
-        </el-table-column>
-
-        <el-table-column label="操作" width="260" fixed="right">
-          <template #default="{ row }">
-            <el-button
-              type="text"
-              size="small"
-              @click="editFavorite(row)"
-            >
-              编辑
-            </el-button>
-            <!-- 只有A股显示同步按钮 -->
-            <el-button
-              v-if="row.market === 'A股'"
-              type="text"
-              size="small"
-              @click="showSingleSyncDialog(row)"
-              style="color: #409EFF;"
-            >
-              同步
-            </el-button>
-            <el-button
-              type="text"
-              size="small"
-              @click="analyzeFavorite(row)"
-            >
-              分析
-            </el-button>
-            <el-button
-              type="text"
-              size="small"
-              @click="removeFavorite(row)"
-              style="color: #f56c6c;"
-            >
-              移除
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <!-- 空状态 -->
-      <div v-if="!loading && favorites.length === 0" class="empty-state">
-        <el-empty description="暂无自选股">
-          <el-button type="primary" @click="showAddDialog">
-            添加第一只自选股
-          </el-button>
-        </el-empty>
-      </div>
-    </el-card>
-
-    <!-- 添加自选股对话框 -->
-    <el-dialog
-      v-model="addDialogVisible"
-      title="添加自选股"
-      width="500px"
-    >
-      <el-form :model="addForm" :rules="addRules" ref="addFormRef" label-width="100px">
-        <el-form-item label="市场类型" prop="market">
-          <el-select v-model="addForm.market" @change="handleMarketChange">
-            <el-option label="A股" value="A股" />
-            <el-option label="港股" value="港股" />
-            <el-option label="美股" value="美股" />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="股票代码" prop="stock_code">
-          <el-input
-            v-model="addForm.stock_code"
-            :placeholder="getStockCodePlaceholder()"
-            @blur="fetchStockInfo"
-          />
-          <div style="font-size: 12px; color: #909399; margin-top: 4px;">
-            {{ getStockCodeHint() }}
-          </div>
-        </el-form-item>
-
-        <el-form-item label="股票名称" prop="stock_name">
-          <el-input v-model="addForm.stock_name" placeholder="股票名称" />
-          <div v-if="addForm.market !== 'A股'" style="font-size: 12px; color: #E6A23C; margin-top: 4px;">
-            {{ addForm.market }}不支持自动获取，请手动输入股票名称
-          </div>
-        </el-form-item>
-
-        <el-form-item label="标签">
-          <el-select
-            v-model="addForm.tags"
-            multiple
-            filterable
-            allow-create
-            placeholder="选择或创建标签"
-          >
-            <el-option v-for="tag in userTags" :key="tag" :label="tag" :value="tag">
-              <span :style="{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }">
-                <span>{{ tag }}</span>
-                <span :style="{ display:'inline-block', width:'12px', height:'12px', border:'1px solid #ddd', borderRadius:'2px', marginLeft:'8px', background: getTagColor(tag) }"></span>
-              </span>
-            </el-option>
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="备注">
-          <el-input
-            v-model="addForm.notes"
-            type="textarea"
-            :rows="2"
-            placeholder="可选：添加备注信息"
-          />
-        </el-form-item>
-      </el-form>
-
-      <template #footer>
-        <el-button @click="addDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleAddFavorite" :loading="addLoading">
-          添加
-        </el-button>
-      </template>
-    </el-dialog>
-    <!-- 编辑自选股对话框 -->
-    <el-dialog
-      v-model="editDialogVisible"
-      title="编辑自选股"
-      width="520px"
-    >
-      <el-form :model="editForm" ref="editFormRef" label-width="100px">
-        <el-form-item label="股票">
-          <div>{{ editForm.stock_code }}｜{{ editForm.stock_name }}（{{ editForm.market }}）</div>
-        </el-form-item>
-
-        <el-form-item label="标签">
-          <el-select v-model="editForm.tags" multiple filterable allow-create placeholder="选择或创建标签">
-            <el-option v-for="tag in userTags" :key="tag" :label="tag" :value="tag">
-              <span :style="{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }">
-                <span>{{ tag }}</span>
-                <span :style="{ display:'inline-block', width:'12px', height:'12px', border:'1px solid #ddd', borderRadius:'2px', marginLeft:'8px', background: getTagColor(tag) }"></span>
-              </span>
-            </el-option>
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="备注">
-          <el-input v-model="editForm.notes" type="textarea" :rows="2" placeholder="可选：添加备注信息" />
-        </el-form-item>
-      </el-form>
-
-      <template #footer>
-        <el-button @click="editDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="editLoading" @click="handleUpdateFavorite">保存</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 标签管理对话框 -->
-    <el-dialog v-model="tagDialogVisible" title="标签管理" width="560px">
-      <el-table :data="tagList" v-loading="tagLoading" size="small" style="width: 100%; margin-bottom: 12px;">
-        <el-table-column label="名称" min-width="220">
-          <template #default="{ row }">
-            <template v-if="row._editing">
-              <el-input v-model="row._name" placeholder="标签名称" size="small" />
-            </template>
-            <template v-else>
-              <el-tag :color="row.color" effect="dark" style="margin-right:6px"></el-tag>
-              {{ row.name }}
-            </template>
-          </template>
-        </el-table-column>
-        <el-table-column label="颜色" width="140">
-          <template #default="{ row }">
-            <template v-if="row._editing">
-              <el-select v-model="row._color" placeholder="选择颜色" size="small" style="width: 200px">
-                <el-option v-for="c in COLOR_PALETTE" :key="c" :label="c" :value="c">
-                  <span :style="{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }">
-                    <span>{{ c }}</span>
-                    <span :style="{ display: 'inline-block', width: '12px', height: '12px', border: '1px solid #ddd', borderRadius: '2px', marginLeft: '8px', background: c }"></span>
-                  </span>
-                </el-option>
-              </el-select>
-              <span class="color-dot-preview" :style="{ background: row._color }"></span>
-            </template>
-            <template v-else>
-              <span :style="{display:'inline-block',width:'14px',height:'14px',background: row.color,border:'1px solid #ddd',marginRight:'6px'}"></span>
-              {{ row.color }}
-
-            </template>
-          </template>
-        </el-table-column>
-        <el-table-column label="排序" width="100" align="center">
-          <template #default="{ row }">
-            <template v-if="row._editing">
-              <el-input v-model.number="row._sort" type="number" size="small" />
-            </template>
-            <template v-else>
-              {{ row.sort_order }}
-            </template>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="160" fixed="right">
-          <template #default="{ row }">
-            <template v-if="row._editing">
-              <el-button type="text" size="small" @click="saveTag(row)">保存</el-button>
-              <el-button type="text" size="small" @click="cancelEditTag(row)">取消</el-button>
-            </template>
-            <template v-else>
-              <el-button type="text" size="small" @click="editTag(row)">编辑</el-button>
-              <el-button type="text" size="small" style="color:#f56c6c" @click="deleteTag(row)">删除</el-button>
-            </template>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <div style="display:flex; gap:8px; align-items:center;">
-        <el-input v-model="newTag.name" placeholder="新标签名" style="flex:1" />
-        <el-select v-model="newTag.color" placeholder="选择颜色" style="width:200px">
-          <el-option v-for="c in COLOR_PALETTE" :key="c" :label="c" :value="c">
-            <span :style="{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }">
-              <span>{{ c }}</span>
-              <span :style="{ display: 'inline-block', width: '12px', height: '12px', border: '1px solid #ddd', borderRadius: '2px', marginLeft: '8px', background: c }"></span>
-            </span>
-          </el-option>
-        </el-select>
-        <span class="color-dot-preview" :style="{ background: newTag.color }"></span>
-        <el-input v-model.number="newTag.sort_order" type="number" placeholder="排序" style="width:120px" />
-        <el-button type="primary" @click="createTag" :loading="tagLoading">新增</el-button>
-      </div>
-
-      <template #footer>
-        <el-button @click="tagDialogVisible=false">关闭</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 批量同步对话框 -->
-    <el-dialog
-      v-model="batchSyncDialogVisible"
-      title="批量同步股票数据"
-      width="500px"
-    >
-      <el-alert
-        type="info"
-        :closable="false"
-        style="margin-bottom: 16px;"
-      >
-        已选择 <strong>{{ selectedStocks.length }}</strong> 只股票
-      </el-alert>
-
-      <el-form :model="batchSyncForm" label-width="120px">
-        <el-form-item label="同步内容">
-          <el-checkbox-group v-model="batchSyncForm.syncTypes">
-            <el-checkbox label="historical">历史行情数据</el-checkbox>
-            <el-checkbox label="financial">财务数据</el-checkbox>
-            <el-checkbox label="basic">基础数据</el-checkbox>
-          </el-checkbox-group>
-        </el-form-item>
-        <el-form-item label="数据源">
-          <el-radio-group v-model="batchSyncForm.dataSource">
-            <el-radio label="tushare">Tushare</el-radio>
-            <el-radio label="akshare">AKShare</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item label="历史数据天数" v-if="batchSyncForm.syncTypes.includes('historical')">
-          <el-input-number v-model="batchSyncForm.days" :min="1" :max="3650" />
-          <span style="margin-left: 10px; color: #909399; font-size: 12px;">
-            (最多3650天，约10年)
-          </span>
-        </el-form-item>
-      </el-form>
-
-      <el-alert
-        type="warning"
-        :closable="false"
-        style="margin-top: 16px;"
-      >
-        批量同步可能需要较长时间，请耐心等待
-      </el-alert>
-
-      <template #footer>
-        <el-button @click="batchSyncDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleBatchSync" :loading="batchSyncLoading">
-          开始同步
-        </el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 单个股票同步对话框 -->
-    <el-dialog
-      v-model="singleSyncDialogVisible"
-      title="同步股票数据"
-      width="500px"
-    >
-      <el-form :model="singleSyncForm" label-width="120px">
-        <el-form-item label="股票代码">
-          <el-input v-model="currentSyncStock.stock_code" disabled />
-        </el-form-item>
-        <el-form-item label="股票名称">
-          <el-input v-model="currentSyncStock.stock_name" disabled />
-        </el-form-item>
-        <el-form-item label="同步内容">
-          <el-checkbox-group v-model="singleSyncForm.syncTypes">
-            <el-checkbox label="realtime">实时行情</el-checkbox>
-            <el-checkbox label="historical">历史行情数据</el-checkbox>
-            <el-checkbox label="financial">财务数据</el-checkbox>
-            <el-checkbox label="basic">基础数据</el-checkbox>
-          </el-checkbox-group>
-        </el-form-item>
-        <el-form-item label="数据源">
-          <el-radio-group v-model="singleSyncForm.dataSource">
-            <el-radio label="tushare">Tushare</el-radio>
-            <el-radio label="akshare">AKShare</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item label="历史数据天数" v-if="singleSyncForm.syncTypes.includes('historical')">
-          <el-input-number v-model="singleSyncForm.days" :min="1" :max="3650" />
-          <span style="margin-left: 10px; color: #909399; font-size: 12px;">
-            (最多3650天，约10年)
-          </span>
-        </el-form-item>
-      </el-form>
-
-      <template #footer>
-        <el-button @click="singleSyncDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSingleSync" :loading="singleSyncLoading">
-          开始同步
-        </el-button>
-      </template>
-    </el-dialog>
-
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { useRouter } from 'vue-router'
-import {
-  Star,
-  Search,
-  Refresh,
-  Plus,
-  Download
-} from '@element-plus/icons-vue'
-import { favoritesApi } from '@/api/favorites'
-import { tagsApi } from '@/api/tags'
-import { stockSyncApi } from '@/api/stockSync'
-import { normalizeMarketForAnalysis } from '@/utils/market'
-import { ApiClient } from '@/api/request'
-
 import type { FavoriteItem } from '@/api/favorites'
-import { useAuthStore } from '@/stores/auth'
+import {
+  Download,
+  Plus,
+  Refresh,
+  Search,
+  Star
+} from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { favoritesApi } from '@/api/favorites'
+import { ApiClient } from '@/api/request'
+import { stockSyncApi } from '@/api/stockSync'
+import { tagsApi } from '@/api/tags'
 
+import { useAuthStore } from '@/stores/auth'
+import { normalizeMarketForAnalysis } from '@/utils/market'
 
 // 颜色可选项（20种预设颜色）
 const COLOR_PALETTE = [
-  '#409EFF', '#1677FF', '#2F88FF', '#52C41A', '#67C23A',
-  '#13C2C2', '#FA8C16', '#E6A23C', '#F56C6C', '#EB2F96',
-  '#722ED1', '#8E44AD', '#00BFBF', '#1F2D3D', '#606266',
-  '#909399', '#C0C4CC', '#FF7F50', '#A0CFFF', '#2C3E50'
+  '#409EFF',
+  '#1677FF',
+  '#2F88FF',
+  '#52C41A',
+  '#67C23A',
+  '#13C2C2',
+  '#FA8C16',
+  '#E6A23C',
+  '#F56C6C',
+  '#EB2F96',
+  '#722ED1',
+  '#8E44AD',
+  '#00BFBF',
+  '#1F2D3D',
+  '#606266',
+  '#909399',
+  '#C0C4CC',
+  '#FF7F50',
+  '#A0CFFF',
+  '#2C3E50'
 ]
 
 const router = useRouter()
@@ -562,7 +77,7 @@ const currentSyncStock = ref({
   stock_name: ''
 })
 const singleSyncForm = ref({
-  syncTypes: ['realtime'],  // 默认只选中实时行情（最常用）
+  syncTypes: ['realtime'], // 默认只选中实时行情（最常用）
   dataSource: 'tushare' as 'tushare' | 'akshare',
   days: 365
 })
@@ -637,7 +152,6 @@ const editForm = ref({
   notes: ''
 })
 
-
 // 计算属性
 const filteredFavorites = computed<FavoriteItem[]>(() => {
   let result: FavoriteItem[] = favorites.value
@@ -646,8 +160,8 @@ const filteredFavorites = computed<FavoriteItem[]>(() => {
   if (searchKeyword.value) {
     const keyword = searchKeyword.value.toLowerCase()
     result = result.filter((item: FavoriteItem) =>
-      (item.stock_code || '').toLowerCase().includes(keyword) ||
-      (item.stock_name || '').toLowerCase().includes(keyword)
+      (item.stock_code || '').toLowerCase().includes(keyword)
+      || (item.stock_name || '').toLowerCase().includes(keyword)
     )
   }
 
@@ -689,7 +203,8 @@ const hasAStocks = computed(() => {
 
 // 判断选中的股票是否都是A股
 const selectedStocksAreAllAShares = computed(() => {
-  if (selectedStocks.value.length === 0) return false
+  if (selectedStocks.value.length === 0)
+    return false
   return selectedStocks.value.every(item => item.market === 'A股')
 })
 
@@ -816,7 +331,7 @@ const saveTag = async (row: any) => {
     await tagsApi.update(row.id, {
       name: row._name ?? row.name,
       color: row._color ?? row.color,
-      sort_order: row._sort ?? row.sort_order,
+      sort_order: row._sort ?? row.sort_order
     })
     ElMessage.success('保存成功')
     row._editing = false
@@ -848,8 +363,6 @@ const deleteTag = async (row: any) => {
     tagLoading.value = false
   }
 }
-
-
 
 const refreshData = () => {
   loadFavorites()
@@ -904,7 +417,8 @@ const getStockCodeHint = () => {
 }
 
 const fetchStockInfo = async () => {
-  if (!addForm.value.stock_code) return
+  if (!addForm.value.stock_code)
+    return
 
   try {
     const symbol = addForm.value.stock_code.trim()
@@ -939,7 +453,8 @@ const handleAddFavorite = async () => {
     addLoading.value = true
     const payload = { ...addForm.value }
     const res = await favoritesApi.add(payload as any)
-    if ((res as any)?.success === false) throw new Error((res as any)?.message || '添加失败')
+    if ((res as any)?.success === false)
+      throw new Error((res as any)?.message || '添加失败')
     ElMessage.success('添加成功')
     addDialogVisible.value = false
     await loadFavorites()
@@ -959,7 +474,8 @@ const handleUpdateFavorite = async () => {
       notes: editForm.value.notes
     }
     const res = await favoritesApi.update(editForm.value.stock_code, payload as any)
-    if ((res as any)?.success === false) throw new Error((res as any)?.message || '更新失败')
+    if ((res as any)?.success === false)
+      throw new Error((res as any)?.message || '更新失败')
     ElMessage.success('保存成功')
     editDialogVisible.value = false
     await loadFavorites()
@@ -970,7 +486,6 @@ const handleUpdateFavorite = async () => {
     editLoading.value = false
   }
 }
-
 
 const editFavorite = (row: any) => {
   editForm.value = {
@@ -1002,7 +517,8 @@ const removeFavorite = async (row: any) => {
       }
     )
     const res = await favoritesApi.remove(row.stock_code)
-    if ((res as any)?.success === false) throw new Error((res as any)?.message || '移除失败')
+    if ((res as any)?.success === false)
+      throw new Error((res as any)?.message || '移除失败')
     ElMessage.success('移除成功')
     await loadFavorites()
   } catch (e) {
@@ -1164,11 +680,12 @@ const handleBatchSync = async () => {
 }
 
 const getChangeClass = (changePercent: number) => {
-  if (changePercent > 0) return 'text-red'
-  if (changePercent < 0) return 'text-green'
+  if (changePercent > 0)
+    return 'text-red'
+  if (changePercent < 0)
+    return 'text-green'
   return ''
 }
-
 
 const formatPrice = (value: any): string => {
   const n = Number(value)
@@ -1177,7 +694,8 @@ const formatPrice = (value: any): string => {
 
 const formatPercent = (value: any): string => {
   const n = Number(value)
-  if (!Number.isFinite(n)) return '-'
+  if (!Number.isFinite(n))
+    return '-'
   const sign = n > 0 ? '+' : ''
   return `${sign}${n.toFixed(2)}%`
 }
@@ -1195,6 +713,548 @@ onMounted(() => {
   }
 })
 </script>
+
+<template>
+  <div class="favorites">
+    <div class="page-header">
+      <h1 class="page-title">
+        <el-icon><Star /></el-icon>
+        我的自选股
+      </h1>
+      <p class="page-description">
+        管理您关注的股票
+      </p>
+    </div>
+
+    <!-- 操作栏 -->
+    <el-card class="action-card" shadow="never">
+      <el-row :gutter="16" align="middle" style="margin-bottom: 16px;">
+        <el-col :span="8">
+          <el-input
+            v-model="searchKeyword"
+            placeholder="搜索股票代码或名称"
+            clearable
+          >
+            <template #prefix>
+              <el-icon><Search /></el-icon>
+            </template>
+          </el-input>
+        </el-col>
+
+        <el-col :span="4">
+          <el-select v-model="selectedMarket" placeholder="市场" clearable>
+            <el-option label="A股" value="A股" />
+            <el-option label="港股" value="港股" />
+            <el-option label="美股" value="美股" />
+          </el-select>
+        </el-col>
+
+        <el-col :span="4">
+          <el-select v-model="selectedBoard" placeholder="板块" clearable>
+            <el-option label="主板" value="主板" />
+            <el-option label="创业板" value="创业板" />
+            <el-option label="科创板" value="科创板" />
+            <el-option label="北交所" value="北交所" />
+          </el-select>
+        </el-col>
+
+        <el-col :span="4">
+          <el-select v-model="selectedExchange" placeholder="交易所" clearable>
+            <el-option label="上海证券交易所" value="上海证券交易所" />
+            <el-option label="深圳证券交易所" value="深圳证券交易所" />
+            <el-option label="北京证券交易所" value="北京证券交易所" />
+          </el-select>
+        </el-col>
+
+        <el-col :span="4">
+          <el-select v-model="selectedTag" placeholder="标签" clearable>
+            <el-option
+              v-for="tag in userTags"
+              :key="tag"
+              :label="tag"
+              :value="tag"
+            />
+          </el-select>
+        </el-col>
+      </el-row>
+
+      <el-row :gutter="16" align="middle">
+        <el-col :span="24">
+          <div class="action-buttons">
+            <el-button @click="refreshData">
+              <el-icon><Refresh /></el-icon>
+              刷新
+            </el-button>
+            <!-- 只有有A股自选股时才显示同步实时行情按钮 -->
+            <el-button
+              v-if="hasAStocks"
+              type="success"
+              :loading="syncRealtimeLoading"
+              @click="syncAllRealtime"
+            >
+              <el-icon><Refresh /></el-icon>
+              同步实时行情
+            </el-button>
+            <!-- 只有选中的股票都是A股时才显示批量同步按钮 -->
+            <el-button
+              v-if="selectedStocksAreAllAShares"
+              type="primary"
+              @click="showBatchSyncDialog"
+            >
+              <el-icon><Download /></el-icon>
+              批量同步数据
+            </el-button>
+            <el-button @click="openTagManager">
+              标签管理
+            </el-button>
+            <el-button type="primary" @click="showAddDialog">
+              <el-icon><Plus /></el-icon>
+              添加自选股
+            </el-button>
+          </div>
+        </el-col>
+      </el-row>
+    </el-card>
+
+    <!-- 自选股列表 -->
+    <el-card class="favorites-list-card" shadow="never">
+      <el-table
+        v-loading="loading"
+        :data="filteredFavorites"
+        style="width: 100%"
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" width="55" />
+        <el-table-column prop="stock_code" label="股票代码" width="120">
+          <template #default="{ row }">
+            <el-link type="primary" @click="viewStockDetail(row)">
+              {{ row.stock_code }}
+            </el-link>
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="stock_name" label="股票名称" width="150" />
+        <el-table-column prop="market" label="市场" width="80">
+          <template #default="{ row }">
+            {{ row.market || 'A股' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="board" label="板块" width="100">
+          <template #default="{ row }">
+            {{ row.board || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="exchange" label="交易所" width="140">
+          <template #default="{ row }">
+            {{ row.exchange || '-' }}
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="current_price" label="当前价格" width="100">
+          <template #default="{ row }">
+            <span v-if="row.current_price !== null && row.current_price !== undefined">¥{{ formatPrice(row.current_price) }}</span>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="change_percent" label="涨跌幅" width="100">
+          <template #default="{ row }">
+            <span
+              v-if="row.change_percent !== null && row.change_percent !== undefined"
+              :class="getChangeClass(row.change_percent)"
+            >
+              {{ formatPercent(row.change_percent) }}
+            </span>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="tags" label="标签" width="150">
+          <template #default="{ row }">
+            <el-tag
+              v-for="tag in row.tags"
+              :key="tag"
+              size="small"
+              :color="getTagColor(tag)"
+              effect="dark"
+              :style="{ marginRight: '4px' }"
+            >
+              {{ tag }}
+            </el-tag>
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="added_at" label="添加时间" width="120">
+          <template #default="{ row }">
+            {{ formatDate(row.added_at) }}
+          </template>
+        </el-table-column>
+
+        <el-table-column label="操作" width="260" fixed="right">
+          <template #default="{ row }">
+            <el-button
+              type="text"
+              size="small"
+              @click="editFavorite(row)"
+            >
+              编辑
+            </el-button>
+            <!-- 只有A股显示同步按钮 -->
+            <el-button
+              v-if="row.market === 'A股'"
+              type="text"
+              size="small"
+              style="color: #409EFF;"
+              @click="showSingleSyncDialog(row)"
+            >
+              同步
+            </el-button>
+            <el-button
+              type="text"
+              size="small"
+              @click="analyzeFavorite(row)"
+            >
+              分析
+            </el-button>
+            <el-button
+              type="text"
+              size="small"
+              style="color: #f56c6c;"
+              @click="removeFavorite(row)"
+            >
+              移除
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <!-- 空状态 -->
+      <div v-if="!loading && favorites.length === 0" class="empty-state">
+        <el-empty description="暂无自选股">
+          <el-button type="primary" @click="showAddDialog">
+            添加第一只自选股
+          </el-button>
+        </el-empty>
+      </div>
+    </el-card>
+
+    <!-- 添加自选股对话框 -->
+    <el-dialog
+      v-model="addDialogVisible"
+      title="添加自选股"
+      width="500px"
+    >
+      <el-form ref="addFormRef" :model="addForm" :rules="addRules" label-width="100px">
+        <el-form-item label="市场类型" prop="market">
+          <el-select v-model="addForm.market" @change="handleMarketChange">
+            <el-option label="A股" value="A股" />
+            <el-option label="港股" value="港股" />
+            <el-option label="美股" value="美股" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="股票代码" prop="stock_code">
+          <el-input
+            v-model="addForm.stock_code"
+            :placeholder="getStockCodePlaceholder()"
+            @blur="fetchStockInfo"
+          />
+          <div style="font-size: 12px; color: #909399; margin-top: 4px;">
+            {{ getStockCodeHint() }}
+          </div>
+        </el-form-item>
+
+        <el-form-item label="股票名称" prop="stock_name">
+          <el-input v-model="addForm.stock_name" placeholder="股票名称" />
+          <div v-if="addForm.market !== 'A股'" style="font-size: 12px; color: #E6A23C; margin-top: 4px;">
+            {{ addForm.market }}不支持自动获取，请手动输入股票名称
+          </div>
+        </el-form-item>
+
+        <el-form-item label="标签">
+          <el-select
+            v-model="addForm.tags"
+            multiple
+            filterable
+            allow-create
+            placeholder="选择或创建标签"
+          >
+            <el-option v-for="tag in userTags" :key="tag" :label="tag" :value="tag">
+              <span :style="{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }">
+                <span>{{ tag }}</span>
+                <span :style="{ display: 'inline-block', width: '12px', height: '12px', border: '1px solid #ddd', borderRadius: '2px', marginLeft: '8px', background: getTagColor(tag) }" />
+              </span>
+            </el-option>
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="备注">
+          <el-input
+            v-model="addForm.notes"
+            type="textarea"
+            :rows="2"
+            placeholder="可选：添加备注信息"
+          />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="addDialogVisible = false">
+          取消
+        </el-button>
+        <el-button type="primary" :loading="addLoading" @click="handleAddFavorite">
+          添加
+        </el-button>
+      </template>
+    </el-dialog>
+    <!-- 编辑自选股对话框 -->
+    <el-dialog
+      v-model="editDialogVisible"
+      title="编辑自选股"
+      width="520px"
+    >
+      <el-form ref="editFormRef" :model="editForm" label-width="100px">
+        <el-form-item label="股票">
+          <div>{{ editForm.stock_code }}｜{{ editForm.stock_name }}（{{ editForm.market }}）</div>
+        </el-form-item>
+
+        <el-form-item label="标签">
+          <el-select v-model="editForm.tags" multiple filterable allow-create placeholder="选择或创建标签">
+            <el-option v-for="tag in userTags" :key="tag" :label="tag" :value="tag">
+              <span :style="{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }">
+                <span>{{ tag }}</span>
+                <span :style="{ display: 'inline-block', width: '12px', height: '12px', border: '1px solid #ddd', borderRadius: '2px', marginLeft: '8px', background: getTagColor(tag) }" />
+              </span>
+            </el-option>
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="备注">
+          <el-input v-model="editForm.notes" type="textarea" :rows="2" placeholder="可选：添加备注信息" />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="editDialogVisible = false">
+          取消
+        </el-button>
+        <el-button type="primary" :loading="editLoading" @click="handleUpdateFavorite">
+          保存
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 标签管理对话框 -->
+    <el-dialog v-model="tagDialogVisible" title="标签管理" width="560px">
+      <el-table v-loading="tagLoading" :data="tagList" size="small" style="width: 100%; margin-bottom: 12px;">
+        <el-table-column label="名称" min-width="220">
+          <template #default="{ row }">
+            <template v-if="row._editing">
+              <el-input v-model="row._name" placeholder="标签名称" size="small" />
+            </template>
+            <template v-else>
+              <el-tag :color="row.color" effect="dark" style="margin-right:6px" />
+              {{ row.name }}
+            </template>
+          </template>
+        </el-table-column>
+        <el-table-column label="颜色" width="140">
+          <template #default="{ row }">
+            <template v-if="row._editing">
+              <el-select v-model="row._color" placeholder="选择颜色" size="small" style="width: 200px">
+                <el-option v-for="c in COLOR_PALETTE" :key="c" :label="c" :value="c">
+                  <span :style="{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }">
+                    <span>{{ c }}</span>
+                    <span :style="{ display: 'inline-block', width: '12px', height: '12px', border: '1px solid #ddd', borderRadius: '2px', marginLeft: '8px', background: c }" />
+                  </span>
+                </el-option>
+              </el-select>
+              <span class="color-dot-preview" :style="{ background: row._color }" />
+            </template>
+            <template v-else>
+              <span :style="{ display: 'inline-block', width: '14px', height: '14px', background: row.color, border: '1px solid #ddd', marginRight: '6px' }" />
+              {{ row.color }}
+            </template>
+          </template>
+        </el-table-column>
+        <el-table-column label="排序" width="100" align="center">
+          <template #default="{ row }">
+            <template v-if="row._editing">
+              <el-input v-model.number="row._sort" type="number" size="small" />
+            </template>
+            <template v-else>
+              {{ row.sort_order }}
+            </template>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="160" fixed="right">
+          <template #default="{ row }">
+            <template v-if="row._editing">
+              <el-button type="text" size="small" @click="saveTag(row)">
+                保存
+              </el-button>
+              <el-button type="text" size="small" @click="cancelEditTag(row)">
+                取消
+              </el-button>
+            </template>
+            <template v-else>
+              <el-button type="text" size="small" @click="editTag(row)">
+                编辑
+              </el-button>
+              <el-button type="text" size="small" style="color:#f56c6c" @click="deleteTag(row)">
+                删除
+              </el-button>
+            </template>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <div style="display:flex; gap:8px; align-items:center;">
+        <el-input v-model="newTag.name" placeholder="新标签名" style="flex:1" />
+        <el-select v-model="newTag.color" placeholder="选择颜色" style="width:200px">
+          <el-option v-for="c in COLOR_PALETTE" :key="c" :label="c" :value="c">
+            <span :style="{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }">
+              <span>{{ c }}</span>
+              <span :style="{ display: 'inline-block', width: '12px', height: '12px', border: '1px solid #ddd', borderRadius: '2px', marginLeft: '8px', background: c }" />
+            </span>
+          </el-option>
+        </el-select>
+        <span class="color-dot-preview" :style="{ background: newTag.color }" />
+        <el-input v-model.number="newTag.sort_order" type="number" placeholder="排序" style="width:120px" />
+        <el-button type="primary" :loading="tagLoading" @click="createTag">
+          新增
+        </el-button>
+      </div>
+
+      <template #footer>
+        <el-button @click="tagDialogVisible = false">
+          关闭
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 批量同步对话框 -->
+    <el-dialog
+      v-model="batchSyncDialogVisible"
+      title="批量同步股票数据"
+      width="500px"
+    >
+      <el-alert
+        type="info"
+        :closable="false"
+        style="margin-bottom: 16px;"
+      >
+        已选择 <strong>{{ selectedStocks.length }}</strong> 只股票
+      </el-alert>
+
+      <el-form :model="batchSyncForm" label-width="120px">
+        <el-form-item label="同步内容">
+          <el-checkbox-group v-model="batchSyncForm.syncTypes">
+            <el-checkbox label="historical">
+              历史行情数据
+            </el-checkbox>
+            <el-checkbox label="financial">
+              财务数据
+            </el-checkbox>
+            <el-checkbox label="basic">
+              基础数据
+            </el-checkbox>
+          </el-checkbox-group>
+        </el-form-item>
+        <el-form-item label="数据源">
+          <el-radio-group v-model="batchSyncForm.dataSource">
+            <el-radio label="tushare">
+              Tushare
+            </el-radio>
+            <el-radio label="akshare">
+              AKShare
+            </el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item v-if="batchSyncForm.syncTypes.includes('historical')" label="历史数据天数">
+          <el-input-number v-model="batchSyncForm.days" :min="1" :max="3650" />
+          <span style="margin-left: 10px; color: #909399; font-size: 12px;">
+            (最多3650天，约10年)
+          </span>
+        </el-form-item>
+      </el-form>
+
+      <el-alert
+        type="warning"
+        :closable="false"
+        style="margin-top: 16px;"
+      >
+        批量同步可能需要较长时间，请耐心等待
+      </el-alert>
+
+      <template #footer>
+        <el-button @click="batchSyncDialogVisible = false">
+          取消
+        </el-button>
+        <el-button type="primary" :loading="batchSyncLoading" @click="handleBatchSync">
+          开始同步
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 单个股票同步对话框 -->
+    <el-dialog
+      v-model="singleSyncDialogVisible"
+      title="同步股票数据"
+      width="500px"
+    >
+      <el-form :model="singleSyncForm" label-width="120px">
+        <el-form-item label="股票代码">
+          <el-input v-model="currentSyncStock.stock_code" disabled />
+        </el-form-item>
+        <el-form-item label="股票名称">
+          <el-input v-model="currentSyncStock.stock_name" disabled />
+        </el-form-item>
+        <el-form-item label="同步内容">
+          <el-checkbox-group v-model="singleSyncForm.syncTypes">
+            <el-checkbox label="realtime">
+              实时行情
+            </el-checkbox>
+            <el-checkbox label="historical">
+              历史行情数据
+            </el-checkbox>
+            <el-checkbox label="financial">
+              财务数据
+            </el-checkbox>
+            <el-checkbox label="basic">
+              基础数据
+            </el-checkbox>
+          </el-checkbox-group>
+        </el-form-item>
+        <el-form-item label="数据源">
+          <el-radio-group v-model="singleSyncForm.dataSource">
+            <el-radio label="tushare">
+              Tushare
+            </el-radio>
+            <el-radio label="akshare">
+              AKShare
+            </el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item v-if="singleSyncForm.syncTypes.includes('historical')" label="历史数据天数">
+          <el-input-number v-model="singleSyncForm.days" :min="1" :max="3650" />
+          <span style="margin-left: 10px; color: #909399; font-size: 12px;">
+            (最多3650天，约10年)
+          </span>
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="singleSyncDialogVisible = false">
+          取消
+        </el-button>
+        <el-button type="primary" :loading="singleSyncLoading" @click="handleSingleSync">
+          开始同步
+        </el-button>
+      </template>
+    </el-dialog>
+  </div>
+</template>
 
 <style lang="scss" scoped>
 .favorites {

@@ -1,24 +1,88 @@
+<script setup lang="ts">
+import { Expand, Fold } from '@element-plus/icons-vue'
+import { ElBacktop } from 'element-plus'
+import { computed } from 'vue'
+import AppFooter from '@/components/Layout/AppFooter.vue'
+import Breadcrumb from '@/components/Layout/Breadcrumb.vue'
+import HeaderActions from '@/components/Layout/HeaderActions.vue'
+import SidebarMenu from '@/components/Layout/SidebarMenu.vue'
+import UserProfile from '@/components/Layout/UserProfile.vue'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { useAppStore } from '@/stores/app'
+
+const appStore = useAppStore()
+const route = useRoute()
+const { width } = useWindowSize()
+
+// 需要缓存的组件
+const keepAliveComponents = computed(() => [
+  'Dashboard',
+  'StockScreening',
+  'AnalysisHistory',
+  'QueueManagement'
+])
+
+// 移动端判断
+const isMobile = computed(() => width.value < 768)
+
+// 点击主内容时，若移动端且侧边栏已展开，则收起
+const handleMainClick = () => {
+  if (isMobile.value && !appStore.sidebarCollapsed) {
+    appStore.setSidebarCollapsed(true)
+  }
+}
+
+function setMainContentHeight() {
+  nextTick(() => {
+    const headerHeight = document.querySelector('.header')?.clientHeight || 60
+    const footerHeight = document.querySelector('.footer')?.clientHeight || 60
+    mainContentHeight.value = `calc(100vh - ${headerHeight}px - ${footerHeight}px - 2px)`
+  })
+}
+
+// 动态计算主内容区最小高度
+const mainContentHeight = ref('')
+
+// 初始化时设置一次
+setMainContentHeight()
+
+// 监听窗口大小变化：在小屏幕上自动折叠侧边栏
+watch(width, newWidth => {
+  if (newWidth < 768 && !appStore.sidebarCollapsed) {
+    appStore.setSidebarCollapsed(true)
+  }
+  setMainContentHeight()
+})
+
+// 路由变化时，移动端收起侧边栏
+watch(() => route.fullPath, () => {
+  if (isMobile.value) {
+    appStore.setSidebarCollapsed(true)
+  }
+})
+</script>
+
 <template>
   <div class="basic-layout">
     <!-- 侧边栏 -->
     <aside
       class="sidebar"
       :class="{ collapsed: appStore.sidebarCollapsed }"
-      :style="{ width: appStore.actualSidebarWidth + 'px' }"
+      :style="{ width: `${appStore.actualSidebarWidth}px` }"
     >
       <div class="sidebar-header">
         <div class="logo">
-          <img src="/logo.svg" alt="TradingAgents-CN" />
+          <img src="/logo.svg" alt="TradingAgents-CN">
           <span v-show="!appStore.sidebarCollapsed" class="logo-text">
             TradingAgents-CN
           </span>
         </div>
       </div>
-      
+
       <nav class="sidebar-nav">
         <SidebarMenu />
       </nav>
-      
+
       <div class="sidebar-footer">
         <UserProfile />
       </div>
@@ -29,24 +93,24 @@
       v-if="isMobile && !appStore.sidebarCollapsed"
       class="sidebar-overlay"
       @click="appStore.setSidebarCollapsed(true)"
-    ></div>
+    />
 
     <!-- 主内容区 -->
-    <div class="main-container" :style="{ marginLeft: appStore.actualSidebarWidth + 'px' }" @click="handleMainClick">
+    <div class="main-container" :style="{ marginLeft: `${appStore.actualSidebarWidth}px` }" @click="handleMainClick">
       <!-- 顶部导航栏 -->
       <header class="header">
         <div class="header-left">
           <el-button
             type="text"
-            @click.stop="appStore.toggleSidebar()"
             class="sidebar-toggle"
+            @click.stop="appStore.toggleSidebar()"
           >
             <el-icon><Expand v-if="appStore.sidebarCollapsed" /><Fold v-else /></el-icon>
           </el-button>
-          
+
           <Breadcrumb />
         </div>
-        
+
         <div class="header-right">
           <HeaderActions />
         </div>
@@ -76,73 +140,9 @@
     </div>
 
     <!-- 回到顶部 -->
-    <el-backtop :right="40" :bottom="40" />
+    <ElBacktop :right="40" :bottom="40" />
   </div>
 </template>
-
-<script setup lang="ts">
-import { computed } from 'vue'
-import { useAppStore } from '@/stores/app'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import SidebarMenu from '@/components/Layout/SidebarMenu.vue'
-import UserProfile from '@/components/Layout/UserProfile.vue'
-import Breadcrumb from '@/components/Layout/Breadcrumb.vue'
-import HeaderActions from '@/components/Layout/HeaderActions.vue'
-import AppFooter from '@/components/Layout/AppFooter.vue'
-import { Expand, Fold } from '@element-plus/icons-vue'
-import { ElBacktop } from 'element-plus'
-
-const appStore = useAppStore()
-const route = useRoute()
-const { width } = useWindowSize()
-
-// 需要缓存的组件
-const keepAliveComponents = computed(() => [
-  'Dashboard',
-  'StockScreening',
-  'AnalysisHistory',
-  'QueueManagement'
-])
-
-// 移动端判断
-const isMobile = computed(() => width.value < 768)
-
-// 点击主内容时，若移动端且侧边栏已展开，则收起
-const handleMainClick = () => {
-  if (isMobile.value && !appStore.sidebarCollapsed) {
-    appStore.setSidebarCollapsed(true)
-  }
-}
-
-function setMainContentHeight() {
-  nextTick(() => {
-    const headerHeight = document.querySelector('.header')?.clientHeight || 60
-    const footerHeight = document.querySelector('.footer')?.clientHeight || 60
-    mainContentHeight.value =  `calc(100vh - ${headerHeight}px - ${footerHeight}px - 2px)`
-  })
-}
-
-// 动态计算主内容区最小高度
-const mainContentHeight = ref('')
-
-// 初始化时设置一次
-setMainContentHeight()
-
-// 监听窗口大小变化：在小屏幕上自动折叠侧边栏
-watch(width, (newWidth) => {
-  if (newWidth < 768 && !appStore.sidebarCollapsed) {
-    appStore.setSidebarCollapsed(true)
-  }
-  setMainContentHeight()
-})
-
-// 路由变化时，移动端收起侧边栏
-watch(() => route.fullPath, () => {
-  if (isMobile.value) {
-    appStore.setSidebarCollapsed(true)
-  }
-})
-</script>
 
 <style lang="scss" scoped>
 .basic-layout {
@@ -238,7 +238,7 @@ watch(() => route.fullPath, () => {
 
     .sidebar-toggle {
       padding: 8px;
-      
+
       .el-icon {
         font-size: 18px;
       }
@@ -278,7 +278,7 @@ watch(() => route.fullPath, () => {
 @media (max-width: 768px) {
   .sidebar {
     transform: translateX(-100%);
-    
+
     &:not(.collapsed) {
       transform: translateX(0);
     }

@@ -1,88 +1,8 @@
-<template>
-  <div class="market-category-management">
-    <div class="header">
-      <h3>市场分类管理</h3>
-      <el-button type="primary" icon="Plus" @click="showAddDialog">
-        添加分类
-      </el-button>
-    </div>
-
-    <el-table
-      v-loading="loading"
-      :data="categories"
-      style="width: 100%"
-      row-key="id"
-    >
-      <el-table-column prop="sort_order" label="排序" width="80" sortable />
-      
-      <el-table-column prop="id" label="分类ID" width="120" />
-      
-      <el-table-column prop="display_name" label="显示名称" width="120" />
-      
-      <el-table-column prop="description" label="描述" min-width="200" />
-      
-      <el-table-column label="状态" width="100">
-        <template #default="{ row }">
-          <el-tag :type="row.enabled ? 'success' : 'danger'" size="small">
-            {{ row.enabled ? '启用' : '禁用' }}
-          </el-tag>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="数据源数量" width="120">
-        <template #default="{ row }">
-          <el-tag type="info" size="small">
-            {{ getDataSourceCount(row.id) }}
-          </el-tag>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="创建时间" width="180">
-        <template #default="{ row }">
-          {{ formatDate(row.created_at) }}
-        </template>
-      </el-table-column>
-
-      <el-table-column label="操作" width="200" fixed="right">
-        <template #default="{ row }">
-          <el-button
-            size="small"
-            @click="editCategory(row)"
-          >
-            编辑
-          </el-button>
-          <el-button
-            size="small"
-            :type="row.enabled ? 'warning' : 'success'"
-            @click="toggleCategory(row)"
-          >
-            {{ row.enabled ? '禁用' : '启用' }}
-          </el-button>
-          <el-button
-            size="small"
-            type="danger"
-            @click="deleteCategory(row)"
-            :disabled="getDataSourceCount(row.id) > 0"
-          >
-            删除
-          </el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <!-- 分类对话框 -->
-    <MarketCategoryDialog
-      v-model:visible="dialogVisible"
-      :category="currentCategory"
-      @success="handleSuccess"
-    />
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import type { DataSourceGrouping, MarketCategory } from '@/api/config'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { configApi, type MarketCategory, type DataSourceGrouping } from '@/api/config'
+import { computed, onMounted, ref } from 'vue'
+import { configApi } from '@/api/config'
 import MarketCategoryDialog from './MarketCategoryDialog.vue'
 
 // Refs
@@ -101,7 +21,8 @@ const getDataSourceCount = computed(() => {
 
 // 格式化日期
 const formatDate = (dateStr?: string) => {
-  if (!dateStr) return '-'
+  if (!dateStr)
+    return '-'
   return new Date(dateStr).toLocaleString('zh-CN')
 }
 
@@ -146,7 +67,7 @@ const toggleCategory = async (category: MarketCategory) => {
     await configApi.updateMarketCategory(category.id, {
       enabled: !category.enabled
     })
-    
+
     category.enabled = !category.enabled
     ElMessage.success(`分类已${category.enabled ? '启用' : '禁用'}`)
   } catch (error) {
@@ -158,7 +79,7 @@ const toggleCategory = async (category: MarketCategory) => {
 // 删除分类
 const deleteCategory = async (category: MarketCategory) => {
   const dataSourceCount = getDataSourceCount.value(category.id)
-  
+
   if (dataSourceCount > 0) {
     ElMessage.warning('该分类下还有数据源，无法删除')
     return
@@ -193,6 +114,87 @@ onMounted(() => {
   loadGroupings()
 })
 </script>
+
+<template>
+  <div class="market-category-management">
+    <div class="header">
+      <h3>市场分类管理</h3>
+      <el-button type="primary" icon="Plus" @click="showAddDialog">
+        添加分类
+      </el-button>
+    </div>
+
+    <el-table
+      v-loading="loading"
+      :data="categories"
+      style="width: 100%"
+      row-key="id"
+    >
+      <el-table-column prop="sort_order" label="排序" width="80" sortable />
+
+      <el-table-column prop="id" label="分类ID" width="120" />
+
+      <el-table-column prop="display_name" label="显示名称" width="120" />
+
+      <el-table-column prop="description" label="描述" min-width="200" />
+
+      <el-table-column label="状态" width="100">
+        <template #default="{ row }">
+          <el-tag :type="row.enabled ? 'success' : 'danger'" size="small">
+            {{ row.enabled ? '启用' : '禁用' }}
+          </el-tag>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="数据源数量" width="120">
+        <template #default="{ row }">
+          <el-tag type="info" size="small">
+            {{ getDataSourceCount(row.id) }}
+          </el-tag>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="创建时间" width="180">
+        <template #default="{ row }">
+          {{ formatDate(row.created_at) }}
+        </template>
+      </el-table-column>
+
+      <el-table-column label="操作" width="200" fixed="right">
+        <template #default="{ row }">
+          <el-button
+            size="small"
+            @click="editCategory(row)"
+          >
+            编辑
+          </el-button>
+          <el-button
+            size="small"
+            :type="row.enabled ? 'warning' : 'success'"
+            @click="toggleCategory(row)"
+          >
+            {{ row.enabled ? '禁用' : '启用' }}
+          </el-button>
+          <el-button
+            size="small"
+            type="danger"
+            :disabled="getDataSourceCount(row.id) > 0"
+            @click="deleteCategory(row)"
+          >
+            删除
+          </el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <!-- 分类对话框 -->
+    <MarketCategoryDialog
+      v-model:visible="dialogVisible"
+      :category="currentCategory"
+      @success="handleSuccess"
+    />
+  </div>
+</template>
 
 <style lang="scss" scoped>
 .market-category-management {

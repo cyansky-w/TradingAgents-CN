@@ -1,3 +1,12 @@
+<script setup lang="ts">
+import { Coin, Share, UserFilled } from '@element-plus/icons-vue'
+
+function onDragStart(event: DragEvent, type: string) {
+  event.dataTransfer!.setData('application/vueflow', type)
+  event.dataTransfer!.effectAllowed = 'move'
+}
+</script>
+
 <template>
   <div class="editor-palette">
     <h5>节点</h5>
@@ -27,15 +36,6 @@
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-import { UserFilled, Share, Coin } from '@element-plus/icons-vue'
-
-function onDragStart(event: DragEvent, type: string) {
-  event.dataTransfer!.setData('application/vueflow', type)
-  event.dataTransfer!.effectAllowed = 'move'
-}
-</script>
 
 <style scoped>
 .editor-palette {

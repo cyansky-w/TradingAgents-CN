@@ -1,106 +1,42 @@
-<template>
-  <div class="workflow-editor">
-    <WorkflowToolbar
-      :workflow-name="workflowName"
-      :error-count="validationErrors.filter(e => e.level === 'error').length"
-      :saving="sync.saving.value"
-      @back="goBack"
-      @validate="handleValidate"
-      @save="handleSave"
-      @run="handleRun"
-    />
-
-    <div class="editor-body">
-      <NodePalette />
-
-      <FlowCanvas
-        :nodes="flowNodes"
-        :edges="flowEdges"
-        :node-types="nodeTypes"
-        @node-click="onNodeClick"
-        @nodes-change="onNodesChange"
-        @connect="onConnect"
-        @drop="onDrop"
-      />
-
-      <NodeConfigPanel
-        :selected-node="selectedNode"
-        :agent-options="agentOptions"
-        :workflow-options="workflowOptions"
-        :current-workflow-id="workflowId"
-        @change="markDirty"
-        @delete-node="deleteSelectedNode"
-      />
-    </div>
-
-    <ValidationReport
-      :visible="validateVisible"
-      :errors="validationErrors"
-      @update:visible="validateVisible = $event"
-      @focus-node="focusNode"
-    />
-
-    <!-- Run Dialog -->
-    <el-dialog v-model="runDialogVisible" title="执行工作流" width="560px" destroy-on-close>
-      <div class="run-dialog-body">
-        <template v-if="templateVars.length">
-          <div class="run-section-label">模板参数</div>
-          <el-form size="small" label-position="top">
-            <el-form-item v-for="v in templateVars" :key="v" :label="v">
-              <el-input v-model="runForm[v]" :placeholder="`请输入 ${v}`" />
-            </el-form-item>
-          </el-form>
-          <el-divider content-position="left">消息预览</el-divider>
-          <div class="run-preview">{{ renderedMessage }}</div>
-        </template>
-        <template v-else>
-          <div class="run-section-label">输入消息</div>
-          <el-input v-model="runFreeText" type="textarea" :rows="6" placeholder="请输入要发送给工作流的消息" />
-        </template>
-      </div>
-      <template #footer>
-        <el-button @click="runDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="doRun" :loading="runLoading">执行</el-button>
-      </template>
-    </el-dialog>
-  </div>
-</template>
-
 <script setup lang="ts">
+import type { FlowNode } from './composables/useWorkflowSync'
+import type { ValidationError } from './composables/useWorkflowValidation'
+import type { Agent } from '@/api/agents'
+import type { Workflow } from '@/api/workflows'
+import { ElMessage } from 'element-plus'
 import { computed, markRaw, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { agentsApi } from '@/api/agents'
+import { workflowsApi } from '@/api/workflows'
+
+import FlowCanvas from './components/FlowCanvas.vue'
+import NodeConfigPanel from './components/NodeConfigPanel.vue'
+import NodePalette from './components/NodePalette.vue'
+import ValidationReport from './components/ValidationReport.vue'
+import WorkflowToolbar from './components/WorkflowToolbar.vue'
+import {
+  autoLayoutIfNeeded,
+  createNode,
+
+  toFlowEdges,
+  toFlowNodes,
+  useWorkflowSync
+} from './composables/useWorkflowSync'
+import { validateDag } from './composables/useWorkflowValidation'
+
+import AgentNode from './nodes/AgentNode.vue'
+import IONode from './nodes/IONode.vue'
+import SubflowNode from './nodes/SubflowNode.vue'
+
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import '@vue-flow/controls/dist/style.css'
 import '@vue-flow/minimap/dist/style.css'
 
-import WorkflowToolbar from './components/WorkflowToolbar.vue'
-import NodePalette from './components/NodePalette.vue'
-import FlowCanvas from './components/FlowCanvas.vue'
-import NodeConfigPanel from './components/NodeConfigPanel.vue'
-import ValidationReport from './components/ValidationReport.vue'
-
-import AgentNode from './nodes/AgentNode.vue'
-import SubflowNode from './nodes/SubflowNode.vue'
-import IONode from './nodes/IONode.vue'
-
-import {
-  useWorkflowSync,
-  toFlowNodes,
-  toFlowEdges,
-  autoLayoutIfNeeded,
-  createNode,
-  type FlowNode,
-} from './composables/useWorkflowSync'
-import { validateDag, type ValidationError } from './composables/useWorkflowValidation'
-import { workflowsApi, type Workflow } from '@/api/workflows'
-import { agentsApi, type Agent } from '@/api/agents'
-
 const nodeTypes: Record<string, any> = {
   agent: markRaw(AgentNode),
   subflow: markRaw(SubflowNode),
-  io: markRaw(IONode),
+  io: markRaw(IONode)
 }
 
 const route = useRoute()
@@ -127,7 +63,8 @@ const messageTemplate = ref('')
 
 const templateVars = computed<string[]>(() => {
   const matches = messageTemplate.value.match(/\{\{(\w+)\}\}/g)
-  if (!matches) return []
+  if (!matches)
+    return []
   return [...new Set(matches.map(m => m.replace(/\{\{|\}\}/g, '')))]
 })
 
@@ -145,7 +82,8 @@ function markDirty() { dirty = true }
 
 function goBack() {
   if (dirty) {
-    if (!confirm('有未保存的更改，确认返回？')) return
+    if (!confirm('有未保存的更改，确认返回？'))
+      return
   }
   router.push('/workflows')
 }
@@ -167,10 +105,12 @@ async function loadWorkflow() {
 async function loadOptions() {
   const [agentRes, wfRes] = await Promise.all([
     agentsApi.list({ page: 1, page_size: 100 }),
-    workflowsApi.list({ page: 1, page_size: 100 }),
+    workflowsApi.list({ page: 1, page_size: 100 })
   ])
-  if (agentRes.success) agentOptions.value = agentRes.data.items
-  if (wfRes.success) workflowOptions.value = wfRes.data.items.filter(w => w.id !== workflowId)
+  if (agentRes.success)
+    agentOptions.value = agentRes.data.items
+  if (wfRes.success)
+    workflowOptions.value = wfRes.data.items.filter(w => w.id !== workflowId)
   resolveNodeNames()
 }
 
@@ -178,11 +118,13 @@ function resolveNodeNames() {
   for (const node of flowNodes.value) {
     if (node.type === 'agent' && node.data.agent_id && !node.data.agentName) {
       const agent = agentOptions.value.find(a => a.id === node.data.agent_id)
-      if (agent) node.data.agentName = agent.name
+      if (agent)
+        node.data.agentName = agent.name
     }
     if (node.type === 'subflow' && node.data.workflow_id && !node.data.workflowName) {
       const wf = workflowOptions.value.find(w => w.id === node.data.workflow_id)
-      if (wf) node.data.workflowName = wf.name
+      if (wf)
+        node.data.workflowName = wf.name
     }
   }
 }
@@ -210,7 +152,8 @@ function onDrop(type: string, x: number, y: number) {
 }
 
 function deleteSelectedNode() {
-  if (!selectedNode.value) return
+  if (!selectedNode.value)
+    return
   const nodeId = selectedNode.value.id
   flowNodes.value = flowNodes.value.filter(n => n.id !== nodeId)
   flowEdges.value = flowEdges.value.filter((e: any) => e.source !== nodeId && e.target !== nodeId)
@@ -220,7 +163,8 @@ function deleteSelectedNode() {
 
 function focusNode(nodeId: string) {
   const node = flowNodes.value.find(n => n.id === nodeId)
-  if (node) selectedNode.value = node
+  if (node)
+    selectedNode.value = node
   validateVisible.value = false
 }
 
@@ -291,6 +235,86 @@ onMounted(async () => {
   await Promise.all([loadWorkflow(), loadOptions()])
 })
 </script>
+
+<template>
+  <div class="workflow-editor">
+    <WorkflowToolbar
+      :workflow-name="workflowName"
+      :error-count="validationErrors.filter(e => e.level === 'error').length"
+      :saving="sync.saving.value"
+      @back="goBack"
+      @validate="handleValidate"
+      @save="handleSave"
+      @run="handleRun"
+    />
+
+    <div class="editor-body">
+      <NodePalette />
+
+      <FlowCanvas
+        :nodes="flowNodes"
+        :edges="flowEdges"
+        :node-types="nodeTypes"
+        @node-click="onNodeClick"
+        @nodes-change="onNodesChange"
+        @connect="onConnect"
+        @drop="onDrop"
+      />
+
+      <NodeConfigPanel
+        :selected-node="selectedNode"
+        :agent-options="agentOptions"
+        :workflow-options="workflowOptions"
+        :current-workflow-id="workflowId"
+        @change="markDirty"
+        @delete-node="deleteSelectedNode"
+      />
+    </div>
+
+    <ValidationReport
+      :visible="validateVisible"
+      :errors="validationErrors"
+      @update:visible="validateVisible = $event"
+      @focus-node="focusNode"
+    />
+
+    <!-- Run Dialog -->
+    <el-dialog v-model="runDialogVisible" title="执行工作流" width="560px" destroy-on-close>
+      <div class="run-dialog-body">
+        <template v-if="templateVars.length">
+          <div class="run-section-label">
+            模板参数
+          </div>
+          <el-form size="small" label-position="top">
+            <el-form-item v-for="v in templateVars" :key="v" :label="v">
+              <el-input v-model="runForm[v]" :placeholder="`请输入 ${v}`" />
+            </el-form-item>
+          </el-form>
+          <el-divider content-position="left">
+            消息预览
+          </el-divider>
+          <div class="run-preview">
+            {{ renderedMessage }}
+          </div>
+        </template>
+        <template v-else>
+          <div class="run-section-label">
+            输入消息
+          </div>
+          <el-input v-model="runFreeText" type="textarea" :rows="6" placeholder="请输入要发送给工作流的消息" />
+        </template>
+      </div>
+      <template #footer>
+        <el-button @click="runDialogVisible = false">
+          取消
+        </el-button>
+        <el-button type="primary" :loading="runLoading" @click="doRun">
+          执行
+        </el-button>
+      </template>
+    </el-dialog>
+  </div>
+</template>
 
 <style scoped>
 .workflow-editor {

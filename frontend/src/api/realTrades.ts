@@ -73,7 +73,7 @@ export interface PortfolioDashboard {
   holding_count: number
   total_trade_count: number
   excluded: Array<Record<string, unknown>>
-  pnl_curve: Array<{ date: string; cumulative_pnl: DecimalString }>
+  pnl_curve: Array<{ date: string, cumulative_pnl: DecimalString }>
 }
 
 export interface RealTradeRecord {
@@ -126,8 +126,8 @@ export interface DashboardData {
   profit_loss_ratio: number
   holding_count: number
   total_trade_count: number
-  pnl_curve: Array<{ date: string; cumulative_pnl: number }>
-  sector_distribution: Array<{ code: string; name: string; market_value: number; percentage: number }>
+  pnl_curve: Array<{ date: string, cumulative_pnl: number }>
+  sector_distribution: Array<{ code: string, name: string, market_value: number, percentage: number }>
 }
 
 export interface CreateTradePayload {
@@ -191,18 +191,18 @@ export const realTradesApi = {
     return ApiClient.get<PaginatedRecords>('/api/real-trades/records', params)
   },
   async getPositions(base_currency: BaseCurrency = 'CNY') {
-    return ApiClient.get<{ items: PortfolioPosition[]; total_market_value: DecimalString; excluded: Array<Record<string, unknown>> }>('/api/real-trades/positions', { base_currency })
+    return ApiClient.get<{ items: PortfolioPosition[], total_market_value: DecimalString, excluded: Array<Record<string, unknown>> }>('/api/real-trades/positions', { base_currency })
   },
   async getDashboard(days = 90, base_currency: BaseCurrency = 'CNY') {
     return ApiClient.get<PortfolioDashboard>('/api/real-trades/dashboard', { days, base_currency })
   },
-  async getAssetRules(params: { market: Market; exchange: string; symbol: string; instrument_type: InstrumentType }) {
+  async getAssetRules(params: { market: Market, exchange: string, symbol: string, instrument_type: InstrumentType }) {
     return ApiClient.get<AssetRules>('/api/real-trades/asset-rules', params)
   },
   async getPortfolioPreference() {
-    return ApiClient.get<{ user_id: string; base_currency: BaseCurrency }>('/api/real-trades/portfolio-preference')
+    return ApiClient.get<{ user_id: string, base_currency: BaseCurrency }>('/api/real-trades/portfolio-preference')
   },
   async updatePortfolioPreference(base_currency: BaseCurrency) {
-    return ApiClient.put<{ user_id: string; base_currency: BaseCurrency }>('/api/real-trades/portfolio-preference', { base_currency })
-  },
+    return ApiClient.put<{ user_id: string, base_currency: BaseCurrency }>('/api/real-trades/portfolio-preference', { base_currency })
+  }
 }

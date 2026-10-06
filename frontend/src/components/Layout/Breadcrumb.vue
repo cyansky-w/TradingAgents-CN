@@ -1,3 +1,21 @@
+<script setup lang="ts">
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
+
+const route = useRoute()
+
+const breadcrumbList = computed(() => {
+  const matched = route.matched.filter(item => item.meta && item.meta.title)
+
+  const breadcrumbs = matched.map(item => ({
+    path: item.path,
+    title: item.meta.title as string
+  }))
+
+  return breadcrumbs
+})
+</script>
+
 <template>
   <el-breadcrumb separator="/" class="breadcrumb">
     <el-breadcrumb-item
@@ -9,24 +27,6 @@
     </el-breadcrumb-item>
   </el-breadcrumb>
 </template>
-
-<script setup lang="ts">
-import { computed } from 'vue'
-import { useRoute } from 'vue-router'
-
-const route = useRoute()
-
-const breadcrumbList = computed(() => {
-  const matched = route.matched.filter(item => item.meta && item.meta.title)
-  
-  const breadcrumbs = matched.map(item => ({
-    path: item.path,
-    title: item.meta.title as string
-  }))
-
-  return breadcrumbs
-})
-</script>
 
 <style lang="scss" scoped>
 .breadcrumb {

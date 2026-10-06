@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
-
 import type { PortfolioPosition } from '@/api/realTrades'
+
+import { describe, expect, it } from 'vitest'
 import {
   closePositionKey,
   closePositionLabel,

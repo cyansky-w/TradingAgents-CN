@@ -11,7 +11,7 @@ interface Props extends PrimitiveProps {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  as: 'div',
+  as: 'div'
 })
 </script>
 

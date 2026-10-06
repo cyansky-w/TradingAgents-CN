@@ -122,4 +122,3 @@ export const stockSyncApi = {
     return ApiClient.get<StockSyncStatus>(`/api/stock-sync/status/${symbol}`)
   }
 }
-

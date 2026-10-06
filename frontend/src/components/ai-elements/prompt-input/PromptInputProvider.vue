@@ -36,24 +36,24 @@ usePromptInputProvider({
   maxFiles: props.maxFiles,
   maxFileSize: props.maxFileSize,
   accept: props.accept,
-  onSubmit: (msg) => {
+  onSubmit: msg => {
     const listener = getListener('onSubmit')
     if (listener)
       return callListener(listener, msg)
 
     emit('submit', msg)
   },
-  onError: (err) => {
+  onError: err => {
     const listener = getListener('onError')
     if (listener) {
-      void Promise.resolve(callListener(listener, err)).catch((error) => {
+      void Promise.resolve(callListener(listener, err)).catch(error => {
         console.error('PromptInputProvider onError listener failed:', error)
       })
       return
     }
 
     emit('error', err)
-  },
+  }
 })
 </script>
 

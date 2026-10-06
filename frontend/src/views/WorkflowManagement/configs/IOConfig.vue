@@ -1,5 +1,14 @@
+<script setup lang="ts">
+import type { FlowNode } from '../composables/useWorkflowSync'
+
+defineProps<{ node: FlowNode | null }>()
+const emit = defineEmits<{ change: [] }>()
+
+function emitChange() { emit('change') }
+</script>
+
 <template>
-  <div class="config-panel" v-if="node">
+  <div v-if="node" class="config-panel">
     <h4>{{ node!.data.io_direction === 'output' ? '输出' : '输入' }}节点配置</h4>
     <el-form label-width="80px" size="small">
       <el-form-item label="标签">
@@ -14,15 +23,6 @@
     </el-form>
   </div>
 </template>
-
-<script setup lang="ts">
-import type { FlowNode } from '../composables/useWorkflowSync'
-
-defineProps<{ node: FlowNode | null }>()
-const emit = defineEmits<{ change: [] }>()
-
-function emitChange() { emit('change') }
-</script>
 
 <style scoped>
 .config-panel { padding: 12px; }

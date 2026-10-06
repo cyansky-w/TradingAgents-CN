@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { ChatMessage } from '@/types/chat'
-import { Message, MessageContent, MessageResponse } from '@/components/ai-elements/message'
-import { computed } from 'vue'
 import type { UIMessage } from 'ai'
+import type { ChatMessage } from '@/types/chat'
+import { computed } from 'vue'
+import { Message, MessageContent, MessageResponse } from '@/components/ai-elements/message'
 
 const props = defineProps<{
   message: ChatMessage

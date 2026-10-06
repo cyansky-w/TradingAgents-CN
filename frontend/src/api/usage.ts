@@ -2,8 +2,8 @@
  * 使用统计 API
  */
 
-import request, { ApiClient } from './request'
 import type { ApiResponse } from './request'
+import request, { ApiClient } from './request'
 
 export interface UsageRecord {
   id?: string
@@ -38,8 +38,8 @@ export function getUsageRecords(params?: {
   start_date?: string
   end_date?: string
   limit?: number
-}): Promise<ApiResponse<{ records: UsageRecord[]; total: number }>> {
-  return ApiClient.get<{ records: UsageRecord[]; total: number }>(
+}): Promise<ApiResponse<{ records: UsageRecord[], total: number }>> {
+  return ApiClient.get<{ records: UsageRecord[], total: number }>(
     '/api/usage/records',
     params
   )
@@ -102,4 +102,3 @@ export function deleteOldRecords(days: number = 90) {
     params: { days }
   })
 }
-

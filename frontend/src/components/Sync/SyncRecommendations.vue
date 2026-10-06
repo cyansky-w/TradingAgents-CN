@@ -1,13 +1,76 @@
+<script setup lang="ts">
+import type { SyncRecommendations } from '@/api/sync'
+import {
+  Connection,
+  Document,
+  Promotion,
+  Refresh,
+  Select,
+  Star,
+  Warning
+} from '@element-plus/icons-vue'
+import { onMounted, ref } from 'vue'
+import { getSyncRecommendations } from '@/api/sync'
+
+// 响应式数据
+const loading = ref(false)
+const error = ref('')
+const recommendations = ref<SyncRecommendations | null>(null)
+
+// 获取同步建议
+const fetchRecommendations = async () => {
+  try {
+    loading.value = true
+    error.value = ''
+
+    const response = await getSyncRecommendations()
+    if (response.success) {
+      recommendations.value = response.data
+    } else {
+      error.value = response.message || '获取建议失败'
+    }
+  } catch (err: any) {
+    console.error('获取同步建议失败:', err)
+    error.value = err.message || '网络请求失败'
+  } finally {
+    loading.value = false
+  }
+}
+
+// 获取优先数据源示例
+const getPreferredSourcesExample = (): string => {
+  if (!recommendations.value)
+    return 'tushare,akshare'
+
+  const sources = []
+  if (recommendations.value.primary_source) {
+    sources.push(recommendations.value.primary_source.name)
+  }
+  if (recommendations.value.fallback_sources.length > 0) {
+    sources.push(recommendations.value.fallback_sources[0].name)
+  }
+
+  return sources.join(',') || 'tushare,akshare'
+}
+
+// 组件挂载时获取数据
+onMounted(() => {
+  fetchRecommendations()
+})
+</script>
+
 <template>
   <div class="sync-recommendations">
     <el-card class="recommendations-card" shadow="hover">
       <template #header>
         <div class="card-header">
-          <el-icon class="header-icon"><Promotion /></el-icon>
+          <el-icon class="header-icon">
+            <Promotion />
+          </el-icon>
           <span class="header-title">使用建议</span>
-          <el-button 
-            type="primary" 
-            size="small" 
+          <el-button
+            type="primary"
+            size="small"
             :loading="loading"
             @click="fetchRecommendations"
           >
@@ -31,7 +94,9 @@
           <!-- 推荐主数据源 -->
           <div v-if="recommendations.primary_source" class="primary-source-section">
             <h4 class="section-title">
-              <el-icon class="title-icon"><Star /></el-icon>
+              <el-icon class="title-icon">
+                <Star />
+              </el-icon>
               推荐主数据源
             </h4>
             <div class="primary-source-card">
@@ -40,8 +105,12 @@
                   {{ recommendations.primary_source.name.toUpperCase() }}
                 </el-tag>
                 <div class="source-details">
-                  <div class="priority">优先级: {{ recommendations.primary_source.priority }}</div>
-                  <div class="reason">{{ recommendations.primary_source.reason }}</div>
+                  <div class="priority">
+                    优先级: {{ recommendations.primary_source.priority }}
+                  </div>
+                  <div class="reason">
+                    {{ recommendations.primary_source.reason }}
+                  </div>
                 </div>
               </div>
             </div>
@@ -50,12 +119,14 @@
           <!-- 备用数据源 -->
           <div v-if="recommendations.fallback_sources.length > 0" class="fallback-sources-section">
             <h4 class="section-title">
-              <el-icon class="title-icon"><Connection /></el-icon>
+              <el-icon class="title-icon">
+                <Connection />
+              </el-icon>
               备用数据源
             </h4>
             <div class="fallback-sources-list">
-              <div 
-                v-for="source in recommendations.fallback_sources" 
+              <div
+                v-for="source in recommendations.fallback_sources"
                 :key="source.name"
                 class="fallback-source-item"
               >
@@ -70,16 +141,20 @@
           <!-- 建议列表 -->
           <div v-if="recommendations.suggestions.length > 0" class="suggestions-section">
             <h4 class="section-title">
-              <el-icon class="title-icon"><Promotion /></el-icon>
+              <el-icon class="title-icon">
+                <Promotion />
+              </el-icon>
               优化建议
             </h4>
             <div class="suggestions-list">
-              <div 
-                v-for="(suggestion, index) in recommendations.suggestions" 
+              <div
+                v-for="(suggestion, index) in recommendations.suggestions"
                 :key="index"
                 class="suggestion-item"
               >
-                <el-icon class="suggestion-icon"><Select /></el-icon>
+                <el-icon class="suggestion-icon">
+                  <Select />
+                </el-icon>
                 <span class="suggestion-text">{{ suggestion }}</span>
               </div>
             </div>
@@ -88,7 +163,9 @@
           <!-- 警告信息 -->
           <div v-if="recommendations.warnings.length > 0" class="warnings-section">
             <h4 class="section-title">
-              <el-icon class="title-icon"><Warning /></el-icon>
+              <el-icon class="title-icon">
+                <Warning />
+              </el-icon>
               注意事项
             </h4>
             <div class="warnings-list">
@@ -107,7 +184,9 @@
           <!-- 配置示例 -->
           <div class="config-example-section">
             <h4 class="section-title">
-              <el-icon class="title-icon"><Document /></el-icon>
+              <el-icon class="title-icon">
+                <Document />
+              </el-icon>
               配置示例
             </h4>
             <div class="config-example">
@@ -128,7 +207,7 @@ BAOSTOCK_ENABLED=true
 DEFAULT_CHINA_DATA_SOURCE={{ recommendations.primary_source?.name || 'tushare' }}</code></pre>
                   </div>
                 </el-collapse-item>
-                
+
                 <el-collapse-item title="API调用示例" name="api">
                   <div class="code-block">
                     <pre><code># 使用默认优先级同步
@@ -154,65 +233,6 @@ POST /api/sync/multi-source/stock_basics/run?force=true</code></pre>
   </div>
 </template>
 
-<script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import {
-  Promotion,
-  Refresh,
-  Star,
-  Connection,
-  Select,
-  Warning,
-  Document
-} from '@element-plus/icons-vue'
-import { getSyncRecommendations, type SyncRecommendations } from '@/api/sync'
-
-// 响应式数据
-const loading = ref(false)
-const error = ref('')
-const recommendations = ref<SyncRecommendations | null>(null)
-
-// 获取同步建议
-const fetchRecommendations = async () => {
-  try {
-    loading.value = true
-    error.value = ''
-    
-    const response = await getSyncRecommendations()
-    if (response.success) {
-      recommendations.value = response.data
-    } else {
-      error.value = response.message || '获取建议失败'
-    }
-  } catch (err: any) {
-    console.error('获取同步建议失败:', err)
-    error.value = err.message || '网络请求失败'
-  } finally {
-    loading.value = false
-  }
-}
-
-// 获取优先数据源示例
-const getPreferredSourcesExample = (): string => {
-  if (!recommendations.value) return 'tushare,akshare'
-  
-  const sources = []
-  if (recommendations.value.primary_source) {
-    sources.push(recommendations.value.primary_source.name)
-  }
-  if (recommendations.value.fallback_sources.length > 0) {
-    sources.push(recommendations.value.fallback_sources[0].name)
-  }
-  
-  return sources.join(',') || 'tushare,akshare'
-}
-
-// 组件挂载时获取数据
-onMounted(() => {
-  fetchRecommendations()
-})
-</script>
-
 <style scoped lang="scss">
 .sync-recommendations {
   .recommendations-card {
@@ -220,12 +240,12 @@ onMounted(() => {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      
+
       .header-icon {
         margin-right: 8px;
         color: var(--el-color-warning);
       }
-      
+
       .header-title {
         font-weight: 600;
         flex: 1;
@@ -245,7 +265,7 @@ onMounted(() => {
       font-size: 16px;
       font-weight: 600;
       color: var(--el-text-color-primary);
-      
+
       .title-icon {
         margin-right: 8px;
       }
@@ -253,25 +273,25 @@ onMounted(() => {
 
     .primary-source-section {
       margin-bottom: 24px;
-      
+
       .primary-source-card {
         padding: 16px;
         border: 2px solid var(--el-color-success-light-7);
         border-radius: 8px;
         background-color: var(--el-color-success-light-9);
-        
+
         .source-info {
           display: flex;
           align-items: center;
           gap: 16px;
-          
+
           .source-details {
             .priority {
               font-size: 14px;
               color: var(--el-text-color-regular);
               margin-bottom: 4px;
             }
-            
+
             .reason {
               font-size: 14px;
               color: var(--el-text-color-secondary);
@@ -283,12 +303,12 @@ onMounted(() => {
 
     .fallback-sources-section {
       margin-bottom: 24px;
-      
+
       .fallback-sources-list {
         display: flex;
         flex-wrap: wrap;
         gap: 12px;
-        
+
         .fallback-source-item {
           display: flex;
           align-items: center;
@@ -297,7 +317,7 @@ onMounted(() => {
           border: 1px solid var(--el-border-color-light);
           border-radius: 6px;
           background-color: var(--el-fill-color-lighter);
-          
+
           .source-priority {
             font-size: 12px;
             color: var(--el-text-color-secondary);
@@ -308,7 +328,7 @@ onMounted(() => {
 
     .suggestions-section {
       margin-bottom: 24px;
-      
+
       .suggestions-list {
         .suggestion-item {
           display: flex;
@@ -316,13 +336,13 @@ onMounted(() => {
           gap: 8px;
           margin-bottom: 12px;
           padding: 8px 0;
-          
+
           .suggestion-icon {
             color: var(--el-color-success);
             margin-top: 2px;
             flex-shrink: 0;
           }
-          
+
           .suggestion-text {
             line-height: 1.5;
             color: var(--el-text-color-regular);
@@ -333,11 +353,11 @@ onMounted(() => {
 
     .warnings-section {
       margin-bottom: 24px;
-      
+
       .warnings-list {
         .warning-item {
           margin-bottom: 8px;
-          
+
           &:last-child {
             margin-bottom: 0;
           }
@@ -351,7 +371,7 @@ onMounted(() => {
           background-color: var(--el-fill-color-lighter);
           border-radius: 6px;
           padding: 16px;
-          
+
           pre {
             margin: 0;
             font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;

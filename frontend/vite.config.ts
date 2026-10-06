@@ -1,9 +1,9 @@
-import { defineConfig } from 'vitest/config'
+import { resolve } from 'node:path'
 import vue from '@vitejs/plugin-vue'
-import { resolve } from 'path'
 import AutoImport from 'unplugin-auto-import/vite'
-import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
+import Components from 'unplugin-vue-components/vite'
+import { defineConfig } from 'vitest/config'
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -59,12 +59,12 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
         secure: false,
-        ws: true  // 🔥 启用 WebSocket 代理支持
+        ws: true // 🔥 启用 WebSocket 代理支持
       }
     }
   },
   build: {
-    target: 'es2020',  // 支持 nullish coalescing operator (??) 和 optional chaining (?.)
+    target: 'es2020', // 支持 nullish coalescing operator (??) 和 optional chaining (?.)
     outDir: 'dist',
     assetsDir: 'assets',
     sourcemap: false,

@@ -1,24 +1,30 @@
+<script setup lang="ts">
+import { Share } from '@element-plus/icons-vue'
+import { Handle, Position } from '@vue-flow/core'
+
+defineProps<{ data: Record<string, any> }>()
+</script>
+
 <template>
   <div class="custom-node subflow-node">
     <div class="node-header">
-      <el-icon size="14"><Share /></el-icon>
+      <el-icon size="14">
+        <Share />
+      </el-icon>
       <span class="node-title">{{ data.label || '子流程' }}</span>
     </div>
     <div class="node-body">
-      <div v-if="data.workflowName" class="node-meta">{{ data.workflowName }}</div>
-      <div v-else class="node-meta node-meta--empty">未绑定工作流</div>
+      <div v-if="data.workflowName" class="node-meta">
+        {{ data.workflowName }}
+      </div>
+      <div v-else class="node-meta node-meta--empty">
+        未绑定工作流
+      </div>
     </div>
     <Handle type="target" :position="Position.Left" />
     <Handle type="source" :position="Position.Right" />
   </div>
 </template>
-
-<script setup lang="ts">
-import { Handle, Position } from '@vue-flow/core'
-import { Share } from '@element-plus/icons-vue'
-
-defineProps<{ data: Record<string, any> }>()
-</script>
 
 <style scoped>
 .custom-node {

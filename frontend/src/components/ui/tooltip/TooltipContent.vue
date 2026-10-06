@@ -6,11 +6,11 @@ import { TooltipContent, TooltipPortal, useForwardPropsEmits } from 'reka-ui'
 import { cn } from '@/lib/utils'
 
 defineOptions({
-  inheritAttrs: false,
+  inheritAttrs: false
 })
 
-const props = withDefaults(defineProps<TooltipContentProps & { class?: HTMLAttributes["class"] }>(), {
-  sideOffset: 4,
+const props = withDefaults(defineProps<TooltipContentProps & { class?: HTMLAttributes['class'] }>(), {
+  sideOffset: 4
 })
 
 const emits = defineEmits<TooltipContentEmits>()

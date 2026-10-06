@@ -1,5 +1,5 @@
-import { ApiClient } from './request'
 import type { ApiResponse } from './request'
+import { ApiClient } from './request'
 
 export interface ToolParameter {
   name: string
@@ -112,19 +112,19 @@ export const toolsApi = {
     return await ApiClient.delete<{ id: string }>(`/api/tools/${id}`)
   },
 
-  async toggle(id: string, enabled: boolean): Promise<ApiResponse<{ id: string; enabled: boolean }>> {
-    return await ApiClient.put<{ id: string; enabled: boolean }>(`/api/tools/${id}/toggle`, { enabled })
+  async toggle(id: string, enabled: boolean): Promise<ApiResponse<{ id: string, enabled: boolean }>> {
+    return await ApiClient.put<{ id: string, enabled: boolean }>(`/api/tools/${id}/toggle`, { enabled })
   },
 
-  async healthCheck(id: string): Promise<ApiResponse<{ id: string; health_status: string; details: string }>> {
-    return await ApiClient.post<{ id: string; health_status: string; details: string }>(`/api/tools/${id}/health-check`)
+  async healthCheck(id: string): Promise<ApiResponse<{ id: string, health_status: string, details: string }>> {
+    return await ApiClient.post<{ id: string, health_status: string, details: string }>(`/api/tools/${id}/health-check`)
   },
 
   async getAllTags(): Promise<ApiResponse<string[]>> {
     return await ApiClient.get<string[]>('/api/tools/tags')
   },
 
-  async seed(): Promise<ApiResponse<{ created: number; updated: number; skipped: number; total: number }>> {
-    return await ApiClient.post<{ created: number; updated: number; skipped: number; total: number }>('/api/tools/seed')
+  async seed(): Promise<ApiResponse<{ created: number, updated: number, skipped: number, total: number }>> {
+    return await ApiClient.post<{ created: number, updated: number, skipped: number, total: number }>('/api/tools/seed')
   }
 }

@@ -1,258 +1,13 @@
-<template>
-  <div class="workflow-management">
-    <div class="page-header">
-      <h2>工作流管理</h2>
-      <div class="header-actions">
-        <el-input
-          v-model="searchText"
-          placeholder="搜索工作流..."
-          prefix-icon="Search"
-          clearable
-          style="width: 200px"
-          @input="handleSearch"
-        />
-        <el-select v-model="filterTag" placeholder="标签" clearable style="width: 120px" @change="loadWorkflows(true)">
-          <el-option v-for="tag in allTags" :key="tag" :label="tag" :value="tag" />
-        </el-select>
-        <el-select v-model="filterEnabled" placeholder="状态" clearable style="width: 100px" @change="loadWorkflows(true)">
-          <el-option label="已启用" :value="true" />
-          <el-option label="已禁用" :value="false" />
-        </el-select>
-        <el-button type="primary" @click="showCreateDialog">
-          <el-icon><Plus /></el-icon> 新建
-        </el-button>
-        <el-button @click="handleSeed" :loading="seedLoading">
-          <el-icon><Refresh /></el-icon> 初始化工作流
-        </el-button>
-      </div>
-    </div>
-
-    <div v-if="listLoading" class="grid-loading">
-      <el-icon class="is-loading"><Loading /></el-icon> 加载中...
-    </div>
-
-    <div v-else-if="workflows.length === 0" class="grid-empty">
-      <el-empty description="暂无工作流，点击「初始化工作流」添加系统预设" />
-    </div>
-
-    <el-scrollbar v-else class="card-grid-wrap">
-      <div class="card-grid">
-        <WorkflowCard
-          v-for="wf in workflows"
-          :key="wf.id"
-          :workflow="wf"
-          @detail="selectWorkflow(wf)"
-          @edit="openEditor(wf)"
-          @run="selectAndRun(wf)"
-          @toggle="handleToggle"
-          @validate="selectAndValidate(wf)"
-          @delete="selectAndDelete(wf)"
-        />
-      </div>
-      <div v-if="workflows.length >= total" class="grid-end">已加载全部 {{ total }} 个工作流</div>
-    </el-scrollbar>
-
-    <!-- Detail Drawer -->
-    <el-drawer
-      v-model="drawerVisible"
-      :title="selectedWf?.name || ''"
-      size="520px"
-      destroy-on-close
-    >
-      <template v-if="selectedWf" #default>
-        <div class="drawer-body">
-          <div class="section">
-            <h4>基本信息</h4>
-            <el-form label-width="100px" size="small">
-              <el-form-item label="编码">
-                <span class="mono">{{ selectedWf.code }}</span>
-              </el-form-item>
-              <el-form-item label="名称">
-                <el-input v-if="editing" v-model="editForm.name" />
-                <span v-else>{{ selectedWf.name }}</span>
-              </el-form-item>
-              <el-form-item label="描述">
-                <el-input v-if="editing" v-model="editForm.description" type="textarea" :rows="2" />
-                <span v-else>{{ selectedWf.description || '-' }}</span>
-              </el-form-item>
-              <el-form-item label="消息模板">
-                <el-input v-if="editing" v-model="editForm.message_template" type="textarea" :rows="3" placeholder="支持 {{变量名}} 语法" />
-                <span v-else class="mono">{{ selectedWf.message_template || '-' }}</span>
-              </el-form-item>
-              <el-form-item label="输出模板">
-                <el-input v-if="editing" v-model="editForm.output_template" placeholder="如 {{summary.output}}" />
-                <span v-else class="mono">{{ selectedWf.output_template || '-' }}</span>
-              </el-form-item>
-            </el-form>
-          </div>
-
-          <div class="section">
-            <h4>触发方式</h4>
-            <el-form label-width="100px" size="small">
-              <el-form-item label="类型">
-                <el-select v-if="editing" v-model="editForm.trigger.type">
-                  <el-option label="手动" value="manual" />
-                  <el-option label="定时" value="cron" />
-                  <el-option label="事件" value="event" />
-                </el-select>
-                <span v-else>{{ triggerTypeLabel(selectedWf.trigger?.type) }}</span>
-              </el-form-item>
-              <el-form-item v-if="editForm.trigger?.type === 'cron' || selectedWf.trigger?.type === 'cron'" label="Cron 表达式">
-                <el-input v-if="editing" v-model="editForm.trigger.cron" placeholder="0 9 * * 1-5" />
-                <span v-else class="mono">{{ selectedWf.trigger?.cron || '-' }}</span>
-              </el-form-item>
-            </el-form>
-          </div>
-
-          <div class="section">
-            <h4>节点 ({{ selectedWf.nodes.length }})</h4>
-            <div class="node-list">
-              <div v-for="node in selectedWf.nodes" :key="node.id" class="node-chip">
-                <el-tag :type="nodeTypeColor(node.type)" size="small">{{ nodeTypeLabel(node.type) }}</el-tag>
-                <span class="node-label">{{ node.label || node.id }}</span>
-              </div>
-              <span v-if="selectedWf.nodes.length === 0" class="text-muted">无节点</span>
-            </div>
-          </div>
-
-          <WorkflowSettings :settings="editing ? editForm.settings : selectedWf.settings" :editing="editing" @update="(key: string, value: any) => { (editForm.settings as any)[key] = value }" />
-
-          <div class="section">
-            <h4>标签</h4>
-            <el-select v-if="editing" v-model="editForm.tags" multiple filterable allow-create default-first-option style="width: 100%">
-              <el-option v-for="tag in allTags" :key="tag" :label="tag" :value="tag" />
-            </el-select>
-            <div v-else>
-              <el-tag v-for="tag in selectedWf.tags" :key="tag" class="tag-chip">{{ tag }}</el-tag>
-              <span v-if="selectedWf.tags.length === 0" class="text-muted">无标签</span>
-            </div>
-          </div>
-
-          <RunList
-            :runs="runs"
-            :loading="runsLoading"
-            :run-loading="runLoading"
-            @run="handleRun"
-            @refresh="loadRuns"
-            @view-run="viewRunDetail"
-            @cancel-run="handleCancelRun"
-          />
-
-          <div class="section">
-            <h4>统计</h4>
-            <div class="text-muted">
-              调用 {{ selectedWf.usage_count }} 次
-              <span v-if="selectedWf.last_used_at"> · 最后调用 {{ formatTime(selectedWf.last_used_at) }}</span>
-              <span> · 创建 {{ formatTime(selectedWf.created_at) }}</span>
-            </div>
-          </div>
-        </div>
-      </template>
-
-      <template #footer>
-        <div class="drawer-footer">
-          <template v-if="editing">
-            <el-button type="primary" @click="handleSave" :loading="saveLoading">保存</el-button>
-            <el-button @click="cancelEdit">取消</el-button>
-          </template>
-          <template v-else>
-            <el-button type="primary" @click="startEdit">编辑</el-button>
-            <el-button @click="openEditor()">编辑器</el-button>
-            <el-button @click="handleValidate" :loading="validateLoading">校验 DAG</el-button>
-            <el-button type="danger" @click="handleDelete">删除</el-button>
-          </template>
-        </div>
-      </template>
-    </el-drawer>
-
-    <!-- Create Dialog -->
-    <el-dialog v-model="createVisible" title="新建工作流" width="640px" destroy-on-close>
-      <el-form :model="createForm" label-width="100px" size="small">
-        <el-form-item label="编码" required>
-          <el-input v-model="createForm.code" placeholder="daily_market_report" />
-          <span class="text-muted">仅小写字母/数字/下划线，创建后不可修改</span>
-        </el-form-item>
-        <el-form-item label="名称" required>
-          <el-input v-model="createForm.name" />
-        </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="createForm.description" type="textarea" :rows="2" />
-        </el-form-item>
-        <el-form-item label="消息模板">
-          <el-input v-model="createForm.message_template" type="textarea" :rows="3" placeholder="支持 {{变量名}} 语法" />
-        </el-form-item>
-        <el-form-item label="标签">
-          <el-select v-model="createForm.tags" multiple filterable allow-create default-first-option style="width: 100%">
-            <el-option v-for="tag in allTags" :key="tag" :label="tag" :value="tag" />
-          </el-select>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="createVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleCreate" :loading="createLoading">创建</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- Run Input Dialog -->
-    <el-dialog v-model="runDialogVisible" title="执行工作流" width="500px" destroy-on-close>
-      <template v-if="runTemplateVars.length">
-        <div class="run-section-label">模板参数</div>
-        <el-form size="small" label-position="top">
-          <el-form-item v-for="v in runTemplateVars" :key="v" :label="v">
-            <el-input v-model="runForm[v]" :placeholder="`请输入 ${v}`" />
-          </el-form-item>
-        </el-form>
-      </template>
-      <template v-else>
-        <div class="run-section-label">输入消息</div>
-        <el-input v-model="runFreeText" type="textarea" :rows="5" placeholder="请输入要发送给工作流的消息" />
-      </template>
-      <template #footer>
-        <el-button @click="runDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="doRun" :loading="runLoading">执行</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- Validation Result Dialog -->
-    <el-dialog v-model="validateVisible" title="DAG 校验结果" width="500px">
-      <el-result v-if="validationResult" :icon="validationResult.valid ? 'success' : 'error'" :title="validationResult.valid ? '校验通过' : '校验失败'">
-        <template v-if="!validationResult.valid" #sub-title>
-          <ul class="validation-errors">
-            <li v-for="(err, i) in validationResult.errors" :key="i">
-              <span v-if="err.node_id" class="mono" style="margin-right:4px">[{{ err.node_id }}]</span>
-              {{ err.message }}
-            </li>
-          </ul>
-        </template>
-        <template v-if="validationResult?.warnings?.length" #extra>
-          <div class="validation-warnings">
-            <p style="margin:0 0 4px;font-weight:500">警告</p>
-            <ul class="validation-errors" style="color:var(--el-color-warning)">
-              <li v-for="(w, i) in validationResult.warnings" :key="'w'+i">
-                <span v-if="w.node_id" class="mono" style="margin-right:4px">[{{ w.node_id }}]</span>
-                {{ w.message }}
-              </li>
-            </ul>
-          </div>
-        </template>
-      </el-result>
-      <template #footer>
-        <el-button @click="validateVisible = false">关闭</el-button>
-      </template>
-    </el-dialog>
-  </div>
-</template>
-
 <script setup lang="ts">
+import type { Workflow, WorkflowCreateDto, WorkflowRun, WorkflowValidationResult } from '@/api/workflows'
+import { Loading, Plus, Refresh } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Loading, Plus, Refresh } from '@element-plus/icons-vue'
 import { workflowsApi } from '@/api/workflows'
 import WorkflowCard from './components/WorkflowCard.vue'
 import WorkflowSettings from './configs/WorkflowSettings.vue'
 import RunList from './runs/RunList.vue'
-import type { Workflow, WorkflowCreateDto, WorkflowValidationResult, WorkflowRun } from '@/api/workflows'
 
 const workflows = ref<Workflow[]>([])
 const selectedWf = ref<Workflow | null>(null)
@@ -286,7 +41,8 @@ const runFreeText = ref('')
 const runTemplateVars = computed<string[]>(() => {
   const tpl = selectedWf.value?.message_template || ''
   const matches = tpl.match(/\{\{(\w+)\}\}/g)
-  if (!matches) return []
+  if (!matches)
+    return []
   return [...new Set(matches.map(m => m.replace(/\{\{|\}\}/g, '')))]
 })
 
@@ -326,7 +82,8 @@ function nodeTypeColor(type: string) {
 }
 
 function formatTime(value: string) {
-  if (!value) return '-'
+  if (!value)
+    return '-'
   try { return new Date(value).toLocaleString() } catch { return value }
 }
 
@@ -340,7 +97,8 @@ async function loadWorkflows(_reset = true) {
       page: 1,
       page_size: 100
     })
-    if (!res.success) return
+    if (!res.success)
+      return
     workflows.value = res.data.items
     total.value = res.data.total
   } catch (err: any) {
@@ -352,15 +110,18 @@ async function loadWorkflows(_reset = true) {
 
 async function loadTags() {
   const res = await workflowsApi.getTags()
-  if (res.success) allTags.value = res.data
+  if (res.success)
+    allTags.value = res.data
 }
 
 async function loadRuns() {
-  if (!selectedWf.value) return
+  if (!selectedWf.value)
+    return
   runsLoading.value = true
   try {
     const res = await workflowsApi.listRuns(selectedWf.value.id)
-    if (res.success) runs.value = res.data.items
+    if (res.success)
+      runs.value = res.data.items
   } catch {
     ElMessage.error('加载运行历史失败')
   } finally {
@@ -369,7 +130,8 @@ async function loadRuns() {
 }
 
 async function selectWorkflow(wf: Workflow) {
-  if (editing.value) cancelEdit()
+  if (editing.value)
+    cancelEdit()
   selectedWf.value = wf
   fillEditForm(wf)
   runs.value = []
@@ -401,14 +163,16 @@ function handleSearch() {
 }
 
 function startEdit() {
-  if (!selectedWf.value) return
+  if (!selectedWf.value)
+    return
   fillEditForm(selectedWf.value)
   editing.value = true
 }
 
 function cancelEdit() {
   editing.value = false
-  if (selectedWf.value) fillEditForm(selectedWf.value)
+  if (selectedWf.value)
+    fillEditForm(selectedWf.value)
 }
 
 function showCreateDialog() {
@@ -451,7 +215,8 @@ async function handleCreate() {
 }
 
 async function handleSave() {
-  if (!selectedWf.value) return
+  if (!selectedWf.value)
+    return
   saveLoading.value = true
   try {
     const res = await workflowsApi.update(selectedWf.value.id, {
@@ -481,14 +246,16 @@ async function handleSave() {
 async function handleToggle(wf: Workflow, enabled: boolean) {
   try {
     const res = await workflowsApi.toggle(wf.id, enabled)
-    if (res.success) wf.enabled = enabled
+    if (res.success)
+      wf.enabled = enabled
   } catch (err: any) {
     ElMessage.error(err?.response?.data?.detail || '操作失败')
   }
 }
 
 async function handleDelete() {
-  if (!selectedWf.value) return
+  if (!selectedWf.value)
+    return
   try {
     await ElMessageBox.confirm(`确认删除工作流「${selectedWf.value.name}」？`, '删除确认', { type: 'warning' })
     await workflowsApi.remove(selectedWf.value.id)
@@ -497,7 +264,8 @@ async function handleDelete() {
     drawerVisible.value = false
     await loadWorkflows(true)
   } catch (err: any) {
-    if (err === 'cancel' || err === 'close') return
+    if (err === 'cancel' || err === 'close')
+      return
     ElMessage.error(err?.response?.data?.detail || '删除失败')
   }
 }
@@ -520,7 +288,8 @@ async function selectAndValidate(wf: Workflow) {
 }
 
 async function handleValidate() {
-  if (!selectedWf.value) return
+  if (!selectedWf.value)
+    return
   validateLoading.value = true
   try {
     const res = await workflowsApi.validate(selectedWf.value.id)
@@ -552,7 +321,8 @@ function handleRun() {
 }
 
 async function doRun() {
-  if (!selectedWf.value) return
+  if (!selectedWf.value)
+    return
   let input: Record<string, any> = {}
   if (runTemplateVars.value.length) {
     const missing = runTemplateVars.value.find(v => !runForm.value[v]?.trim())
@@ -612,7 +382,8 @@ async function handleSeed() {
 
 function openEditor(wf?: Workflow) {
   const id = wf?.id || selectedWf.value?.id
-  if (id) router.push(`/workflows/${id}/edit`)
+  if (id)
+    router.push(`/workflows/${id}/edit`)
 }
 
 function viewRunDetail(runId: string) {
@@ -624,6 +395,287 @@ onMounted(async () => {
   await loadWorkflows(true)
 })
 </script>
+
+<template>
+  <div class="workflow-management">
+    <div class="page-header">
+      <h2>工作流管理</h2>
+      <div class="header-actions">
+        <el-input
+          v-model="searchText"
+          placeholder="搜索工作流..."
+          prefix-icon="Search"
+          clearable
+          style="width: 200px"
+          @input="handleSearch"
+        />
+        <el-select v-model="filterTag" placeholder="标签" clearable style="width: 120px" @change="loadWorkflows(true)">
+          <el-option v-for="tag in allTags" :key="tag" :label="tag" :value="tag" />
+        </el-select>
+        <el-select v-model="filterEnabled" placeholder="状态" clearable style="width: 100px" @change="loadWorkflows(true)">
+          <el-option label="已启用" :value="true" />
+          <el-option label="已禁用" :value="false" />
+        </el-select>
+        <el-button type="primary" @click="showCreateDialog">
+          <el-icon><Plus /></el-icon> 新建
+        </el-button>
+        <el-button :loading="seedLoading" @click="handleSeed">
+          <el-icon><Refresh /></el-icon> 初始化工作流
+        </el-button>
+      </div>
+    </div>
+
+    <div v-if="listLoading" class="grid-loading">
+      <el-icon class="is-loading">
+        <Loading />
+      </el-icon> 加载中...
+    </div>
+
+    <div v-else-if="workflows.length === 0" class="grid-empty">
+      <el-empty description="暂无工作流，点击「初始化工作流」添加系统预设" />
+    </div>
+
+    <el-scrollbar v-else class="card-grid-wrap">
+      <div class="card-grid">
+        <WorkflowCard
+          v-for="wf in workflows"
+          :key="wf.id"
+          :workflow="wf"
+          @detail="selectWorkflow(wf)"
+          @edit="openEditor(wf)"
+          @run="selectAndRun(wf)"
+          @toggle="handleToggle"
+          @validate="selectAndValidate(wf)"
+          @delete="selectAndDelete(wf)"
+        />
+      </div>
+      <div v-if="workflows.length >= total" class="grid-end">
+        已加载全部 {{ total }} 个工作流
+      </div>
+    </el-scrollbar>
+
+    <!-- Detail Drawer -->
+    <el-drawer
+      v-model="drawerVisible"
+      :title="selectedWf?.name || ''"
+      size="520px"
+      destroy-on-close
+    >
+      <template v-if="selectedWf" #default>
+        <div class="drawer-body">
+          <div class="section">
+            <h4>基本信息</h4>
+            <el-form label-width="100px" size="small">
+              <el-form-item label="编码">
+                <span class="mono">{{ selectedWf.code }}</span>
+              </el-form-item>
+              <el-form-item label="名称">
+                <el-input v-if="editing" v-model="editForm.name" />
+                <span v-else>{{ selectedWf.name }}</span>
+              </el-form-item>
+              <el-form-item label="描述">
+                <el-input v-if="editing" v-model="editForm.description" type="textarea" :rows="2" />
+                <span v-else>{{ selectedWf.description || '-' }}</span>
+              </el-form-item>
+              <el-form-item label="消息模板">
+                <el-input v-if="editing" v-model="editForm.message_template" type="textarea" :rows="3" placeholder="支持 {{变量名}} 语法" />
+                <span v-else class="mono">{{ selectedWf.message_template || '-' }}</span>
+              </el-form-item>
+              <el-form-item label="输出模板">
+                <el-input v-if="editing" v-model="editForm.output_template" placeholder="如 {{summary.output}}" />
+                <span v-else class="mono">{{ selectedWf.output_template || '-' }}</span>
+              </el-form-item>
+            </el-form>
+          </div>
+
+          <div class="section">
+            <h4>触发方式</h4>
+            <el-form label-width="100px" size="small">
+              <el-form-item label="类型">
+                <el-select v-if="editing" v-model="editForm.trigger.type">
+                  <el-option label="手动" value="manual" />
+                  <el-option label="定时" value="cron" />
+                  <el-option label="事件" value="event" />
+                </el-select>
+                <span v-else>{{ triggerTypeLabel(selectedWf.trigger?.type) }}</span>
+              </el-form-item>
+              <el-form-item v-if="editForm.trigger?.type === 'cron' || selectedWf.trigger?.type === 'cron'" label="Cron 表达式">
+                <el-input v-if="editing" v-model="editForm.trigger.cron" placeholder="0 9 * * 1-5" />
+                <span v-else class="mono">{{ selectedWf.trigger?.cron || '-' }}</span>
+              </el-form-item>
+            </el-form>
+          </div>
+
+          <div class="section">
+            <h4>节点 ({{ selectedWf.nodes.length }})</h4>
+            <div class="node-list">
+              <div v-for="node in selectedWf.nodes" :key="node.id" class="node-chip">
+                <el-tag :type="nodeTypeColor(node.type)" size="small">
+                  {{ nodeTypeLabel(node.type) }}
+                </el-tag>
+                <span class="node-label">{{ node.label || node.id }}</span>
+              </div>
+              <span v-if="selectedWf.nodes.length === 0" class="text-muted">无节点</span>
+            </div>
+          </div>
+
+          <WorkflowSettings :settings="editing ? editForm.settings : selectedWf.settings" :editing="editing" @update="(key: string, value: any) => { (editForm.settings as any)[key] = value }" />
+
+          <div class="section">
+            <h4>标签</h4>
+            <el-select v-if="editing" v-model="editForm.tags" multiple filterable allow-create default-first-option style="width: 100%">
+              <el-option v-for="tag in allTags" :key="tag" :label="tag" :value="tag" />
+            </el-select>
+            <div v-else>
+              <el-tag v-for="tag in selectedWf.tags" :key="tag" class="tag-chip">
+                {{ tag }}
+              </el-tag>
+              <span v-if="selectedWf.tags.length === 0" class="text-muted">无标签</span>
+            </div>
+          </div>
+
+          <RunList
+            :runs="runs"
+            :loading="runsLoading"
+            :run-loading="runLoading"
+            @run="handleRun"
+            @refresh="loadRuns"
+            @view-run="viewRunDetail"
+            @cancel-run="handleCancelRun"
+          />
+
+          <div class="section">
+            <h4>统计</h4>
+            <div class="text-muted">
+              调用 {{ selectedWf.usage_count }} 次
+              <span v-if="selectedWf.last_used_at"> · 最后调用 {{ formatTime(selectedWf.last_used_at) }}</span>
+              <span> · 创建 {{ formatTime(selectedWf.created_at) }}</span>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <template #footer>
+        <div class="drawer-footer">
+          <template v-if="editing">
+            <el-button type="primary" :loading="saveLoading" @click="handleSave">
+              保存
+            </el-button>
+            <el-button @click="cancelEdit">
+              取消
+            </el-button>
+          </template>
+          <template v-else>
+            <el-button type="primary" @click="startEdit">
+              编辑
+            </el-button>
+            <el-button @click="openEditor()">
+              编辑器
+            </el-button>
+            <el-button :loading="validateLoading" @click="handleValidate">
+              校验 DAG
+            </el-button>
+            <el-button type="danger" @click="handleDelete">
+              删除
+            </el-button>
+          </template>
+        </div>
+      </template>
+    </el-drawer>
+
+    <!-- Create Dialog -->
+    <el-dialog v-model="createVisible" title="新建工作流" width="640px" destroy-on-close>
+      <el-form :model="createForm" label-width="100px" size="small">
+        <el-form-item label="编码" required>
+          <el-input v-model="createForm.code" placeholder="daily_market_report" />
+          <span class="text-muted">仅小写字母/数字/下划线，创建后不可修改</span>
+        </el-form-item>
+        <el-form-item label="名称" required>
+          <el-input v-model="createForm.name" />
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input v-model="createForm.description" type="textarea" :rows="2" />
+        </el-form-item>
+        <el-form-item label="消息模板">
+          <el-input v-model="createForm.message_template" type="textarea" :rows="3" placeholder="支持 {{变量名}} 语法" />
+        </el-form-item>
+        <el-form-item label="标签">
+          <el-select v-model="createForm.tags" multiple filterable allow-create default-first-option style="width: 100%">
+            <el-option v-for="tag in allTags" :key="tag" :label="tag" :value="tag" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="createVisible = false">
+          取消
+        </el-button>
+        <el-button type="primary" :loading="createLoading" @click="handleCreate">
+          创建
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- Run Input Dialog -->
+    <el-dialog v-model="runDialogVisible" title="执行工作流" width="500px" destroy-on-close>
+      <template v-if="runTemplateVars.length">
+        <div class="run-section-label">
+          模板参数
+        </div>
+        <el-form size="small" label-position="top">
+          <el-form-item v-for="v in runTemplateVars" :key="v" :label="v">
+            <el-input v-model="runForm[v]" :placeholder="`请输入 ${v}`" />
+          </el-form-item>
+        </el-form>
+      </template>
+      <template v-else>
+        <div class="run-section-label">
+          输入消息
+        </div>
+        <el-input v-model="runFreeText" type="textarea" :rows="5" placeholder="请输入要发送给工作流的消息" />
+      </template>
+      <template #footer>
+        <el-button @click="runDialogVisible = false">
+          取消
+        </el-button>
+        <el-button type="primary" :loading="runLoading" @click="doRun">
+          执行
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- Validation Result Dialog -->
+    <el-dialog v-model="validateVisible" title="DAG 校验结果" width="500px">
+      <el-result v-if="validationResult" :icon="validationResult.valid ? 'success' : 'error'" :title="validationResult.valid ? '校验通过' : '校验失败'">
+        <template v-if="!validationResult.valid" #sub-title>
+          <ul class="validation-errors">
+            <li v-for="(err, i) in validationResult.errors" :key="i">
+              <span v-if="err.node_id" class="mono" style="margin-right:4px">[{{ err.node_id }}]</span>
+              {{ err.message }}
+            </li>
+          </ul>
+        </template>
+        <template v-if="validationResult?.warnings?.length" #extra>
+          <div class="validation-warnings">
+            <p style="margin:0 0 4px;font-weight:500">
+              警告
+            </p>
+            <ul class="validation-errors" style="color:var(--el-color-warning)">
+              <li v-for="(w, i) in validationResult.warnings" :key="`w${i}`">
+                <span v-if="w.node_id" class="mono" style="margin-right:4px">[{{ w.node_id }}]</span>
+                {{ w.message }}
+              </li>
+            </ul>
+          </div>
+        </template>
+      </el-result>
+      <template #footer>
+        <el-button @click="validateVisible = false">
+          关闭
+        </el-button>
+      </template>
+    </el-dialog>
+  </div>
+</template>
 
 <style scoped>
 .workflow-management {

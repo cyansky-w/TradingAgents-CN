@@ -2,11 +2,15 @@
  * 操作日志API接口
  */
 
-import { ApiClient, type ApiResponse } from './request'
+import type { ApiResponse } from './request'
 import { useAuthStore } from '@/stores/auth'
 
+// 格式化时间（导入统一的时间格式化工具）
+import { formatDateTime as formatDateTimeUtil } from '@/utils/datetime'
+import { ApiClient } from './request'
+
 const unwrapResponse = <T>(promise: Promise<ApiResponse<T>>): Promise<T> =>
-  promise.then((res) => res.data)
+  promise.then(res => res.data)
 
 // 操作日志数据类型
 export interface OperationLog {
@@ -96,16 +100,23 @@ export class OperationLogsApi {
    */
   static getOperationLogs(params: OperationLogQuery = {}): Promise<OperationLogListResponse> {
     const queryParams = new URLSearchParams()
-    
-    if (params.page) queryParams.append('page', params.page.toString())
-    if (params.page_size) queryParams.append('page_size', params.page_size.toString())
-    if (params.start_date) queryParams.append('start_date', params.start_date)
-    if (params.end_date) queryParams.append('end_date', params.end_date)
-    if (params.action_type) queryParams.append('action_type', params.action_type)
-    if (params.success !== undefined) queryParams.append('success', params.success.toString())
-    if (params.keyword) queryParams.append('keyword', params.keyword)
-    
-    const url = `/api/system/logs/list${queryParams.toString() ? '?' + queryParams.toString() : ''}`
+
+    if (params.page)
+      queryParams.append('page', params.page.toString())
+    if (params.page_size)
+      queryParams.append('page_size', params.page_size.toString())
+    if (params.start_date)
+      queryParams.append('start_date', params.start_date)
+    if (params.end_date)
+      queryParams.append('end_date', params.end_date)
+    if (params.action_type)
+      queryParams.append('action_type', params.action_type)
+    if (params.success !== undefined)
+      queryParams.append('success', params.success.toString())
+    if (params.keyword)
+      queryParams.append('keyword', params.keyword)
+
+    const url = `/api/system/logs/list${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
     return unwrapResponse(ApiClient.get<OperationLogListResponse>(url))
   }
 
@@ -162,16 +173,19 @@ export class OperationLogsApi {
     action_type?: string
   } = {}): Promise<Blob> {
     const queryParams = new URLSearchParams()
-    
-    if (params.start_date) queryParams.append('start_date', params.start_date)
-    if (params.end_date) queryParams.append('end_date', params.end_date)
-    if (params.action_type) queryParams.append('action_type', params.action_type)
-    
-    const url = `/api/system/logs/export/csv${queryParams.toString() ? '?' + queryParams.toString() : ''}`
+
+    if (params.start_date)
+      queryParams.append('start_date', params.start_date)
+    if (params.end_date)
+      queryParams.append('end_date', params.end_date)
+    if (params.action_type)
+      queryParams.append('action_type', params.action_type)
+
+    const url = `/api/system/logs/export/csv${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
     const token = useAuthStore().token
     return fetch(url, {
       headers: token ? { Authorization: `Bearer ${token}` } : undefined
-    }).then(async (response) => {
+    }).then(async response => {
       if (!response.ok) {
         throw new Error(`导出操作日志失败: HTTP ${response.status}`)
       }
@@ -190,7 +204,7 @@ export const ActionTypes = {
   SYSTEM_SETTINGS: 'system_settings',
   USER_LOGIN: 'user_login',
   USER_LOGOUT: 'user_logout',
-  USER_MANAGEMENT: 'user_management',  // 🔧 添加用户管理操作类型
+  USER_MANAGEMENT: 'user_management', // 🔧 添加用户管理操作类型
   DATABASE_OPERATION: 'database_operation',
   SCREENING: 'screening',
   REPORT_GENERATION: 'report_generation'
@@ -206,7 +220,7 @@ export const ActionTypeNames = {
   [ActionTypes.SYSTEM_SETTINGS]: '系统设置',
   [ActionTypes.USER_LOGIN]: '用户登录',
   [ActionTypes.USER_LOGOUT]: '用户登出',
-  [ActionTypes.USER_MANAGEMENT]: '用户管理',  // 🔧 添加用户管理操作类型名称
+  [ActionTypes.USER_MANAGEMENT]: '用户管理', // 🔧 添加用户管理操作类型名称
   [ActionTypes.DATABASE_OPERATION]: '数据库操作',
   [ActionTypes.SCREENING]: '股票筛选',
   [ActionTypes.REPORT_GENERATION]: '报告生成'
@@ -222,7 +236,7 @@ export const ActionTypeTagColors = {
   [ActionTypes.SYSTEM_SETTINGS]: 'danger',
   [ActionTypes.USER_LOGIN]: 'success',
   [ActionTypes.USER_LOGOUT]: 'warning',
-  [ActionTypes.USER_MANAGEMENT]: 'warning',  // 🔧 添加用户管理操作类型颜色
+  [ActionTypes.USER_MANAGEMENT]: 'warning', // 🔧 添加用户管理操作类型颜色
   [ActionTypes.DATABASE_OPERATION]: 'primary',
   [ActionTypes.SCREENING]: 'info',
   [ActionTypes.REPORT_GENERATION]: 'primary'
@@ -236,9 +250,6 @@ export const getActionTypeName = (actionType: string): string => {
 export const getActionTypeTagColor = (actionType: string): 'primary' | 'success' | 'warning' | 'info' | 'danger' => {
   return ActionTypeTagColors[actionType as keyof typeof ActionTypeTagColors] || 'info'
 }
-
-// 格式化时间（导入统一的时间格式化工具）
-import { formatDateTime as formatDateTimeUtil } from '@/utils/datetime'
 
 export const formatDateTime = (timestamp: string | number): string => {
   return formatDateTimeUtil(timestamp)

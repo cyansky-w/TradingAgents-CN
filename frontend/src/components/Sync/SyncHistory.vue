@@ -1,125 +1,9 @@
-<template>
-  <div class="sync-history">
-    <el-card class="history-card" shadow="hover">
-      <template #header>
-        <div class="card-header">
-          <el-icon class="header-icon"><Clock /></el-icon>
-          <span class="header-title">同步历史</span>
-          <el-button
-            type="primary"
-            size="small"
-            :loading="loading"
-            @click="refreshHistory"
-          >
-            <el-icon><Refresh /></el-icon>
-            刷新
-          </el-button>
-        </div>
-      </template>
-
-      <div v-loading="loading" class="history-content">
-        <div v-if="error" class="error-message">
-          <el-alert
-            :title="error"
-            type="error"
-            :closable="false"
-            show-icon
-          />
-        </div>
-
-        <div v-else-if="historyList.length > 0" class="history-list">
-          <el-timeline>
-            <el-timeline-item
-              v-for="(item, index) in historyList"
-              :key="index"
-              :timestamp="formatTime(item.finished_at || item.started_at)"
-              :type="getTimelineType(item.status)"
-              :icon="getTimelineIcon(item.status)"
-              placement="top"
-            >
-              <div class="history-item">
-                <div class="item-header">
-                  <el-tag 
-                    :type="getStatusType(item.status)"
-                    size="small"
-                    class="status-tag"
-                  >
-                    {{ getStatusText(item.status) }}
-                  </el-tag>
-                  <span class="job-name">{{ item.job }}</span>
-                </div>
-                
-                <div class="item-stats">
-                  <div class="stats-row">
-                    <span class="stat-item">总数: {{ item.total }}</span>
-                    <span class="stat-item success">新增: {{ item.inserted }}</span>
-                    <span class="stat-item primary">更新: {{ item.updated }}</span>
-                    <span class="stat-item danger">错误: {{ item.errors }}</span>
-                  </div>
-                  
-                  <div v-if="item.data_sources_used?.length" class="sources-row">
-                    <span class="sources-label">数据源:</span>
-                    <el-tag 
-                      v-for="source in item.data_sources_used" 
-                      :key="source"
-                      size="small"
-                      type="info"
-                      class="source-tag"
-                    >
-                      {{ source }}
-                    </el-tag>
-                  </div>
-                  
-                  <div v-if="item.last_trade_date" class="trade-date-row">
-                    <span class="trade-date-label">交易日期:</span>
-                    <span class="trade-date-value">{{ item.last_trade_date }}</span>
-                  </div>
-                </div>
-                
-                <div v-if="item.message" class="item-message">
-                  <el-alert
-                    :title="item.message"
-                    :type="item.status === 'failed' ? 'error' : 'warning'"
-                    :closable="false"
-                    size="small"
-                  />
-                </div>
-                
-                <div class="item-duration">
-                  <span class="duration-text">
-                    {{ getDuration(item.started_at, item.finished_at) }}
-                  </span>
-                </div>
-              </div>
-            </el-timeline-item>
-          </el-timeline>
-          
-          <!-- 加载更多 -->
-          <div v-if="hasMore" class="load-more">
-            <el-button 
-              type="primary" 
-              link 
-              :loading="loadingMore"
-              @click="loadMore"
-            >
-              加载更多
-            </el-button>
-          </div>
-        </div>
-
-        <div v-else class="empty-state">
-          <el-empty description="暂无同步历史" />
-        </div>
-      </div>
-    </el-card>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import type { SyncStatus } from '@/api/sync'
+import { CircleCloseFilled, Clock, Refresh, SuccessFilled, Warning } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { Clock, Refresh, SuccessFilled, CircleCloseFilled, Warning } from '@element-plus/icons-vue'
-import { getSyncHistory, type SyncStatus } from '@/api/sync'
+import { onMounted, ref } from 'vue'
+import { getSyncHistory } from '@/api/sync'
 
 type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
 
@@ -250,21 +134,22 @@ const getTimelineIcon = (status: string) => {
 
 // 格式化时间
 const formatTime = (timeStr?: string) => {
-  if (!timeStr) return ''
-  
+  if (!timeStr)
+    return ''
+
   const date = new Date(timeStr)
   const now = new Date()
   const diff = now.getTime() - date.getTime()
-  
+
   // 如果是今天
   if (diff < 24 * 60 * 60 * 1000) {
-    return date.toLocaleTimeString('zh-CN', { 
-      hour: '2-digit', 
+    return date.toLocaleTimeString('zh-CN', {
+      hour: '2-digit',
       minute: '2-digit',
       second: '2-digit'
     })
   }
-  
+
   // 如果是昨天或更早
   return date.toLocaleString('zh-CN', {
     month: '2-digit',
@@ -276,12 +161,13 @@ const formatTime = (timeStr?: string) => {
 
 // 计算持续时间
 const getDuration = (startTime?: string, endTime?: string) => {
-  if (!startTime || !endTime) return ''
-  
+  if (!startTime || !endTime)
+    return ''
+
   const start = new Date(startTime)
   const end = new Date(endTime)
   const duration = end.getTime() - start.getTime()
-  
+
   if (duration < 1000) {
     return `${duration}ms`
   } else if (duration < 60000) {
@@ -299,6 +185,125 @@ onMounted(() => {
 })
 </script>
 
+<template>
+  <div class="sync-history">
+    <el-card class="history-card" shadow="hover">
+      <template #header>
+        <div class="card-header">
+          <el-icon class="header-icon">
+            <Clock />
+          </el-icon>
+          <span class="header-title">同步历史</span>
+          <el-button
+            type="primary"
+            size="small"
+            :loading="loading"
+            @click="refreshHistory"
+          >
+            <el-icon><Refresh /></el-icon>
+            刷新
+          </el-button>
+        </div>
+      </template>
+
+      <div v-loading="loading" class="history-content">
+        <div v-if="error" class="error-message">
+          <el-alert
+            :title="error"
+            type="error"
+            :closable="false"
+            show-icon
+          />
+        </div>
+
+        <div v-else-if="historyList.length > 0" class="history-list">
+          <el-timeline>
+            <el-timeline-item
+              v-for="(item, index) in historyList"
+              :key="index"
+              :timestamp="formatTime(item.finished_at || item.started_at)"
+              :type="getTimelineType(item.status)"
+              :icon="getTimelineIcon(item.status)"
+              placement="top"
+            >
+              <div class="history-item">
+                <div class="item-header">
+                  <el-tag
+                    :type="getStatusType(item.status)"
+                    size="small"
+                    class="status-tag"
+                  >
+                    {{ getStatusText(item.status) }}
+                  </el-tag>
+                  <span class="job-name">{{ item.job }}</span>
+                </div>
+
+                <div class="item-stats">
+                  <div class="stats-row">
+                    <span class="stat-item">总数: {{ item.total }}</span>
+                    <span class="stat-item success">新增: {{ item.inserted }}</span>
+                    <span class="stat-item primary">更新: {{ item.updated }}</span>
+                    <span class="stat-item danger">错误: {{ item.errors }}</span>
+                  </div>
+
+                  <div v-if="item.data_sources_used?.length" class="sources-row">
+                    <span class="sources-label">数据源:</span>
+                    <el-tag
+                      v-for="source in item.data_sources_used"
+                      :key="source"
+                      size="small"
+                      type="info"
+                      class="source-tag"
+                    >
+                      {{ source }}
+                    </el-tag>
+                  </div>
+
+                  <div v-if="item.last_trade_date" class="trade-date-row">
+                    <span class="trade-date-label">交易日期:</span>
+                    <span class="trade-date-value">{{ item.last_trade_date }}</span>
+                  </div>
+                </div>
+
+                <div v-if="item.message" class="item-message">
+                  <el-alert
+                    :title="item.message"
+                    :type="item.status === 'failed' ? 'error' : 'warning'"
+                    :closable="false"
+                    size="small"
+                  />
+                </div>
+
+                <div class="item-duration">
+                  <span class="duration-text">
+                    {{ getDuration(item.started_at, item.finished_at) }}
+                  </span>
+                </div>
+              </div>
+            </el-timeline-item>
+          </el-timeline>
+
+          <!-- 加载更多 -->
+          <div v-if="hasMore" class="load-more">
+            <el-button
+              type="primary"
+              link
+              :loading="loadingMore"
+              @click="loadMore"
+            >
+              加载更多
+            </el-button>
+          </div>
+        </div>
+
+        <div v-else class="empty-state">
+          <el-empty description="暂无同步历史" />
+        </div>
+      </div>
+    </el-card>
+  </div>
+</template>
+
 <style scoped lang="scss">
 .sync-history {
   .history-card {
@@ -306,12 +311,12 @@ onMounted(() => {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      
+
       .header-icon {
         margin-right: 8px;
         color: var(--el-color-primary);
       }
-      
+
       .header-title {
         font-weight: 600;
         flex: 1;
@@ -332,60 +337,60 @@ onMounted(() => {
         align-items: center;
         gap: 8px;
         margin-bottom: 8px;
-        
+
         .job-name {
           font-weight: 500;
           color: var(--el-text-color-regular);
         }
       }
-      
+
       .item-stats {
         margin-bottom: 8px;
-        
+
         .stats-row {
           display: flex;
           gap: 16px;
           margin-bottom: 4px;
-          
+
           .stat-item {
             font-size: 12px;
-            
+
             &.success { color: var(--el-color-success); }
             &.primary { color: var(--el-color-primary); }
             &.danger { color: var(--el-color-danger); }
           }
         }
-        
+
         .sources-row {
           display: flex;
           align-items: center;
           gap: 8px;
           margin-bottom: 4px;
-          
+
           .sources-label {
             font-size: 12px;
             color: var(--el-text-color-secondary);
           }
-          
+
           .source-tag {
             font-size: 10px;
           }
         }
-        
+
         .trade-date-row {
           font-size: 12px;
           color: var(--el-text-color-secondary);
-          
+
           .trade-date-label {
             margin-right: 4px;
           }
         }
       }
-      
+
       .item-message {
         margin-bottom: 8px;
       }
-      
+
       .item-duration {
         .duration-text {
           font-size: 12px;
@@ -393,7 +398,7 @@ onMounted(() => {
         }
       }
     }
-    
+
     .load-more {
       text-align: center;
       padding: 16px 0;

@@ -1,5 +1,5 @@
+import type { ChatMessage, ChatRequest, Conversation, ConversationCreate, ConversationUpdate, ToolInfo } from '@/types/chat'
 import { ApiClient } from './request'
-import type { Conversation, ConversationCreate, ConversationUpdate, ChatMessage, ChatRequest, ToolInfo } from '@/types/chat'
 
 export const chatApi = {
   listConversations(archived?: boolean, limit?: number) {
@@ -32,13 +32,13 @@ export const chatApi = {
 
   listTools() {
     return ApiClient.get<ToolInfo[]>('/api/chat/tools')
-  },
+  }
 }
 
 export function streamChat(
   convId: string,
   message: string,
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<Response> {
   const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
   const token = localStorage.getItem('auth-token')
@@ -50,8 +50,8 @@ export function streamChat(
     headers: {
       'Authorization': `Bearer ${token}`,
       'Accept': 'text/event-stream',
-      'Cache-Control': 'no-cache',
+      'Cache-Control': 'no-cache'
     },
-    signal,
+    signal
   })
 }

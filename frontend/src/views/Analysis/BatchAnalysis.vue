@@ -1,303 +1,12 @@
-<template>
-  <div class="batch-analysis">
-    <!-- 页面头部 -->
-    <div class="page-header">
-      <div class="header-content">
-        <div class="title-section">
-          <h1 class="page-title">
-            <el-icon class="title-icon"><Files /></el-icon>
-            批量分析
-          </h1>
-          <p class="page-description">
-            AI驱动的批量股票分析，高效处理多只股票
-          </p>
-        </div>
-      </div>
-
-      <!-- 风险提示 -->
-      <div class="risk-disclaimer">
-        <el-alert
-          type="warning"
-          :closable="false"
-          show-icon
-        >
-          <template #title>
-            <span style="font-size: 14px;">
-              <strong>⚠️ 重要提示：</strong>本工具为股票分析辅助工具，所有分析结果仅供参考，不构成投资建议。投资有风险，决策需谨慎。
-            </span>
-          </template>
-        </el-alert>
-      </div>
-    </div>
-
-    <!-- 股票列表输入区域 -->
-    <div class="analysis-container">
-      <el-row :gutter="24">
-        <el-col :span="24">
-          <el-card class="stock-list-card" shadow="hover">
-            <template #header>
-              <div class="card-header">
-                <h3>📋 股票列表</h3>
-                <el-tag :type="stockCodes.length > 0 ? 'success' : 'info'" size="small">
-                  {{ stockCodes.length }} 只股票
-                </el-tag>
-              </div>
-            </template>
-
-            <div class="stock-input-section">
-              <div class="input-area">
-                <el-input
-                  v-model="stockInput"
-                  type="textarea"
-                  :rows="8"
-                  placeholder="请输入股票代码，每行一个&#10;支持格式：&#10;000001&#10;000002.SZ&#10;600036.SH&#10;AAPL&#10;TSLA"
-                  @input="parseStockCodes"
-                  class="stock-textarea"
-                />
-                <div class="input-actions">
-                  <el-button type="primary" @click="parseStockCodes" size="small">
-                    解析股票代码
-                  </el-button>
-                  <el-button @click="clearStocks" size="small">清空</el-button>
-                </div>
-              </div>
-
-              <!-- 股票预览 -->
-              <div v-if="stockCodes.length > 0" class="stock-preview">
-                <h4>股票预览</h4>
-                <div class="stock-tags">
-                  <el-tag
-                    v-for="(code, index) in stockCodes.slice(0, 20)"
-                    :key="code"
-                    closable
-                    @close="removeStock(index)"
-                    class="stock-tag"
-                  >
-                    {{ code }}
-                  </el-tag>
-                  <el-tag v-if="stockCodes.length > 20" type="info">
-                    +{{ stockCodes.length - 20 }} 更多...
-                  </el-tag>
-                </div>
-              </div>
-
-              <!-- 无效代码提示 -->
-              <div v-if="invalidCodes.length > 0" class="invalid-codes">
-                <el-alert
-                  title="以下股票代码格式可能有误，请检查："
-                  type="warning"
-                  :closable="false"
-                >
-                  <div class="invalid-list">
-                    <el-tag v-for="code in invalidCodes" :key="code" type="danger" size="small">
-                      {{ code }}
-                    </el-tag>
-                  </div>
-                </el-alert>
-              </div>
-            </div>
-          </el-card>
-        </el-col>
-      </el-row>
-
-      <!-- 分析配置区域 -->
-      <el-row :gutter="24" style="margin-top: 24px;">
-        <!-- 左侧：分析配置 -->
-        <el-col :span="18">
-          <el-card class="config-card" shadow="hover">
-            <template #header>
-              <div class="card-header">
-                <h3>⚙️ 分析配置</h3>
-                <el-tag type="primary" size="small">批量设置</el-tag>
-              </div>
-            </template>
-
-            <el-form :model="batchForm" label-width="100px" class="batch-form">
-              <!-- 基础信息 -->
-              <div class="form-section">
-                <h4 class="section-title">📋 基础信息</h4>
-                <el-form-item label="批次标题" required>
-                  <el-input
-                    v-model="batchForm.title"
-                    placeholder="如：银行板块分析"
-                    size="large"
-                  />
-                </el-form-item>
-
-                <el-form-item label="批次描述">
-                  <el-input
-                    v-model="batchForm.description"
-                    type="textarea"
-                    :rows="2"
-                    placeholder="描述本次批量分析的目的和背景（可选）"
-                  />
-                </el-form-item>
-              </div>
-
-              <!-- 分析参数 -->
-              <div class="form-section">
-                <h4 class="section-title">⚙️ 分析参数</h4>
-                <el-form-item label="分析深度">
-                  <el-select v-model="batchForm.depth" placeholder="选择深度" size="large" style="width: 100%">
-                    <el-option label="⚡ 1级 - 快速分析 (2-4分钟/只)" value="1" />
-                    <el-option label="📈 2级 - 基础分析 (4-6分钟/只)" value="2" />
-                    <el-option label="🎯 3级 - 标准分析 (6-10分钟/只，推荐)" value="3" />
-                    <el-option label="🔍 4级 - 深度分析 (10-15分钟/只)" value="4" />
-                    <el-option label="🏆 5级 - 全面分析 (15-25分钟/只)" value="5" />
-                  </el-select>
-                </el-form-item>
-              </div>
-
-              <!-- 分析师选择 -->
-              <div class="form-section">
-                <h4 class="section-title">👥 分析师团队</h4>
-                <div class="analysts-selection">
-                  <el-checkbox-group v-model="batchForm.analysts" class="analysts-group">
-                    <div
-                      v-for="analyst in ANALYSTS"
-                      :key="analyst.id"
-                      class="analyst-option"
-                    >
-                      <el-checkbox :label="analyst.name" class="analyst-checkbox">
-                        <div class="analyst-info">
-                          <span class="analyst-name">{{ analyst.name }}</span>
-                          <span class="analyst-desc">{{ analyst.description }}</span>
-                        </div>
-                      </el-checkbox>
-                    </div>
-                  </el-checkbox-group>
-                </div>
-              </div>
-
-              <!-- 操作按钮 -->
-              <div class="form-section">
-                <div class="action-buttons" style="display: flex; justify-content: center; align-items: center; width: 100%; text-align: center;">
-                  <el-button
-                    type="primary"
-                    size="large"
-                    @click="submitBatchAnalysis"
-                    :loading="submitting"
-                    :disabled="stockCodes.length === 0"
-                    class="submit-btn large-batch-btn"
-                    style="width: 320px; height: 56px; font-size: 18px; font-weight: 700; border-radius: 16px;"
-                  >
-                    <el-icon><TrendCharts /></el-icon>
-                    开始批量分析 ({{ stockCodes.length }}只)
-                  </el-button>
-                </div>
-              </div>
-            </el-form>
-          </el-card>
-        </el-col>
-
-        <!-- 右侧：高级配置 -->
-        <el-col :span="6">
-          <el-card class="advanced-config-card" shadow="hover">
-            <template #header>
-              <div class="card-header">
-                <h3>🔧 高级配置</h3>
-              </div>
-            </template>
-
-            <div class="config-content">
-              <!-- AI模型配置组件 -->
-              <ModelConfig
-                v-model:quick-analysis-model="modelSettings.quickAnalysisModel"
-                v-model:deep-analysis-model="modelSettings.deepAnalysisModel"
-                :available-models="availableModels"
-                :analysis-depth="batchForm.depth"
-              />
-
-              <!-- 分析选项 -->
-              <div class="config-section">
-                <h4 class="config-title">⚙️ 分析选项</h4>
-                <div class="analysis-options">
-                  <div class="option-item">
-                    <el-switch v-model="batchForm.includeSentiment" />
-                    <div class="option-content">
-                      <div class="option-name">情绪分析</div>
-                      <div class="option-desc">分析市场情绪和投资者心理</div>
-                    </div>
-                  </div>
-
-                  <div class="option-item">
-                    <el-switch v-model="batchForm.includeRisk" />
-                    <div class="option-content">
-                      <div class="option-name">风险评估</div>
-                      <div class="option-desc">包含详细的风险因素分析</div>
-                    </div>
-                  </div>
-
-                  <div class="option-item">
-                    <el-select v-model="batchForm.language" size="small" style="width: 100%">
-                      <el-option label="中文" value="zh-CN" />
-                      <el-option label="English" value="en-US" />
-                    </el-select>
-                    <div class="option-content">
-                      <div class="option-name">语言偏好</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </el-card>
-        </el-col>
-      </el-row>
-    </div>
-
-    <!-- 股票预览 -->
-    <el-card v-if="stockCodes.length > 0" class="stock-preview-card" shadow="never">
-      <template #header>
-        <div class="card-header">
-          <h3>股票预览 ({{ stockCodes.length }}只)</h3>
-          <el-button type="text" @click="validateStocks">
-            <el-icon><Check /></el-icon>
-            验证股票代码
-          </el-button>
-        </div>
-      </template>
-
-      <div class="stock-grid">
-        <div
-          v-for="(code, index) in stockCodes"
-          :key="index"
-          class="stock-item"
-          :class="{ invalid: invalidCodes.includes(code) }"
-        >
-          <span class="stock-code">{{ code }}</span>
-          <el-button
-            type="text"
-            size="small"
-            @click="removeStock(index)"
-            class="remove-btn"
-          >
-            <el-icon><Close /></el-icon>
-          </el-button>
-        </div>
-      </div>
-
-      <div v-if="invalidCodes.length > 0" class="invalid-notice">
-        <el-alert
-          title="发现无效股票代码"
-          type="warning"
-          :description="`以下股票代码可能无效：${invalidCodes.join(', ')}`"
-          show-icon
-          :closable="false"
-        />
-      </div>
-    </el-card>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { Check, Close, Files, TrendCharts } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Files, TrendCharts, Check, Close } from '@element-plus/icons-vue'
-import { ANALYSTS, DEFAULT_ANALYSTS, convertAnalystNamesToIds } from '@/constants/analysts'
+import { onMounted, reactive, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { configApi } from '@/api/config'
-import { useRouter, useRoute } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
 import ModelConfig from '@/components/ModelConfig.vue'
+import { ANALYSTS, convertAnalystNamesToIds, DEFAULT_ANALYSTS } from '@/constants/analysts'
+import { useAuthStore } from '@/stores/auth'
 import { getMarketByStockCode } from '@/utils/market'
 import { validateStockCode } from '@/utils/stockValidator'
 
@@ -307,8 +16,8 @@ const route = useRoute()
 
 const submitting = ref(false)
 const stockInput = ref('')
-const stockCodes = ref<string[]>([])  // 保留用于表单绑定
-const symbols = ref<string[]>([])     // 标准化后的代码列表
+const stockCodes = ref<string[]>([]) // 保留用于表单绑定
+const symbols = ref<string[]>([]) // 标准化后的代码列表
 const invalidCodes = ref<string[]>([])
 
 // 模型设置
@@ -323,21 +32,23 @@ const availableModels = ref<any[]>([])
 const batchForm = reactive({
   title: '',
   description: '',
-  depth: '3',  // 默认3级标准分析，将在 onMounted 中从用户偏好加载
-  analysts: [...DEFAULT_ANALYSTS],  // 将在 onMounted 中从用户偏好加载
+  depth: '3', // 默认3级标准分析，将在 onMounted 中从用户偏好加载
+  analysts: [...DEFAULT_ANALYSTS], // 将在 onMounted 中从用户偏好加载
   includeSentiment: true,
   includeRisk: true,
   language: 'zh-CN'
 })
 
 // 使用通用校验器规范化代码，自动识别市场
-const normalizeCodeSmart = (raw: string): { symbol?: string; error?: string } => {
+const normalizeCodeSmart = (raw: string): { symbol?: string, error?: string } => {
   const code = String(raw || '').trim()
-  if (!code) return { error: '空代码' }
+  if (!code)
+    return { error: '空代码' }
 
   // 自动识别市场
   const v = validateStockCode(code)
-  if (v.valid && v.normalizedCode) return { symbol: v.normalizedCode }
+  if (v.valid && v.normalizedCode)
+    return { symbol: v.normalizedCode }
 
   return { error: v.message || '代码格式无效' }
 }
@@ -353,7 +64,8 @@ const parseStockCodes = () => {
   const invalid: string[] = []
   for (const c of codes) {
     const { symbol } = normalizeCodeSmart(c)
-    if (symbol) normalized.push(symbol)
+    if (symbol)
+      normalized.push(symbol)
     else invalid.push(c)
   }
 
@@ -434,7 +146,7 @@ onMounted(async () => {
   // 读取路由查询参数以便从筛选页预填充（路由参数优先级最高）
   const q = route.query as any
   if (q?.stocks) {
-    const parts = String(q.stocks).split(',').map((s) => s.trim()).filter(Boolean)
+    const parts = String(q.stocks).split(',').map(s => s.trim()).filter(Boolean)
     stockCodes.value = parts
     stockInput.value = parts.join('\n')
     // 触发解析以更新 symbols
@@ -445,10 +157,10 @@ onMounted(async () => {
 const removeStock = (index: number) => {
   const removedCode = stockCodes.value[index]
   stockCodes.value.splice(index, 1)
-  
+
   // 更新输入框
   stockInput.value = stockCodes.value.join('\n')
-  
+
   // 从无效列表中移除
   const invalidIndex = invalidCodes.value.indexOf(removedCode)
   if (invalidIndex > -1) {
@@ -462,7 +174,8 @@ const validateStocks = async () => {
   const valid: string[] = []
   for (const c of stockCodes.value) {
     const { symbol } = normalizeCodeSmart(c)
-    if (symbol) valid.push(symbol)
+    if (symbol)
+      valid.push(symbol)
     else invalid.push(c)
   }
   stockCodes.value = valid
@@ -510,7 +223,7 @@ const submitBatchAnalysis = async () => {
       title: batchForm.title,
       description: batchForm.description,
       symbols: symbols.value,
-      stock_codes: symbols.value,  // 兼容字段
+      stock_codes: symbols.value, // 兼容字段
       parameters: {
         // 若全部代码可识别为同一市场则携带；否则省略让后端自行判断
         market_type: (() => {
@@ -551,13 +264,12 @@ const submitBatchAnalysis = async () => {
     ).then(() => {
       // 用户点击"前往任务中心"
       router.push({ path: '/tasks', query: { batch_id } })
-    }).catch((action) => {
+    }).catch(action => {
       // 用户点击"留在当前页面"或关闭对话框
       if (action === 'cancel') {
         ElMessage.info('任务正在后台执行，您可以随时前往任务中心查看进度')
       }
     })
-
   } catch (error: any) {
     // 处理错误
     if (error !== 'cancel') {
@@ -567,8 +279,322 @@ const submitBatchAnalysis = async () => {
     submitting.value = false
   }
 }
-
 </script>
+
+<template>
+  <div class="batch-analysis">
+    <!-- 页面头部 -->
+    <div class="page-header">
+      <div class="header-content">
+        <div class="title-section">
+          <h1 class="page-title">
+            <el-icon class="title-icon">
+              <Files />
+            </el-icon>
+            批量分析
+          </h1>
+          <p class="page-description">
+            AI驱动的批量股票分析，高效处理多只股票
+          </p>
+        </div>
+      </div>
+
+      <!-- 风险提示 -->
+      <div class="risk-disclaimer">
+        <el-alert
+          type="warning"
+          :closable="false"
+          show-icon
+        >
+          <template #title>
+            <span style="font-size: 14px;">
+              <strong>⚠️ 重要提示：</strong>本工具为股票分析辅助工具，所有分析结果仅供参考，不构成投资建议。投资有风险，决策需谨慎。
+            </span>
+          </template>
+        </el-alert>
+      </div>
+    </div>
+
+    <!-- 股票列表输入区域 -->
+    <div class="analysis-container">
+      <el-row :gutter="24">
+        <el-col :span="24">
+          <el-card class="stock-list-card" shadow="hover">
+            <template #header>
+              <div class="card-header">
+                <h3>📋 股票列表</h3>
+                <el-tag :type="stockCodes.length > 0 ? 'success' : 'info'" size="small">
+                  {{ stockCodes.length }} 只股票
+                </el-tag>
+              </div>
+            </template>
+
+            <div class="stock-input-section">
+              <div class="input-area">
+                <el-input
+                  v-model="stockInput"
+                  type="textarea"
+                  :rows="8"
+                  placeholder="请输入股票代码，每行一个&#10;支持格式：&#10;000001&#10;000002.SZ&#10;600036.SH&#10;AAPL&#10;TSLA"
+                  class="stock-textarea"
+                  @input="parseStockCodes"
+                />
+                <div class="input-actions">
+                  <el-button type="primary" size="small" @click="parseStockCodes">
+                    解析股票代码
+                  </el-button>
+                  <el-button size="small" @click="clearStocks">
+                    清空
+                  </el-button>
+                </div>
+              </div>
+
+              <!-- 股票预览 -->
+              <div v-if="stockCodes.length > 0" class="stock-preview">
+                <h4>股票预览</h4>
+                <div class="stock-tags">
+                  <el-tag
+                    v-for="(code, index) in stockCodes.slice(0, 20)"
+                    :key="code"
+                    closable
+                    class="stock-tag"
+                    @close="removeStock(index)"
+                  >
+                    {{ code }}
+                  </el-tag>
+                  <el-tag v-if="stockCodes.length > 20" type="info">
+                    +{{ stockCodes.length - 20 }} 更多...
+                  </el-tag>
+                </div>
+              </div>
+
+              <!-- 无效代码提示 -->
+              <div v-if="invalidCodes.length > 0" class="invalid-codes">
+                <el-alert
+                  title="以下股票代码格式可能有误，请检查："
+                  type="warning"
+                  :closable="false"
+                >
+                  <div class="invalid-list">
+                    <el-tag v-for="code in invalidCodes" :key="code" type="danger" size="small">
+                      {{ code }}
+                    </el-tag>
+                  </div>
+                </el-alert>
+              </div>
+            </div>
+          </el-card>
+        </el-col>
+      </el-row>
+
+      <!-- 分析配置区域 -->
+      <el-row :gutter="24" style="margin-top: 24px;">
+        <!-- 左侧：分析配置 -->
+        <el-col :span="18">
+          <el-card class="config-card" shadow="hover">
+            <template #header>
+              <div class="card-header">
+                <h3>⚙️ 分析配置</h3>
+                <el-tag type="primary" size="small">
+                  批量设置
+                </el-tag>
+              </div>
+            </template>
+
+            <el-form :model="batchForm" label-width="100px" class="batch-form">
+              <!-- 基础信息 -->
+              <div class="form-section">
+                <h4 class="section-title">
+                  📋 基础信息
+                </h4>
+                <el-form-item label="批次标题" required>
+                  <el-input
+                    v-model="batchForm.title"
+                    placeholder="如：银行板块分析"
+                    size="large"
+                  />
+                </el-form-item>
+
+                <el-form-item label="批次描述">
+                  <el-input
+                    v-model="batchForm.description"
+                    type="textarea"
+                    :rows="2"
+                    placeholder="描述本次批量分析的目的和背景（可选）"
+                  />
+                </el-form-item>
+              </div>
+
+              <!-- 分析参数 -->
+              <div class="form-section">
+                <h4 class="section-title">
+                  ⚙️ 分析参数
+                </h4>
+                <el-form-item label="分析深度">
+                  <el-select v-model="batchForm.depth" placeholder="选择深度" size="large" style="width: 100%">
+                    <el-option label="⚡ 1级 - 快速分析 (2-4分钟/只)" value="1" />
+                    <el-option label="📈 2级 - 基础分析 (4-6分钟/只)" value="2" />
+                    <el-option label="🎯 3级 - 标准分析 (6-10分钟/只，推荐)" value="3" />
+                    <el-option label="🔍 4级 - 深度分析 (10-15分钟/只)" value="4" />
+                    <el-option label="🏆 5级 - 全面分析 (15-25分钟/只)" value="5" />
+                  </el-select>
+                </el-form-item>
+              </div>
+
+              <!-- 分析师选择 -->
+              <div class="form-section">
+                <h4 class="section-title">
+                  👥 分析师团队
+                </h4>
+                <div class="analysts-selection">
+                  <el-checkbox-group v-model="batchForm.analysts" class="analysts-group">
+                    <div
+                      v-for="analyst in ANALYSTS"
+                      :key="analyst.id"
+                      class="analyst-option"
+                    >
+                      <el-checkbox :label="analyst.name" class="analyst-checkbox">
+                        <div class="analyst-info">
+                          <span class="analyst-name">{{ analyst.name }}</span>
+                          <span class="analyst-desc">{{ analyst.description }}</span>
+                        </div>
+                      </el-checkbox>
+                    </div>
+                  </el-checkbox-group>
+                </div>
+              </div>
+
+              <!-- 操作按钮 -->
+              <div class="form-section">
+                <div class="action-buttons" style="display: flex; justify-content: center; align-items: center; width: 100%; text-align: center;">
+                  <el-button
+                    type="primary"
+                    size="large"
+                    :loading="submitting"
+                    :disabled="stockCodes.length === 0"
+                    class="submit-btn large-batch-btn"
+                    style="width: 320px; height: 56px; font-size: 18px; font-weight: 700; border-radius: 16px;"
+                    @click="submitBatchAnalysis"
+                  >
+                    <el-icon><TrendCharts /></el-icon>
+                    开始批量分析 ({{ stockCodes.length }}只)
+                  </el-button>
+                </div>
+              </div>
+            </el-form>
+          </el-card>
+        </el-col>
+
+        <!-- 右侧：高级配置 -->
+        <el-col :span="6">
+          <el-card class="advanced-config-card" shadow="hover">
+            <template #header>
+              <div class="card-header">
+                <h3>🔧 高级配置</h3>
+              </div>
+            </template>
+
+            <div class="config-content">
+              <!-- AI模型配置组件 -->
+              <ModelConfig
+                v-model:quick-analysis-model="modelSettings.quickAnalysisModel"
+                v-model:deep-analysis-model="modelSettings.deepAnalysisModel"
+                :available-models="availableModels"
+                :analysis-depth="batchForm.depth"
+              />
+
+              <!-- 分析选项 -->
+              <div class="config-section">
+                <h4 class="config-title">
+                  ⚙️ 分析选项
+                </h4>
+                <div class="analysis-options">
+                  <div class="option-item">
+                    <el-switch v-model="batchForm.includeSentiment" />
+                    <div class="option-content">
+                      <div class="option-name">
+                        情绪分析
+                      </div>
+                      <div class="option-desc">
+                        分析市场情绪和投资者心理
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="option-item">
+                    <el-switch v-model="batchForm.includeRisk" />
+                    <div class="option-content">
+                      <div class="option-name">
+                        风险评估
+                      </div>
+                      <div class="option-desc">
+                        包含详细的风险因素分析
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="option-item">
+                    <el-select v-model="batchForm.language" size="small" style="width: 100%">
+                      <el-option label="中文" value="zh-CN" />
+                      <el-option label="English" value="en-US" />
+                    </el-select>
+                    <div class="option-content">
+                      <div class="option-name">
+                        语言偏好
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </el-card>
+        </el-col>
+      </el-row>
+    </div>
+
+    <!-- 股票预览 -->
+    <el-card v-if="stockCodes.length > 0" class="stock-preview-card" shadow="never">
+      <template #header>
+        <div class="card-header">
+          <h3>股票预览 ({{ stockCodes.length }}只)</h3>
+          <el-button type="text" @click="validateStocks">
+            <el-icon><Check /></el-icon>
+            验证股票代码
+          </el-button>
+        </div>
+      </template>
+
+      <div class="stock-grid">
+        <div
+          v-for="(code, index) in stockCodes"
+          :key="index"
+          class="stock-item"
+          :class="{ invalid: invalidCodes.includes(code) }"
+        >
+          <span class="stock-code">{{ code }}</span>
+          <el-button
+            type="text"
+            size="small"
+            class="remove-btn"
+            @click="removeStock(index)"
+          >
+            <el-icon><Close /></el-icon>
+          </el-button>
+        </div>
+      </div>
+
+      <div v-if="invalidCodes.length > 0" class="invalid-notice">
+        <el-alert
+          title="发现无效股票代码"
+          type="warning"
+          :description="`以下股票代码可能无效：${invalidCodes.join(', ')}`"
+          show-icon
+          :closable="false"
+        />
+      </div>
+    </el-card>
+  </div>
+</template>
 
 <style lang="scss" scoped>
 .batch-analysis {

@@ -9,7 +9,7 @@ export interface DataSourceStatus {
   priority: number
   available: boolean
   description: string
-  token_source?: 'database' | 'env'  // Token 来源（仅 Tushare）
+  token_source?: 'database' | 'env' // Token 来源（仅 Tushare）
 }
 
 // 同步状态接口
@@ -55,7 +55,7 @@ export interface DataSourceTestResult {
   priority: number
   available: boolean
   message: string
-  token_source?: 'database' | 'env'  // Token 来源（仅 Tushare）
+  token_source?: 'database' | 'env' // Token 来源（仅 Tushare）
 }
 
 // 使用建议接口
@@ -115,7 +115,7 @@ export const runStockBasicsSync = (params?: {
     queryParams.append('preferred_sources', params.preferred_sources)
   }
 
-  const url = `/api/sync/multi-source/stock_basics/run${queryParams.toString() ? '?' + queryParams.toString() : ''}`
+  const url = `/api/sync/multi-source/stock_basics/run${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
   return ApiClient.post(url, undefined, {
     timeout: 600000 // 🔥 同步操作需要更长时间，设置为10分钟（BaoStock需要逐个获取估值数据）
   })
@@ -164,7 +164,7 @@ export const getSyncHistory = (params?: {
     queryParams.append('status', params.status)
   }
 
-  const url = `/api/sync/multi-source/history${queryParams.toString() ? '?' + queryParams.toString() : ''}`
+  const url = `/api/sync/multi-source/history${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
   return ApiClient.get(url)
 }
 

@@ -1,35 +1,9 @@
-<template>
-  <div id="app" class="app-container">
-    <!-- 网络状态指示器 -->
-    <NetworkStatus />
-
-    <!-- 主要内容区域 -->
-    <router-view v-slot="{ Component, route }">
-      <transition
-        :name="(route?.meta?.transition as string) || 'fade'"
-        mode="out-in"
-        appear
-      >
-        <keep-alive :include="keepAliveComponents">
-          <component :is="Component" />
-        </keep-alive>
-      </transition>
-    </router-view>
-
-    <!-- 配置向导 -->
-    <ConfigWizard
-      v-model="showConfigWizard"
-      @complete="handleWizardComplete"
-    />
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import NetworkStatus from '@/components/NetworkStatus.vue'
 import axios from 'axios'
+import { ElMessage } from 'element-plus'
+import { computed, onMounted, ref } from 'vue'
 import { configApi } from '@/api/config'
+import NetworkStatus from '@/components/NetworkStatus.vue'
 
 // 需要缓存的组件
 const keepAliveComponents = computed(() => [
@@ -77,7 +51,7 @@ const handleWizardComplete = async (data: any) => {
     if (data.llm?.provider && data.llm?.apiKey) {
       try {
         // 先添加厂家（如果不存在）
-        const providerMap: Record<string, { name: string; base_url?: string }> = {
+        const providerMap: Record<string, { name: string, base_url?: string }> = {
           deepseek: { name: 'DeepSeek', base_url: 'https://api.deepseek.com' },
           dashscope: { name: '通义千问', base_url: 'https://dashscope.aliyuncs.com/api/v1' },
           openai: { name: 'OpenAI', base_url: 'https://api.openai.com/v1' },
@@ -172,6 +146,32 @@ onMounted(() => {
   checkFirstTimeSetup()
 })
 </script>
+
+<template>
+  <div id="app" class="app-container">
+    <!-- 网络状态指示器 -->
+    <NetworkStatus />
+
+    <!-- 主要内容区域 -->
+    <router-view v-slot="{ Component, route }">
+      <transition
+        :name="(route?.meta?.transition as string) || 'fade'"
+        mode="out-in"
+        appear
+      >
+        <keep-alive :include="keepAliveComponents">
+          <component :is="Component" />
+        </keep-alive>
+      </transition>
+    </router-view>
+
+    <!-- 配置向导 -->
+    <ConfigWizard
+      v-model="showConfigWizard"
+      @complete="handleWizardComplete"
+    />
+  </div>
+</template>
 
 <style lang="scss">
 .app-container {

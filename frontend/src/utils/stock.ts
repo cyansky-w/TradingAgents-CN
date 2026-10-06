@@ -1,6 +1,6 @@
 /**
  * 股票代码字段兼容性工具函数
- * 
+ *
  * 用于处理前后端字段标准化过程中的兼容性问题
  */
 
@@ -31,8 +31,8 @@ export function getFullSymbol(obj: any): string {
 export function createSymbolObject(symbol: string, fullSymbol?: string) {
   return {
     symbol,
-    stock_code: symbol,  // 兼容字段
-    code: symbol,        // 兼容字段
+    stock_code: symbol, // 兼容字段
+    code: symbol, // 兼容字段
     ...(fullSymbol && { full_symbol: fullSymbol })
   }
 }
@@ -42,18 +42,20 @@ export function createSymbolObject(symbol: string, fullSymbol?: string) {
  * @param symbols 股票代码列表（可能包含新旧字段）
  * @returns 标准化后的代码列表
  */
-export function normalizeSymbols(symbols: (string | { symbol?: string; stock_code?: string; code?: string })[]): string[] {
+export function normalizeSymbols(symbols: (string | { symbol?: string, stock_code?: string, code?: string })[]): string[] {
   const result = new Set<string>()
-  
+
   for (const item of symbols) {
     if (typeof item === 'string') {
-      if (item) result.add(item)
+      if (item)
+        result.add(item)
     } else if (item && typeof item === 'object') {
       const symbol = getStockSymbol(item)
-      if (symbol) result.add(symbol)
+      if (symbol)
+        result.add(symbol)
     }
   }
-  
+
   return Array.from(result)
 }
 
@@ -64,10 +66,11 @@ export function normalizeSymbols(symbols: (string | { symbol?: string; stock_cod
  * @returns 是否有效
  */
 export function validateSymbol(symbol: string, market?: string): boolean {
-  if (!symbol) return false
-  
+  if (!symbol)
+    return false
+
   const trimmed = symbol.trim()
-  
+
   if (market === 'A股' || market === 'CN') {
     // A股：6位数字
     return /^\d{6}$/.test(trimmed)
@@ -78,11 +81,11 @@ export function validateSymbol(symbol: string, market?: string): boolean {
     // 港股：4-5位数字.HK
     return /^\d{4,5}(\.HK)?$/.test(trimmed.toUpperCase())
   }
-  
+
   // 未指定市场时，尝试通用验证
-  return /^\d{6}$/.test(trimmed) || // A股
-         /^[A-Z]{1,5}$/.test(trimmed.toUpperCase()) || // 美股
-         /^\d{4,5}(\.HK)?$/.test(trimmed.toUpperCase()) // 港股
+  return /^\d{6}$/.test(trimmed) // A股
+    || /^[A-Z]{1,5}$/.test(trimmed.toUpperCase()) // 美股
+    || /^\d{4,5}(\.HK)?$/.test(trimmed.toUpperCase()) // 港股
 }
 
 /**
@@ -92,10 +95,11 @@ export function validateSymbol(symbol: string, market?: string): boolean {
  * @returns 格式化后的代码
  */
 export function formatSymbol(symbol: string, market?: string): string {
-  if (!symbol) return ''
-  
+  if (!symbol)
+    return ''
+
   const trimmed = symbol.trim()
-  
+
   if (market === '美股' || market === 'US') {
     return trimmed.toUpperCase()
   } else if (market === '港股' || market === 'HK') {
@@ -105,7 +109,7 @@ export function formatSymbol(symbol: string, market?: string): string {
     }
     return trimmed.toUpperCase()
   }
-  
+
   return trimmed
 }
 
@@ -115,8 +119,9 @@ export function formatSymbol(symbol: string, market?: string): string {
  * @returns 6位代码
  */
 export function extractSymbol(fullSymbol: string): string {
-  if (!fullSymbol) return ''
-  
+  if (!fullSymbol)
+    return ''
+
   // 移除市场后缀（.SZ, .SH, .BJ, .HK等）
   return fullSymbol.split('.')[0]
 }
@@ -127,25 +132,26 @@ export function extractSymbol(fullSymbol: string): string {
  * @returns 市场代码（SZ/SH/BJ）或 null
  */
 export function inferMarketCode(symbol: string): string | null {
-  if (!symbol || !/^\d{6}$/.test(symbol)) return null
-  
+  if (!symbol || !/^\d{6}$/.test(symbol))
+    return null
+
   const code = symbol.substring(0, 3)
-  
+
   // 深圳市场
   if (['000', '001', '002', '003', '300', '301'].includes(code)) {
     return 'SZ'
   }
-  
+
   // 上海市场
   if (['600', '601', '603', '605', '688', '689'].includes(code)) {
     return 'SH'
   }
-  
+
   // 北京市场
   if (['430', '830', '870'].includes(code)) {
     return 'BJ'
   }
-  
+
   return null
 }
 
@@ -156,14 +162,15 @@ export function inferMarketCode(symbol: string): string | null {
  * @returns 完整代码（如 000001.SZ）
  */
 export function buildFullSymbol(symbol: string, marketCode?: string): string {
-  if (!symbol) return ''
-  
+  if (!symbol)
+    return ''
+
   const market = marketCode || inferMarketCode(symbol)
-  
+
   if (market) {
     return `${symbol}.${market}`
   }
-  
+
   return symbol
 }
 
@@ -173,19 +180,20 @@ export function buildFullSymbol(symbol: string, marketCode?: string): string {
  * @returns 转换后的对象（包含新旧字段）
  */
 export function normalizeStockObject<T extends Record<string, any>>(obj: T): T {
-  if (!obj) return obj
-  
+  if (!obj)
+    return obj
+
   const symbol = getStockSymbol(obj)
-  
+
   if (symbol) {
     return {
       ...obj,
       symbol,
-      stock_code: symbol,  // 兼容字段
-      code: symbol         // 兼容字段
+      stock_code: symbol, // 兼容字段
+      code: symbol // 兼容字段
     }
   }
-  
+
   return obj
 }
 
@@ -195,8 +203,8 @@ export function normalizeStockObject<T extends Record<string, any>>(obj: T): T {
  * @returns 转换后的数组
  */
 export function normalizeStockArray<T extends Record<string, any>>(arr: T[]): T[] {
-  if (!Array.isArray(arr)) return arr
-  
+  if (!Array.isArray(arr))
+    return arr
+
   return arr.map(item => normalizeStockObject(item))
 }
-

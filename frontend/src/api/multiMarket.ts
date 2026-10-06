@@ -69,7 +69,7 @@ export function getSupportedMarkets() {
  * 搜索股票（支持多市场）
  */
 export function searchStocks(market: string, query: string, limit: number = 20) {
-  return request<{ stocks: StockInfo[]; total: number }>({
+  return request<{ stocks: StockInfo[], total: number }>({
     url: `/api/markets/${market}/stocks/search`,
     method: 'get',
     params: { q: query, limit }
@@ -107,7 +107,7 @@ export function getStockDailyQuotes(
   endDate?: string,
   limit: number = 100
 ) {
-  return request<{ code: string; market: string; quotes: DailyQuote[]; total: number }>({
+  return request<{ code: string, market: string, quotes: DailyQuote[], total: number }>({
     url: `/api/markets/${market}/stocks/${code}/daily`,
     method: 'get',
     params: {
@@ -117,4 +117,3 @@ export function getStockDailyQuotes(
     }
   })
 }
-

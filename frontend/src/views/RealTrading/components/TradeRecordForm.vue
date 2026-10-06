@@ -1,289 +1,10 @@
-<template>
-  <form class="record-form" @submit.prevent="submit">
-    <div class="form-grid">
-      <label
-        >记录类型
-        <select v-model="form.record_type" data-testid="record-type">
-          <option value="trade">成交</option>
-          <option value="opening_position">期初持仓</option>
-          <option v-if="form.market !== 'CRYPTO'" value="transfer_in">转入</option>
-          <option v-if="form.market !== 'CRYPTO'" value="transfer_out">转出</option>
-        </select>
-      </label>
-      <label
-        >市场
-        <select v-model="form.market" data-testid="market">
-          <option value="CN">A 股</option>
-          <option value="HK">港股</option>
-          <option value="US">美股</option>
-          <option value="CRYPTO">加密货币</option>
-        </select>
-      </label>
-      <label v-if="form.market === 'CRYPTO'"
-        >品种
-        <select v-model="form.instrument_type" data-testid="instrument-type">
-          <option value="crypto_linear_perpetual">USDT 永续</option>
-        </select>
-      </label>
-      <label
-        >交易所
-        <select v-if="form.market === 'US'" v-model="form.exchange">
-          <option value="NASDAQ">NASDAQ</option>
-          <option value="NYSE">NYSE</option>
-          <option value="AMEX">AMEX</option>
-        </select>
-        <input
-          v-else
-          v-model.trim="form.exchange"
-          data-testid="exchange"
-          :disabled="form.market !== 'CRYPTO'"
-        />
-      </label>
-      <label v-if="!isNewCloseTrade" class="span-2">
-        <span
-          >标的
-          <TooltipProvider v-if="form.market === 'CRYPTO'"
-            ><Tooltip
-              ><TooltipTrigger as-child
-                ><button class="symbol-help" type="button" aria-label="加密标的格式说明">
-                  ?
-                </button></TooltipTrigger
-              ><TooltipContent side="top"
-                >USDT 永续格式：BTC/USDT:USDT（交易对:结算币）</TooltipContent
-              ></Tooltip
-            ></TooltipProvider
-          >
-        </span>
-        <input
-          v-model.trim="form.symbol"
-          data-testid="symbol"
-          :placeholder="symbolPlaceholder"
-          @blur="loadRules"
-        />
-      </label>
-      <fieldset v-if="supportsShort && !isTransfer && !isNewCloseTrade" class="span-2 position-side">
-        <legend>持仓方向</legend>
-        <label><input v-model="form.position_side" type="radio" value="long" />多头</label>
-        <label data-testid="position-side-short"
-          ><input v-model="form.position_side" type="radio" value="short" />空头</label
-        >
-      </fieldset>
-      <fieldset v-if="form.record_type === 'trade'" class="span-2" data-testid="position-action">
-        <legend>操作</legend>
-        <label><input v-model="form.position_action" type="radio" value="open" />开仓</label>
-        <label data-testid="position-action-close"
-          ><input v-model="form.position_action" type="radio" value="close" />平仓</label
-        >
-        <span data-testid="trade-side" class="intent">{{ intentLabel }}</span>
-      </fieldset>
-      <label v-if="isNewCloseTrade" class="span-2 close-position-field">
-        <span>当前持仓</span>
-        <Select
-          :model-value="selectedClosePositionKey || undefined"
-          :disabled="closeablePositions.length === 0"
-          @update:model-value="selectClosePosition(String($event))"
-        >
-          <SelectTrigger data-testid="close-position-select">
-            <SelectValue placeholder="选择当前持仓" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem
-                v-for="position in closeablePositions"
-                :key="closePositionKey(position)"
-                :value="closePositionKey(position)"
-              >
-                {{ closePositionLabel(position) }}
-              </SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-        <small v-if="closeablePositions.length === 0" class="field-help">
-          该市场暂无可平持仓
-        </small>
-        <small
-          v-else-if="selectedClosePosition"
-          class="field-help"
-          data-testid="available-close-quantity"
-        >
-          当前持仓数量：{{ selectedClosePosition.quantity }}
-          {{ positionQuantityUnit(selectedClosePosition) }}
-        </small>
-      </label>
-      <div
-        v-if="isNewCloseTrade && selectedClosePosition"
-        class="span-2 selected-position-side"
-        data-testid="selected-position-side"
-      >
-        持仓方向：{{ selectedClosePosition.position_side === 'short' ? '空头' : '多头' }}
-      </div>
-      <label v-if="form.record_type !== 'transfer_in' || form.price"
-        >价格
-        <input
-          v-model.trim="form.price"
-          inputmode="decimal"
-          data-testid="price"
-          @input="recalculateFrom(calculationMode)"
-        />
-      </label>
-      <label v-if="!isPerpetualOpen"
-        >数量
-        <input
-          v-model.trim="form.quantity"
-          inputmode="decimal"
-          data-testid="quantity"
-          :step="quantityRule.step"
-          :min="quantityRule.minimum"
-        />
-      </label>
-      <fieldset
-        v-if="isPerpetualOpen"
-        class="span-2 perpetual-order"
-        data-testid="perpetual-order-inputs"
-      >
-        <legend>下单计算方式</legend>
-        <div class="mode-selector">
-          <label
-            ><input
-              v-model="calculationMode"
-              type="radio"
-              value="quantity"
-              @change="recalculateFrom('quantity')"
-            />按数量</label
-          >
-          <label
-            ><input
-              v-model="calculationMode"
-              type="radio"
-              value="notional"
-              @change="recalculateFrom('notional')"
-            />按订单金额</label
-          >
-          <label
-            ><input
-              v-model="calculationMode"
-              type="radio"
-              value="margin"
-              @change="recalculateFrom('margin')"
-            />按初始保证金</label
-          >
-        </div>
-        <div class="leverage-control">
-          <div class="leverage-heading">
-            <span>杠杆</span>
-            <strong data-testid="leverage-value">{{ form.leverage }}×</strong>
-          </div>
-          <Slider
-            v-model="leverageSliderValue"
-            :min="1"
-            :max="200"
-            :step="1"
-            data-min="1"
-            data-max="200"
-            data-testid="leverage-slider"
-            aria-label="杠杆"
-          />
-          <div class="leverage-marks" aria-label="常用杠杆">
-            <button
-              v-for="mark in leverageMarks"
-              :key="mark"
-              type="button"
-              class="leverage-mark"
-              :class="{ active: Number(form.leverage) === mark }"
-              :style="{ left: leverageMarkPosition(mark) }"
-              :data-testid="`leverage-mark-${mark}`"
-              :aria-label="`${mark}倍杠杆`"
-              @click="setLeverage(mark)"
-            >
-              <span class="leverage-mark-dot" />
-              <span class="leverage-mark-label">{{ mark }}</span>
-            </button>
-          </div>
-        </div>
-        <label v-if="calculationMode === 'quantity'"
-          >数量（{{ form.symbol.split('/')[0] || '标的币' }}）<input
-            v-model.trim="form.quantity"
-            inputmode="decimal"
-            data-testid="quantity"
-            :step="quantityRule.step"
-            :min="quantityRule.minimum"
-            @input="recalculateFrom('quantity')"
-        /></label>
-        <label v-else-if="calculationMode === 'notional'"
-          >订单金额（USDT）<input
-            v-model.trim="form.order_notional"
-            inputmode="decimal"
-            data-testid="order-notional"
-            @input="recalculateFrom('notional')"
-        /></label>
-        <label v-else
-          >初始保证金（USDT）<input
-            v-model.trim="form.initial_margin"
-            inputmode="decimal"
-            data-testid="initial-margin"
-            @input="recalculateFrom('margin')"
-        /></label>
-        <div class="calculated-values">
-          <span v-if="calculationMode !== 'quantity'"
-            >数量
-            <strong data-testid="calculated-quantity">{{ form.quantity || '-' }}</strong></span
-          >
-          <span v-if="calculationMode !== 'notional'"
-            >订单金额
-            <strong data-testid="calculated-notional">{{ form.order_notional || '-' }}</strong>
-            USDT</span
-          >
-          <span v-if="calculationMode !== 'margin'"
-            >初始保证金
-            <strong data-testid="calculated-margin">{{ form.initial_margin || '-' }}</strong>
-            USDT</span
-          >
-        </div>
-      </fieldset>
-      <label class="span-2"
-        >时间
-        <input v-model="form.trade_time" type="datetime-local" step="1" />
-      </label>
-      <label class="span-2"
-        >原因
-        <textarea v-model.trim="form.reason" rows="2" />
-      </label>
-    </div>
-
-    <button
-      class="advanced-toggle"
-      type="button"
-      data-testid="advanced-toggle"
-      @click="advancedOpen = !advancedOpen"
-    >
-      费用与合约元数据
-    </button>
-    <div v-if="advancedOpen" class="form-grid advanced-fields">
-      <label
-        >手续费<input v-model.trim="form.fee_amount" data-testid="fee-amount" inputmode="decimal"
-      /></label>
-      <label>手续费币种<input v-model.trim="form.fee_currency" /></label>
-      <template v-if="isPerpetual">
-        <label>资金费<input v-model.trim="form.funding_fee" inputmode="decimal" /></label>
-      </template>
-    </div>
-    <p v-if="error" class="form-error">{{ error }}</p>
-    <div class="form-actions">
-      <button type="submit" :disabled="submitting || quantityRuleLoading">
-        {{ submitting ? '提交中' : quantityRuleLoading ? '加载交易规则中' : '保存记录' }}
-      </button>
-    </div>
-  </form>
-</template>
-
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import type { AssetRules, CreateLedgerRecordPayload, PortfolioPosition } from '@/api/realTrades'
 import Decimal from 'decimal.js'
+import { computed, reactive, ref, watch } from 'vue'
 import {
-  realTradesApi,
-  type AssetRules,
-  type CreateLedgerRecordPayload,
-  type PortfolioPosition
+
+  realTradesApi
 } from '@/api/realTrades'
 import {
   Select,
@@ -376,23 +97,26 @@ watch([() => form.position_side, () => form.position_action], syncTradeSide, { i
 watch(
   () => form.position_action,
   (action, previous) => {
-    if (props.editing || action === previous) return
-    if (action === 'close') resetClosePosition()
+    if (props.editing || action === previous)
+      return
+    if (action === 'close')
+      resetClosePosition()
     else selectedClosePositionKey.value = ''
   }
 )
 watch(
   () => form.market,
   (market, previous) => {
-    if (!props.editing && isCloseTrade.value && market !== previous) resetClosePosition()
+    if (!props.editing && isCloseTrade.value && market !== previous)
+      resetClosePosition()
   }
 )
 watch(
   () => props.positions,
   () => {
     if (
-      selectedClosePositionKey.value &&
-      !closeablePositions.value.some(
+      selectedClosePositionKey.value
+      && !closeablePositions.value.some(
         position => closePositionKey(position) === selectedClosePositionKey.value
       )
     ) {
@@ -406,29 +130,32 @@ watch(
 watch(
   isPerpetualOpen,
   enabled => {
-    if (enabled) recalculateFrom(calculationMode.value)
+    if (enabled)
+      recalculateFrom(calculationMode.value)
   },
   { immediate: true }
 )
 
 function applyMarketRules() {
   const switchingFromTransfer = form.market === 'CRYPTO' && isTransfer.value
-  if (form.market === 'CN')
+  if (form.market === 'CN') {
     Object.assign(form, {
       exchange: form.symbol?.startsWith('6') ? 'SSE' : 'SZSE',
       instrument_type: 'equity',
       quote_asset: 'CNY',
       position_side: 'long'
     })
+  }
   if (form.market === 'HK')
     Object.assign(form, { exchange: 'SEHK', instrument_type: 'equity', quote_asset: 'HKD' })
-  if (form.market === 'US')
+  if (form.market === 'US') {
     Object.assign(form, {
       exchange: form.exchange || 'NASDAQ',
       instrument_type: 'equity',
       quote_asset: 'USD'
     })
-  if (form.market === 'CRYPTO')
+  }
+  if (form.market === 'CRYPTO') {
     Object.assign(form, {
       exchange: 'binance',
       instrument_type: 'crypto_linear_perpetual',
@@ -437,7 +164,9 @@ function applyMarketRules() {
       record_type: switchingFromTransfer ? 'trade' : form.record_type,
       position_action: switchingFromTransfer ? 'open' : form.position_action
     })
-  if (!supportsShort.value) form.position_side = 'long'
+  }
+  if (!supportsShort.value)
+    form.position_side = 'long'
   if (isTransfer.value) {
     form.position_action = undefined
     form.side = undefined
@@ -461,7 +190,8 @@ function resetClosePosition() {
 async function selectClosePosition(value: string) {
   selectedClosePositionKey.value = value
   const position = props.positions.find(item => closePositionKey(item) === value)
-  if (!position) return
+  if (!position)
+    return
 
   Object.assign(form, {
     market: position.market,
@@ -476,13 +206,15 @@ async function selectClosePosition(value: string) {
   })
   quantityRuleReady.value = false
   syncTradeSide()
-  if (position.market === 'CRYPTO') await loadRules()
+  if (position.market === 'CRYPTO')
+    await loadRules()
 }
 
 function syncTradeSide() {
-  if (form.record_type !== 'trade' || !form.position_action) return
-  form.side =
-    form.position_side === 'long'
+  if (form.record_type !== 'trade' || !form.position_action)
+    return
+  form.side
+    = form.position_side === 'long'
       ? form.position_action === 'open'
         ? 'buy'
         : 'sell'
@@ -505,12 +237,13 @@ function decimalString(value: Decimal) {
 }
 
 function normalizeCryptoSymbol(value?: string) {
-  return (value || '').trim().toUpperCase().replaceAll('／', '/').replaceAll('：', ':')
+  return (value || '').trim().toUpperCase().replace(/／/g, '/').replace(/：/g, ':')
 }
 
 function normalizeLeverage(value?: string) {
   const parsed = Number(value)
-  if (!Number.isFinite(parsed)) return 1
+  if (!Number.isFinite(parsed))
+    return 1
   return Math.min(200, Math.max(1, Math.round(parsed)))
 }
 
@@ -524,7 +257,8 @@ function leverageMarkPosition(value: number) {
 }
 
 function quantizeQuantity(value: Decimal) {
-  if (!quantityRuleReady.value) return value
+  if (!quantityRuleReady.value)
+    return value
   const step = validDecimal(quantityRule.step)
   return step ? value.div(step).floor().mul(step) : value
 }
@@ -546,31 +280,39 @@ function applyPerpetualQuantity(rawQuantity: Decimal, price: Decimal, leverage: 
 }
 
 function recalculateFrom(mode: 'quantity' | 'notional' | 'margin') {
-  if (!isPerpetualOpen.value) return
+  if (!isPerpetualOpen.value)
+    return
   const price = validDecimal(form.price)
   const leverage = validDecimal(form.leverage)
-  if (!price || !leverage) return
+  if (!price || !leverage)
+    return
   if (mode === 'quantity') {
     const quantity = validDecimal(form.quantity)
-    if (!quantity) return
+    if (!quantity)
+      return
     applyPerpetualQuantity(quantity, price, leverage)
   } else if (mode === 'notional') {
     const notional = validDecimal(form.order_notional)
-    if (!notional) return
+    if (!notional)
+      return
     applyPerpetualQuantity(notional.div(price), price, leverage)
   } else {
     const margin = validDecimal(form.initial_margin)
-    if (!margin) return
+    if (!margin)
+      return
     const notional = margin.mul(leverage)
     applyPerpetualQuantity(notional.div(price), price, leverage)
   }
 }
 
 async function loadRules(): Promise<boolean> {
-  if (!form.symbol || form.market !== 'CRYPTO') return false
+  if (!form.symbol || form.market !== 'CRYPTO')
+    return false
   form.symbol = normalizeCryptoSymbol(form.symbol)
-  if (quantityRuleReady.value) return true
-  if (quantityRuleRequest) return quantityRuleRequest
+  if (quantityRuleReady.value)
+    return true
+  if (quantityRuleRequest)
+    return quantityRuleRequest
 
   quantityRuleLoading.value = true
   quantityRuleRequest = (async () => {
@@ -581,7 +323,8 @@ async function loadRules(): Promise<boolean> {
         symbol: form.symbol,
         instrument_type: form.instrument_type
       })
-      if (!response.success) return false
+      if (!response.success)
+        return false
       Object.assign(quantityRule, response.data)
       quantityRuleReady.value = true
       recalculateFrom(calculationMode.value)
@@ -598,7 +341,8 @@ async function loadRules(): Promise<boolean> {
 
 async function submit() {
   error.value = ''
-  if (form.market === 'CRYPTO') form.symbol = normalizeCryptoSymbol(form.symbol)
+  if (form.market === 'CRYPTO')
+    form.symbol = normalizeCryptoSymbol(form.symbol)
   if (isNewCloseTrade.value) {
     if (!selectedClosePosition.value) {
       error.value = '请选择当前持仓'
@@ -632,10 +376,10 @@ async function submit() {
     return
   }
   if (
-    isPerpetualOpen.value &&
-    (!validDecimal(form.leverage) ||
-      !validDecimal(form.order_notional) ||
-      !validDecimal(form.initial_margin))
+    isPerpetualOpen.value
+    && (!validDecimal(form.leverage)
+      || !validDecimal(form.order_notional)
+      || !validDecimal(form.initial_margin))
   ) {
     error.value = '请填写价格、杠杆和当前方式对应的开仓金额'
     return
@@ -649,6 +393,248 @@ async function submit() {
   })
 }
 </script>
+
+<template>
+  <form class="record-form" @submit.prevent="submit">
+    <div class="form-grid">
+      <label>记录类型
+        <select v-model="form.record_type" data-testid="record-type">
+          <option value="trade">成交</option>
+          <option value="opening_position">期初持仓</option>
+          <option v-if="form.market !== 'CRYPTO'" value="transfer_in">转入</option>
+          <option v-if="form.market !== 'CRYPTO'" value="transfer_out">转出</option>
+        </select>
+      </label>
+      <label>市场
+        <select v-model="form.market" data-testid="market">
+          <option value="CN">A 股</option>
+          <option value="HK">港股</option>
+          <option value="US">美股</option>
+          <option value="CRYPTO">加密货币</option>
+        </select>
+      </label>
+      <label v-if="form.market === 'CRYPTO'">品种
+        <select v-model="form.instrument_type" data-testid="instrument-type">
+          <option value="crypto_linear_perpetual">USDT 永续</option>
+        </select>
+      </label>
+      <label>交易所
+        <select v-if="form.market === 'US'" v-model="form.exchange">
+          <option value="NASDAQ">NASDAQ</option>
+          <option value="NYSE">NYSE</option>
+          <option value="AMEX">AMEX</option>
+        </select>
+        <input
+          v-else
+          v-model.trim="form.exchange"
+          data-testid="exchange"
+          :disabled="form.market !== 'CRYPTO'"
+        >
+      </label>
+      <label v-if="!isNewCloseTrade" class="span-2">
+        <span>标的
+          <TooltipProvider v-if="form.market === 'CRYPTO'"><Tooltip><TooltipTrigger as-child><button class="symbol-help" type="button" aria-label="加密标的格式说明">
+            ?
+          </button></TooltipTrigger><TooltipContent side="top">USDT 永续格式：BTC/USDT:USDT（交易对:结算币）</TooltipContent></Tooltip></TooltipProvider>
+        </span>
+        <input
+          v-model.trim="form.symbol"
+          data-testid="symbol"
+          :placeholder="symbolPlaceholder"
+          @blur="loadRules"
+        >
+      </label>
+      <fieldset v-if="supportsShort && !isTransfer && !isNewCloseTrade" class="span-2 position-side">
+        <legend>持仓方向</legend>
+        <label><input v-model="form.position_side" type="radio" value="long">多头</label>
+        <label data-testid="position-side-short"><input v-model="form.position_side" type="radio" value="short">空头</label>
+      </fieldset>
+      <fieldset v-if="form.record_type === 'trade'" class="span-2" data-testid="position-action">
+        <legend>操作</legend>
+        <label><input v-model="form.position_action" type="radio" value="open">开仓</label>
+        <label data-testid="position-action-close"><input v-model="form.position_action" type="radio" value="close">平仓</label>
+        <span data-testid="trade-side" class="intent">{{ intentLabel }}</span>
+      </fieldset>
+      <label v-if="isNewCloseTrade" class="span-2 close-position-field">
+        <span>当前持仓</span>
+        <Select
+          :model-value="selectedClosePositionKey || undefined"
+          :disabled="closeablePositions.length === 0"
+          @update:model-value="selectClosePosition(String($event))"
+        >
+          <SelectTrigger data-testid="close-position-select">
+            <SelectValue placeholder="选择当前持仓" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem
+                v-for="position in closeablePositions"
+                :key="closePositionKey(position)"
+                :value="closePositionKey(position)"
+              >
+                {{ closePositionLabel(position) }}
+              </SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+        <small v-if="closeablePositions.length === 0" class="field-help">
+          该市场暂无可平持仓
+        </small>
+        <small
+          v-else-if="selectedClosePosition"
+          class="field-help"
+          data-testid="available-close-quantity"
+        >
+          当前持仓数量：{{ selectedClosePosition.quantity }}
+          {{ positionQuantityUnit(selectedClosePosition) }}
+        </small>
+      </label>
+      <div
+        v-if="isNewCloseTrade && selectedClosePosition"
+        class="span-2 selected-position-side"
+        data-testid="selected-position-side"
+      >
+        持仓方向：{{ selectedClosePosition.position_side === 'short' ? '空头' : '多头' }}
+      </div>
+      <label v-if="form.record_type !== 'transfer_in' || form.price">价格
+        <input
+          v-model.trim="form.price"
+          inputmode="decimal"
+          data-testid="price"
+          @input="recalculateFrom(calculationMode)"
+        >
+      </label>
+      <label v-if="!isPerpetualOpen">数量
+        <input
+          v-model.trim="form.quantity"
+          inputmode="decimal"
+          data-testid="quantity"
+          :step="quantityRule.step"
+          :min="quantityRule.minimum"
+        >
+      </label>
+      <fieldset
+        v-if="isPerpetualOpen"
+        class="span-2 perpetual-order"
+        data-testid="perpetual-order-inputs"
+      >
+        <legend>下单计算方式</legend>
+        <div class="mode-selector">
+          <label><input
+            v-model="calculationMode"
+            type="radio"
+            value="quantity"
+            @change="recalculateFrom('quantity')"
+          >按数量</label>
+          <label><input
+            v-model="calculationMode"
+            type="radio"
+            value="notional"
+            @change="recalculateFrom('notional')"
+          >按订单金额</label>
+          <label><input
+            v-model="calculationMode"
+            type="radio"
+            value="margin"
+            @change="recalculateFrom('margin')"
+          >按初始保证金</label>
+        </div>
+        <div class="leverage-control">
+          <div class="leverage-heading">
+            <span>杠杆</span>
+            <strong data-testid="leverage-value">{{ form.leverage }}×</strong>
+          </div>
+          <Slider
+            v-model="leverageSliderValue"
+            :min="1"
+            :max="200"
+            :step="1"
+            data-min="1"
+            data-max="200"
+            data-testid="leverage-slider"
+            aria-label="杠杆"
+          />
+          <div class="leverage-marks" aria-label="常用杠杆">
+            <button
+              v-for="mark in leverageMarks"
+              :key="mark"
+              type="button"
+              class="leverage-mark"
+              :class="{ active: Number(form.leverage) === mark }"
+              :style="{ left: leverageMarkPosition(mark) }"
+              :data-testid="`leverage-mark-${mark}`"
+              :aria-label="`${mark}倍杠杆`"
+              @click="setLeverage(mark)"
+            >
+              <span class="leverage-mark-dot" />
+              <span class="leverage-mark-label">{{ mark }}</span>
+            </button>
+          </div>
+        </div>
+        <label v-if="calculationMode === 'quantity'">数量（{{ form.symbol.split('/')[0] || '标的币' }}）<input
+          v-model.trim="form.quantity"
+          inputmode="decimal"
+          data-testid="quantity"
+          :step="quantityRule.step"
+          :min="quantityRule.minimum"
+          @input="recalculateFrom('quantity')"
+        ></label>
+        <label v-else-if="calculationMode === 'notional'">订单金额（USDT）<input
+          v-model.trim="form.order_notional"
+          inputmode="decimal"
+          data-testid="order-notional"
+          @input="recalculateFrom('notional')"
+        ></label>
+        <label v-else>初始保证金（USDT）<input
+          v-model.trim="form.initial_margin"
+          inputmode="decimal"
+          data-testid="initial-margin"
+          @input="recalculateFrom('margin')"
+        ></label>
+        <div class="calculated-values">
+          <span v-if="calculationMode !== 'quantity'">数量
+            <strong data-testid="calculated-quantity">{{ form.quantity || '-' }}</strong></span>
+          <span v-if="calculationMode !== 'notional'">订单金额
+            <strong data-testid="calculated-notional">{{ form.order_notional || '-' }}</strong>
+            USDT</span>
+          <span v-if="calculationMode !== 'margin'">初始保证金
+            <strong data-testid="calculated-margin">{{ form.initial_margin || '-' }}</strong>
+            USDT</span>
+        </div>
+      </fieldset>
+      <label class="span-2">时间
+        <input v-model="form.trade_time" type="datetime-local" step="1">
+      </label>
+      <label class="span-2">原因
+        <textarea v-model.trim="form.reason" rows="2" />
+      </label>
+    </div>
+
+    <button
+      class="advanced-toggle"
+      type="button"
+      data-testid="advanced-toggle"
+      @click="advancedOpen = !advancedOpen"
+    >
+      费用与合约元数据
+    </button>
+    <div v-if="advancedOpen" class="form-grid advanced-fields">
+      <label>手续费<input v-model.trim="form.fee_amount" data-testid="fee-amount" inputmode="decimal"></label>
+      <label>手续费币种<input v-model.trim="form.fee_currency"></label>
+      <template v-if="isPerpetual">
+        <label>资金费<input v-model.trim="form.funding_fee" inputmode="decimal"></label>
+      </template>
+    </div>
+    <p v-if="error" class="form-error">
+      {{ error }}
+    </p>
+    <div class="form-actions">
+      <button type="submit" :disabled="submitting || quantityRuleLoading">
+        {{ submitting ? '提交中' : quantityRuleLoading ? '加载交易规则中' : '保存记录' }}
+      </button>
+    </div>
+  </form>
+</template>
 
 <style scoped>
 .record-form {

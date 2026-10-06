@@ -7,10 +7,10 @@ export interface CurrencyAmount {
 }
 
 export interface PaperAccountSummary {
-  cash: CurrencyAmount | number  // 支持新旧格式
-  realized_pnl: CurrencyAmount | number  // 支持新旧格式
+  cash: CurrencyAmount | number // 支持新旧格式
+  realized_pnl: CurrencyAmount | number // 支持新旧格式
   positions_value: CurrencyAmount
-  equity: CurrencyAmount | number  // 支持新旧格式
+  equity: CurrencyAmount | number // 支持新旧格式
   updated_at?: string
 }
 
@@ -62,6 +62,6 @@ export const paperApi = {
   },
   async resetAccount() {
     // 后端要求 confirm=true
-    return ApiClient.post<{ message: string; cash: number }>(`/api/paper/reset?confirm=true`)
+    return ApiClient.post<{ message: string, cash: number }>(`/api/paper/reset?confirm=true`)
   }
 }

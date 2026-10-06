@@ -1,5 +1,5 @@
-import { ApiClient } from './request'
 import type { ApiResponse } from './request'
+import { ApiClient } from './request'
 
 export interface TagItem {
   id: string
@@ -36,4 +36,3 @@ export const tagsApi = {
     return await ApiClient.delete<{ id: string }>(`/api/tags/${id}`)
   }
 }
-

@@ -114,7 +114,7 @@ export function triggerJob(jobId: string, force: boolean = true) {
 /**
  * 获取任务执行历史
  */
-export function getJobHistory(jobId: string, params?: { limit?: number; offset?: number }) {
+export function getJobHistory(jobId: string, params?: { limit?: number, offset?: number }) {
   return ApiClient.get<{
     history: JobHistory[]
     total: number
@@ -159,7 +159,7 @@ export function getSchedulerHealth() {
  */
 export function updateJobMetadata(
   jobId: string,
-  data: { display_name?: string; description?: string }
+  data: { display_name?: string, description?: string }
 ) {
   return ApiClient.put<void>(`/api/scheduler/jobs/${jobId}/metadata`, data)
 }

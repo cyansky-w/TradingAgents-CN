@@ -10,7 +10,7 @@ interface Props extends /* @vue-ignore */ PromptInputHoverCardProps {
 
 const props = withDefaults(defineProps<Props>(), {
   openDelay: 0,
-  closeDelay: 0,
+  closeDelay: 0
 })
 
 const { openDelay, closeDelay, ...restProps } = props

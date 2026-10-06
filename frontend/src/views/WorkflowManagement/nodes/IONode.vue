@@ -1,20 +1,22 @@
-<template>
-  <div class="custom-node io-node" :class="[`io-node--${data.io_direction}`]">
-    <div class="node-header">
-      <el-icon size="14"><Coin /></el-icon>
-      <span class="node-title">{{ data.label || (data.io_direction === 'input' ? '输入' : '输出') }}</span>
-    </div>
-    <Handle type="source" :position="Position.Right" v-if="data.io_direction === 'input'" />
-    <Handle type="target" :position="Position.Left" v-if="data.io_direction === 'output'" />
-  </div>
-</template>
-
 <script setup lang="ts">
-import { Handle, Position } from '@vue-flow/core'
 import { Coin } from '@element-plus/icons-vue'
+import { Handle, Position } from '@vue-flow/core'
 
 defineProps<{ data: Record<string, any> }>()
 </script>
+
+<template>
+  <div class="custom-node io-node" :class="[`io-node--${data.io_direction}`]">
+    <div class="node-header">
+      <el-icon size="14">
+        <Coin />
+      </el-icon>
+      <span class="node-title">{{ data.label || (data.io_direction === 'input' ? '输入' : '输出') }}</span>
+    </div>
+    <Handle v-if="data.io_direction === 'input'" type="source" :position="Position.Right" />
+    <Handle v-if="data.io_direction === 'output'" type="target" :position="Position.Left" />
+  </div>
+</template>
 
 <style scoped>
 .custom-node {

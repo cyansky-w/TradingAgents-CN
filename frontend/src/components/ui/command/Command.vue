@@ -7,8 +7,8 @@ import { reactive, ref, watch } from 'vue'
 import { cn } from '@/lib/utils'
 import { provideCommandContext } from '.'
 
-const props = withDefaults(defineProps<ListboxRootProps & { class?: HTMLAttributes["class"] }>(), {
-  modelValue: '',
+const props = withDefaults(defineProps<ListboxRootProps & { class?: HTMLAttributes['class'] }>(), {
+  modelValue: ''
 })
 
 const emits = defineEmits<ListboxRootEmits>()
@@ -29,8 +29,8 @@ const filterState = reactive({
     /** Map from visible item id to its search score. */
     items: new Map() as Map<string, number>,
     /** Set of groups with at least one visible item. */
-    groups: new Set() as Set<string>,
-  },
+    groups: new Set() as Set<string>
+  }
 })
 
 function filterItems() {
@@ -72,7 +72,7 @@ watch(() => filterState.search, () => {
 provideCommandContext({
   allItems,
   allGroups,
-  filterState,
+  filterState
 })
 </script>
 

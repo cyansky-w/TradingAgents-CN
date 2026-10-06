@@ -46,7 +46,7 @@ export function usePromptInputProvider(props: {
     const fileName = file.name.toLowerCase()
     const fileType = file.type.toLowerCase()
 
-    return patterns.some((pattern) => {
+    return patterns.some(pattern => {
       const normalizedPattern = pattern.toLowerCase()
 
       if (normalizedPattern.startsWith('.')) {
@@ -91,7 +91,7 @@ export function usePromptInputProvider(props: {
       url: URL.createObjectURL(file),
       mediaType: file.type,
       filename: file.name,
-      file,
+      file
     }))
 
     files.value = [...files.value, ...newAttachments]
@@ -115,11 +115,10 @@ export function usePromptInputProvider(props: {
 
     const remainingFiles: AttachmentFile[] = []
 
-    files.value.forEach((file) => {
+    files.value.forEach(file => {
       if (submittedIds.has(file.id)) {
         revokeObjectUrl(file)
-      }
-      else {
+      } else {
         remainingFiles.push(file)
       }
     })
@@ -139,14 +138,13 @@ export function usePromptInputProvider(props: {
     try {
       const response = await fetch(url)
       const blob = await response.blob()
-      return new Promise((resolve) => {
+      return new Promise(resolve => {
         const reader = new FileReader()
         reader.onloadend = () => resolve(reader.result as string)
         reader.onerror = () => resolve(null)
         reader.readAsDataURL(blob)
       })
-    }
-    catch {
+    } catch {
       return null
     }
   }
@@ -163,25 +161,24 @@ export function usePromptInputProvider(props: {
     try {
       isLoading.value = true
       const processedFiles = await Promise.all(
-        submittedFiles.map(async (item) => {
+        submittedFiles.map(async item => {
           if (item.url && item.url.startsWith('blob:')) {
             const dataUrl = await convertBlobUrlToDataUrl(item.url)
             return { ...item, url: dataUrl ?? item.url }
           }
           return item
-        }),
+        })
       )
 
       const message = {
         text: submittedText,
-        files: processedFiles,
+        files: processedFiles
       }
 
       await props.onSubmit(message)
 
       clearSubmittedFiles(submittedIds)
-    }
-    catch (e) {
+    } catch (e) {
       if (textInput.value === '') {
         setTextInput(submittedText)
       }
@@ -192,12 +189,11 @@ export function usePromptInputProvider(props: {
           : String(e) || 'An unknown error occurred during submission.'
         props.onError({
           code: 'submit_error',
-          message: errorMessage,
+          message: errorMessage
         })
       }
       console.error('Submission failed:', e)
-    }
-    finally {
+    } finally {
       isLoading.value = false
     }
   }
@@ -213,7 +209,7 @@ export function usePromptInputProvider(props: {
     clearFiles,
     clearInput,
     openFileDialog,
-    submitForm,
+    submitForm
   }
 
   provide(PROMPT_INPUT_KEY, context)

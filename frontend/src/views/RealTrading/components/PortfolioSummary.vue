@@ -1,3 +1,19 @@
+<script setup lang="ts">
+import type { BaseCurrency, PortfolioDashboard } from '@/api/realTrades'
+import Decimal from 'decimal.js'
+import { computed, ref } from 'vue'
+import { formatDecimal } from '@/utils/portfolioDecimal'
+
+const props = defineProps<{ dashboard: PortfolioDashboard, baseCurrency: BaseCurrency, excluded: Array<Record<string, unknown>> }>()
+const emit = defineEmits<{ 'update:baseCurrency': [value: BaseCurrency] }>()
+const excludedVisible = ref(false)
+const excluded = computed(() => props.excluded || [])
+const symbols = { CNY: '¥', USD: '$', USDT: '₮' }
+const money = (value: string) => `${symbols[props.baseCurrency]}${formatDecimal(value || '0', 2)}`
+const tone = (value: string) => new Decimal(value || '0').isNegative() ? 'negative' : 'positive'
+function changeCurrency(event: Event) { emit('update:baseCurrency', (event.target as HTMLSelectElement).value as BaseCurrency) }
+</script>
+
 <template>
   <section class="summary-band">
     <div class="summary-heading">
@@ -14,12 +30,20 @@
       <div><span>已实现</span><strong :class="tone(dashboard.realized_pnl)">{{ money(dashboard.realized_pnl) }}</strong></div>
       <div><span>未实现</span><strong :class="tone(dashboard.unrealized_pnl)">{{ money(dashboard.unrealized_pnl) }}</strong></div>
       <div><span>持仓 / 记录</span><strong>{{ dashboard.holding_count }} / {{ dashboard.total_trade_count }}</strong></div>
-      <div><span>排除估值</span><button data-testid="excluded-valuation-button" :disabled="!excluded.length" @click="excludedVisible = true">{{ excluded.length }}</button></div>
+      <div>
+        <span>排除估值</span><button data-testid="excluded-valuation-button" :disabled="!excluded.length" @click="excludedVisible = true">
+          {{ excluded.length }}
+        </button>
+      </div>
     </div>
   </section>
   <div v-if="excludedVisible" class="excluded-overlay" @click.self="excludedVisible = false">
     <section class="excluded-dialog">
-      <header><h2>排除估值明细</h2><button type="button" aria-label="关闭" @click="excludedVisible = false">×</button></header>
+      <header>
+        <h2>排除估值明细</h2><button type="button" aria-label="关闭" @click="excludedVisible = false">
+          ×
+        </button>
+      </header>
       <div v-for="(item, index) in excluded" :key="`${String(item.storage_key || item.symbol || 'item')}-${index}`" class="excluded-item">
         <strong>{{ item.symbol || item.storage_key || '-' }}</strong>
         <span>{{ item.position_side === 'short' ? '空头' : item.position_side === 'long' ? '多头' : '-' }} · {{ item.market || '-' }} / {{ item.exchange || '-' }}</span>
@@ -28,22 +52,6 @@
     </section>
   </div>
 </template>
-
-<script setup lang="ts">
-import { computed, ref } from 'vue'
-import Decimal from 'decimal.js'
-import type { BaseCurrency, PortfolioDashboard } from '@/api/realTrades'
-import { formatDecimal } from '@/utils/portfolioDecimal'
-
-const props = defineProps<{ dashboard: PortfolioDashboard; baseCurrency: BaseCurrency; excluded: Array<Record<string, unknown>> }>()
-const emit = defineEmits<{ 'update:baseCurrency': [value: BaseCurrency] }>()
-const excludedVisible = ref(false)
-const excluded = computed(() => props.excluded || [])
-const symbols = { CNY: '¥', USD: '$', USDT: '₮' }
-const money = (value: string) => `${symbols[props.baseCurrency]}${formatDecimal(value || '0', 2)}`
-const tone = (value: string) => new Decimal(value || '0').isNegative() ? 'negative' : 'positive'
-function changeCurrency(event: Event) { emit('update:baseCurrency', (event.target as HTMLSelectElement).value as BaseCurrency) }
-</script>
 
 <style scoped>
 .summary-band { padding: 20px; background: #fff; border-bottom: 1px solid #e4e7ed; }

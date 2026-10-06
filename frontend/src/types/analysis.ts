@@ -49,23 +49,23 @@ export interface AnalysisTask {
   task_id: string
   batch_id?: string
   user_id: string
-  symbol?: string  // 主字段：6位股票代码
-  stock_code?: string  // 兼容字段（已废弃）
+  symbol?: string // 主字段：6位股票代码
+  stock_code?: string // 兼容字段（已废弃）
   stock_name?: string
   status: AnalysisStatus
   priority: number
   progress: number
-  
+
   // 时间戳
   created_at: string
   started_at?: string
   completed_at?: string
-  
+
   // 执行信息
   worker_id?: string
   parameters: AnalysisParameters
   result?: AnalysisResult
-  
+
   // 重试机制
   retry_count: number
   max_retries: number
@@ -80,22 +80,22 @@ export interface AnalysisBatch {
   title: string
   description?: string
   status: BatchStatus
-  
+
   // 任务统计
   total_tasks: number
   completed_tasks: number
   failed_tasks: number
   cancelled_tasks: number
   progress: number
-  
+
   // 时间戳
   created_at: string
   started_at?: string
   completed_at?: string
-  
+
   // 配置参数
   parameters: AnalysisParameters
-  
+
   // 结果摘要
   results_summary?: Record<string, any>
 }
@@ -103,49 +103,49 @@ export interface AnalysisBatch {
 // 股票信息（统一前后端字段名）
 export interface StockInfo {
   // 基础信息
-  symbol: string  // 主字段：6位股票代码
-  code?: string   // 兼容字段（已废弃）
-  full_symbol?: string  // 完整代码（如 000001.SZ）
+  symbol: string // 主字段：6位股票代码
+  code?: string // 兼容字段（已废弃）
+  full_symbol?: string // 完整代码（如 000001.SZ）
   name: string
   market: string
   industry?: string
   area?: string
-  board?: string         // 板块（主板、创业板、科创板等）
-  exchange?: string      // 交易所（上海证券交易所、深圳证券交易所等）
+  board?: string // 板块（主板、创业板、科创板等）
+  exchange?: string // 交易所（上海证券交易所、深圳证券交易所等）
 
   // 市值信息（亿元）
-  total_mv?: number      // 总市值
-  circ_mv?: number       // 流通市值
+  total_mv?: number // 总市值
+  circ_mv?: number // 流通市值
 
   // 财务指标
-  pe?: number            // 市盈率
-  pb?: number            // 市净率
-  pe_ttm?: number        // 滚动市盈率
-  pb_mrq?: number        // 最新市净率
-  roe?: number           // 净资产收益率(%)
+  pe?: number // 市盈率
+  pb?: number // 市净率
+  pe_ttm?: number // 滚动市盈率
+  pb_mrq?: number // 最新市净率
+  roe?: number // 净资产收益率(%)
 
   // 交易数据
-  close?: number         // 收盘价
-  pct_chg?: number       // 涨跌幅(%)
-  amount?: number        // 成交额
+  close?: number // 收盘价
+  pct_chg?: number // 涨跌幅(%)
+  amount?: number // 成交额
   turnover_rate?: number // 换手率(%)
-  volume_ratio?: number  // 量比
+  volume_ratio?: number // 量比
 
   // 技术指标
-  ma20?: number          // 20日均线
-  rsi14?: number         // RSI指标
-  kdj_k?: number         // KDJ-K
-  kdj_d?: number         // KDJ-D
-  kdj_j?: number         // KDJ-J
-  dif?: number           // MACD-DIF
-  dea?: number           // MACD-DEA
-  macd_hist?: number     // MACD柱状图
+  ma20?: number // 20日均线
+  rsi14?: number // RSI指标
+  kdj_k?: number // KDJ-K
+  kdj_d?: number // KDJ-D
+  kdj_j?: number // KDJ-J
+  dif?: number // MACD-DIF
+  dea?: number // MACD-DEA
+  macd_hist?: number // MACD柱状图
 }
 
 // 单股分析请求
 export interface SingleAnalysisRequest {
-  symbol?: string  // 主字段：6位股票代码
-  stock_code?: string  // 兼容字段（已废弃）
+  symbol?: string // 主字段：6位股票代码
+  stock_code?: string // 兼容字段（已废弃）
   parameters?: AnalysisParameters
 }
 
@@ -153,8 +153,8 @@ export interface SingleAnalysisRequest {
 export interface BatchAnalysisRequest {
   title: string
   description?: string
-  symbols?: string[]  // 主字段：股票代码列表
-  stock_codes?: string[]  // 兼容字段（已废弃）
+  symbols?: string[] // 主字段：股票代码列表
+  stock_codes?: string[] // 兼容字段（已废弃）
   parameters?: AnalysisParameters
 }
 
@@ -162,8 +162,8 @@ export interface BatchAnalysisRequest {
 export interface AnalysisTaskResponse {
   task_id: string
   batch_id?: string
-  symbol?: string  // 主字段：6位股票代码
-  stock_code?: string  // 兼容字段（已废弃）
+  symbol?: string // 主字段：6位股票代码
+  stock_code?: string // 兼容字段（已废弃）
   stock_name?: string
   status: AnalysisStatus
   progress: number
@@ -194,8 +194,8 @@ export interface AnalysisHistoryQuery {
   status?: AnalysisStatus
   start_date?: string
   end_date?: string
-  symbol?: string  // 主字段：股票代码
-  stock_code?: string  // 兼容字段（已废弃）
+  symbol?: string // 主字段：股票代码
+  stock_code?: string // 兼容字段（已废弃）
   batch_id?: string
   page: number
   page_size: number

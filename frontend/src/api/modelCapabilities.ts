@@ -166,4 +166,3 @@ export function getModelCapability(modelName: string) {
     method: 'get'
   })
 }
-

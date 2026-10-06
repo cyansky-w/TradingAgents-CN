@@ -1,3 +1,419 @@
+<script setup lang="ts">
+import type { FormInstance, FormRules } from 'element-plus'
+import type { LLMConfig, LLMProvider } from '@/api/config'
+import { Refresh } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { computed, onMounted, ref, watch } from 'vue'
+import { configApi, validateLLMConfig } from '@/api/config'
+
+// Props
+interface Props {
+  visible: boolean
+  config?: LLMConfig | null
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  config: null
+})
+
+// Emits
+const emit = defineEmits<{
+  'update:visible': [value: boolean]
+  'success': []
+}>()
+
+// Refs
+const formRef = ref<FormInstance>()
+const loading = ref(false)
+const providersLoading = ref(false)
+const availableProviders = ref<LLMProvider[]>([])
+
+// Computed
+const isEdit = computed(() => !!props.config)
+
+// 表单数据
+const defaultFormData = {
+  provider: '',
+  model_name: '',
+  model_display_name: '', // 新增：模型显示名称
+  api_base: '',
+  max_tokens: 4000,
+  temperature: 0.7,
+  timeout: 180, // 默认超时时间改为180秒
+  retry_times: 3,
+  enabled: true,
+  enable_memory: false,
+  enable_debug: false,
+  priority: 0,
+  model_category: '',
+  description: '',
+  input_price_per_1k: 0,
+  output_price_per_1k: 0,
+  currency: 'CNY',
+  // 🆕 模型能力配置
+  capability_level: 2, // 默认标准级
+  suitable_roles: ['both'], // 默认两者都适合
+  features: ['tool_calling'], // 默认支持工具调用
+  recommended_depths: ['快速', '基础', '标准'], // 默认推荐1-3级分析
+  performance_metrics: {
+    speed: 3,
+    cost: 3,
+    quality: 3
+  }
+}
+
+interface PerformanceMetrics {
+  speed: number
+  cost: number
+  quality: number
+}
+
+const normalizePerformanceMetrics = (
+  metrics?: Partial<PerformanceMetrics> | null
+): PerformanceMetrics => ({
+  speed: metrics?.speed ?? defaultFormData.performance_metrics.speed,
+  cost: metrics?.cost ?? defaultFormData.performance_metrics.cost,
+  quality: metrics?.quality ?? defaultFormData.performance_metrics.quality
+})
+
+const formData = ref({
+  ...defaultFormData,
+  performance_metrics: normalizePerformanceMetrics(defaultFormData.performance_metrics)
+})
+
+// 用于跟踪当前选择的模型（用于下拉列表）
+const selectedModelKey = ref<string>('')
+
+// 表单验证规则
+const rules: FormRules = {
+  provider: [{ required: true, message: '请选择供应商', trigger: 'change' }],
+  model_name: [{ required: true, message: '请输入模型名称', trigger: 'blur' }],
+  max_tokens: [{ required: true, message: '请输入最大Token数', trigger: 'blur' }],
+  temperature: [{ required: true, message: '请输入温度参数', trigger: 'blur' }],
+  timeout: [{ required: true, message: '请输入超时时间', trigger: 'blur' }],
+  retry_times: [{ required: true, message: '请输入重试次数', trigger: 'blur' }],
+  priority: [{ required: true, message: '请输入优先级', trigger: 'blur' }]
+}
+
+// 模型选项
+const modelOptions = ref<Array<{ label: string, value: string }>>([])
+
+// 从后端获取的模型目录（包含完整信息）
+interface ModelInfo {
+  name: string
+  display_name: string
+  description?: string
+  context_length?: number
+  max_tokens?: number
+  input_price_per_1k?: number
+  output_price_per_1k?: number
+  currency?: string
+  is_deprecated?: boolean
+  release_date?: string
+  capabilities?: string[]
+  created_at?: string
+  updated_at?: string
+}
+
+const modelCatalog = ref<Record<string, Array<ModelInfo>>>({})
+
+const sortModelsByNewest = (models: ModelInfo[]) => {
+  const getTimestamp = (model: ModelInfo) => {
+    const timeValue = model.created_at || model.updated_at
+    const timestamp = timeValue ? new Date(timeValue).getTime() : 0
+    return Number.isNaN(timestamp) ? 0 : timestamp
+  }
+
+  return [...models].sort((a, b) => getTimestamp(b) - getTimestamp(a))
+}
+
+// 加载模型目录
+const loadModelCatalog = async () => {
+  try {
+    const catalog = await configApi.getModelCatalog()
+    // 转换为 provider -> models 的映射
+    const catalogMap: Record<string, Array<ModelInfo>> = {}
+    catalog.forEach(item => {
+      catalogMap[item.provider] = sortModelsByNewest(item.models || [])
+    })
+    modelCatalog.value = catalogMap
+    console.log('✅ 模型目录加载成功:', Object.keys(catalogMap))
+  } catch (error) {
+    console.error('❌ 加载模型目录失败:', error)
+    ElMessage.warning('加载模型列表失败，将使用默认列表')
+    // 失败时使用空目录，允许用户手动输入
+    modelCatalog.value = {}
+  }
+}
+
+// 根据供应商获取模型选项
+const getModelOptions = (provider: string) => {
+  // 优先从后端获取的目录中查找
+  const models = modelCatalog.value[provider]
+  if (models && models.length > 0) {
+    return sortModelsByNewest(models).map(m => ({
+      label: m.display_name,
+      value: m.name
+    }))
+  }
+
+  // 如果后端没有数据，返回空数组（允许用户手动输入）
+  return []
+}
+
+// 根据供应商和模型名称获取模型详细信息
+const getModelInfo = (provider: string, modelName: string): ModelInfo | null => {
+  const models = modelCatalog.value[provider]
+  if (!models)
+    return null
+
+  return models.find(m => m.name === modelName) || null
+}
+
+// 处理供应商变更
+const handleProviderChange = async (provider: string) => {
+  // 先尝试从已加载的目录中获取
+  modelOptions.value = getModelOptions(provider)
+
+  // 如果没有找到模型，重新加载模型目录
+  if (modelOptions.value.length === 0) {
+    console.log(`⚠️ 供应商 ${provider} 没有模型数据，重新加载模型目录...`)
+    await loadModelCatalog()
+    // 重新获取模型选项
+    modelOptions.value = getModelOptions(provider)
+
+    if (modelOptions.value.length > 0) {
+      ElMessage.success(`已加载 ${modelOptions.value.length} 个可用模型`)
+    } else {
+      ElMessage.warning('该供应商暂无可用模型，请在"模型目录管理"中添加')
+    }
+  }
+
+  formData.value.model_name = ''
+  // 清空价格信息
+  formData.value.input_price_per_1k = 0
+  formData.value.output_price_per_1k = 0
+  formData.value.currency = 'CNY'
+}
+
+// 处理从下拉列表选择模型
+const handleModelSelect = (modelCode: string) => {
+  if (!modelCode) {
+    // 清空选择
+    selectedModelKey.value = ''
+    return
+  }
+
+  // 查找选中的模型信息
+  const selectedModel = modelOptions.value.find(m => m.value === modelCode)
+  if (selectedModel) {
+    // 自动填充模型代码和显示名称
+    formData.value.model_name = selectedModel.value
+    formData.value.model_display_name = selectedModel.label
+
+    console.log('📋 选择模型:', {
+      code: selectedModel.value,
+      display_name: selectedModel.label
+    })
+
+    // 自动填充价格信息
+    const modelInfo = getModelInfo(formData.value.provider, modelCode)
+    if (modelInfo) {
+      console.log('📋 自动填充模型信息:', modelInfo)
+
+      if (modelInfo.input_price_per_1k !== undefined) {
+        formData.value.input_price_per_1k = modelInfo.input_price_per_1k
+      }
+      if (modelInfo.output_price_per_1k !== undefined) {
+        formData.value.output_price_per_1k = modelInfo.output_price_per_1k
+      }
+      if (modelInfo.currency) {
+        formData.value.currency = modelInfo.currency
+      }
+
+      ElMessage.success('已自动填充模型信息和价格')
+    } else {
+      ElMessage.success('已填充模型名称')
+    }
+  }
+}
+
+// 监听配置变化
+watch(
+  () => props.config,
+  config => {
+    if (config) {
+      // 编辑模式：先使用默认值，再用配置覆盖
+      // 注意：对于数字类型的字段，即使是 0 也应该保留
+      formData.value = {
+        ...defaultFormData,
+        ...config,
+        // 确保价格字段正确加载，即使是 0 也要保留
+        input_price_per_1k: config.input_price_per_1k ?? defaultFormData.input_price_per_1k,
+        output_price_per_1k: config.output_price_per_1k ?? defaultFormData.output_price_per_1k,
+        currency: config.currency || defaultFormData.currency,
+        // 确保显示名称正确加载
+        model_display_name: config.model_display_name || '',
+        // 🆕 确保模型能力字段正确加载
+        capability_level: config.capability_level ?? defaultFormData.capability_level,
+        suitable_roles: config.suitable_roles || defaultFormData.suitable_roles,
+        features: config.features || defaultFormData.features,
+        recommended_depths: config.recommended_depths || defaultFormData.recommended_depths,
+        performance_metrics: normalizePerformanceMetrics(config.performance_metrics)
+      }
+      modelOptions.value = getModelOptions(config.provider)
+
+      // 如果有 model_name，尝试在下拉列表中选中它
+      if (config.model_name) {
+        selectedModelKey.value = config.model_name
+      }
+
+      console.log('📝 编辑模式加载配置:', formData.value)
+    } else {
+      formData.value = { ...defaultFormData }
+      modelOptions.value = getModelOptions('dashscope')
+      selectedModelKey.value = ''
+    }
+  },
+  { immediate: true }
+)
+
+// 监听visible变化
+watch(
+  () => props.visible,
+  async visible => {
+    if (visible) {
+      // 对话框打开时刷新供应商列表和模型目录，确保显示最新数据
+      await Promise.all([
+        loadProviders(),
+        loadModelCatalog()
+      ])
+
+      if (props.config) {
+        // 编辑模式：先使用默认值，再用配置覆盖
+        formData.value = {
+          ...defaultFormData,
+          ...props.config,
+          // 确保价格字段正确加载，即使是 0 也要保留
+          input_price_per_1k: props.config.input_price_per_1k ?? defaultFormData.input_price_per_1k,
+          output_price_per_1k: props.config.output_price_per_1k ?? defaultFormData.output_price_per_1k,
+          currency: props.config.currency || defaultFormData.currency,
+          // 确保显示名称正确加载
+          model_display_name: props.config.model_display_name || '',
+          // 🆕 确保模型能力字段正确加载
+          capability_level: props.config.capability_level ?? defaultFormData.capability_level,
+          suitable_roles: props.config.suitable_roles || defaultFormData.suitable_roles,
+          features: props.config.features || defaultFormData.features,
+          recommended_depths: props.config.recommended_depths || defaultFormData.recommended_depths,
+          performance_metrics: normalizePerformanceMetrics(props.config.performance_metrics)
+        }
+        modelOptions.value = getModelOptions(props.config.provider)
+
+        // 如果有 model_name，尝试在下拉列表中选中它
+        if (props.config.model_name) {
+          selectedModelKey.value = props.config.model_name
+        }
+
+        console.log('📝 对话框打开，加载配置:', formData.value)
+      } else {
+        // 新增模式：使用默认值
+        formData.value = { ...defaultFormData }
+        // 如果有供应商，加载其模型列表
+        if (formData.value.provider) {
+          modelOptions.value = getModelOptions(formData.value.provider)
+        } else {
+          modelOptions.value = []
+        }
+        selectedModelKey.value = ''
+      }
+    }
+  }
+)
+
+// 处理可见性变化
+const handleVisibleChange = (value: boolean) => {
+  emit('update:visible', value)
+}
+
+// 处理关闭
+const handleClose = () => {
+  emit('update:visible', false)
+  formRef.value?.resetFields()
+}
+
+// 处理提交
+const handleSubmit = async () => {
+  if (!formRef.value)
+    return
+
+  try {
+    await formRef.value.validate()
+
+    // 验证配置数据
+    const errors = validateLLMConfig(formData.value)
+    if (errors.length > 0) {
+      ElMessage.error(`配置验证失败: ${errors.join(', ')}`)
+      return
+    }
+
+    loading.value = true
+
+    // 准备提交数据，移除api_key字段（由后端从厂家配置获取）
+    const submitData = { ...formData.value }
+    // 使用类型安全的方式移除api_key字段（如果存在的话）
+    if ('api_key' in submitData) {
+      delete (submitData as any).api_key // 不发送api_key，让后端从厂家配置获取
+    }
+
+    console.log('🚀 提交大模型配置:', submitData)
+
+    // 调用API
+    await configApi.updateLLMConfig(submitData)
+
+    ElMessage.success(isEdit.value ? '模型配置更新成功' : '模型配置添加成功')
+    emit('success')
+    handleClose()
+  } catch (error) {
+    console.error('❌ 提交大模型配置失败:', error)
+    ElMessage.error(isEdit.value ? '模型配置更新失败' : '模型配置添加失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 加载可用的厂家列表
+const loadProviders = async (showSuccessMessage = false) => {
+  providersLoading.value = true
+  try {
+    const providers = await configApi.getLLMProviders()
+    // 只显示启用的厂家
+    availableProviders.value = providers.filter(p => p.is_active)
+    console.log('✅ 加载厂家列表成功:', availableProviders.value.length)
+
+    if (showSuccessMessage) {
+      ElMessage.success(`已刷新供应商列表，共 ${availableProviders.value.length} 个启用的供应商`)
+    }
+
+    // 如果是新增模式且没有选择供应商，默认选择第一个
+    if (!isEdit.value && !formData.value.provider && availableProviders.value.length > 0) {
+      formData.value.provider = availableProviders.value[0].name
+      await handleProviderChange(formData.value.provider)
+    }
+  } catch (error) {
+    console.error('❌ 加载厂家列表失败:', error)
+    ElMessage.error('加载厂家列表失败')
+  } finally {
+    providersLoading.value = false
+  }
+}
+
+// 组件挂载时加载厂家数据和模型目录
+onMounted(() => {
+  loadProviders()
+  loadModelCatalog()
+})
+</script>
+
 <template>
   <el-dialog
     :model-value="visible"
@@ -18,9 +434,9 @@
           <el-select
             v-model="formData.provider"
             placeholder="选择供应商"
-            @change="handleProviderChange"
             :loading="providersLoading"
             style="flex: 1; min-width: 0;"
+            @change="handleProviderChange"
           >
             <el-option
               v-for="provider in availableProviders"
@@ -32,8 +448,8 @@
           <el-button
             :icon="Refresh"
             :loading="providersLoading"
-            @click="() => loadProviders(true)"
             title="刷新供应商列表"
+            @click="() => loadProviders(true)"
           />
         </div>
         <div class="form-tip">
@@ -41,7 +457,7 @@
         </div>
       </el-form-item>
 
-      <el-form-item label="选择模型" v-if="modelOptions.length > 0">
+      <el-form-item v-if="modelOptions.length > 0" label="选择模型">
         <el-select
           v-model="selectedModelKey"
           placeholder="从列表中选择模型"
@@ -97,7 +513,9 @@
       </el-form-item>
 
       <!-- 模型参数 -->
-      <el-divider content-position="left">模型参数</el-divider>
+      <el-divider content-position="left">
+        模型参数
+      </el-divider>
 
       <el-form-item label="最大Token数" prop="max_tokens">
         <el-input-number
@@ -137,7 +555,9 @@
       </el-form-item>
 
       <!-- 定价配置 -->
-      <el-divider content-position="left">定价配置</el-divider>
+      <el-divider content-position="left">
+        定价配置
+      </el-divider>
 
       <el-form-item label="输入价格" prop="input_price_per_1k">
         <el-input-number
@@ -170,7 +590,9 @@
       </el-form-item>
 
       <!-- 高级设置 -->
-      <el-divider content-position="left">高级设置</el-divider>
+      <el-divider content-position="left">
+        高级设置
+      </el-divider>
 
       <el-form-item label="启用模型">
         <el-switch v-model="formData.enabled" />
@@ -210,7 +632,9 @@
       </el-form-item>
 
       <!-- 🆕 模型能力配置 -->
-      <el-divider content-position="left">模型能力配置</el-divider>
+      <el-divider content-position="left">
+        模型能力配置
+      </el-divider>
 
       <el-form-item label="能力等级" prop="capability_level">
         <el-select v-model="formData.capability_level" placeholder="选择模型能力等级">
@@ -338,427 +762,16 @@
 
     <template #footer>
       <div class="dialog-footer">
-        <el-button @click="handleClose">取消</el-button>
-        <el-button type="primary" @click="handleSubmit" :loading="loading">
+        <el-button @click="handleClose">
+          取消
+        </el-button>
+        <el-button type="primary" :loading="loading" @click="handleSubmit">
           {{ isEdit ? '更新' : '添加' }}
         </el-button>
       </div>
     </template>
   </el-dialog>
 </template>
-
-<script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import type { FormInstance, FormRules } from 'element-plus'
-import { Refresh } from '@element-plus/icons-vue'
-import { configApi, type LLMProvider, type LLMConfig, validateLLMConfig } from '@/api/config'
-
-// Props
-interface Props {
-  visible: boolean
-  config?: LLMConfig | null
-}
-
-const props = withDefaults(defineProps<Props>(), {
-  config: null
-})
-
-// Emits
-const emit = defineEmits<{
-  'update:visible': [value: boolean]
-  'success': []
-}>()
-
-// Refs
-const formRef = ref<FormInstance>()
-const loading = ref(false)
-const providersLoading = ref(false)
-const availableProviders = ref<LLMProvider[]>([])
-
-// Computed
-const isEdit = computed(() => !!props.config)
-
-// 表单数据
-const defaultFormData = {
-  provider: '',
-  model_name: '',
-  model_display_name: '',  // 新增：模型显示名称
-  api_base: '',
-  max_tokens: 4000,
-  temperature: 0.7,
-  timeout: 180,  // 默认超时时间改为180秒
-  retry_times: 3,
-  enabled: true,
-  enable_memory: false,
-  enable_debug: false,
-  priority: 0,
-  model_category: '',
-  description: '',
-  input_price_per_1k: 0,
-  output_price_per_1k: 0,
-  currency: 'CNY',
-  // 🆕 模型能力配置
-  capability_level: 2,  // 默认标准级
-  suitable_roles: ['both'],  // 默认两者都适合
-  features: ['tool_calling'],  // 默认支持工具调用
-  recommended_depths: ['快速', '基础', '标准'],  // 默认推荐1-3级分析
-  performance_metrics: {
-    speed: 3,
-    cost: 3,
-    quality: 3
-  }
-}
-
-type PerformanceMetrics = {
-  speed: number
-  cost: number
-  quality: number
-}
-
-const normalizePerformanceMetrics = (
-  metrics?: Partial<PerformanceMetrics> | null
-): PerformanceMetrics => ({
-  speed: metrics?.speed ?? defaultFormData.performance_metrics.speed,
-  cost: metrics?.cost ?? defaultFormData.performance_metrics.cost,
-  quality: metrics?.quality ?? defaultFormData.performance_metrics.quality
-})
-
-const formData = ref({
-  ...defaultFormData,
-  performance_metrics: normalizePerformanceMetrics(defaultFormData.performance_metrics)
-})
-
-// 用于跟踪当前选择的模型（用于下拉列表）
-const selectedModelKey = ref<string>('')
-
-// 表单验证规则
-const rules: FormRules = {
-  provider: [{ required: true, message: '请选择供应商', trigger: 'change' }],
-  model_name: [{ required: true, message: '请输入模型名称', trigger: 'blur' }],
-  max_tokens: [{ required: true, message: '请输入最大Token数', trigger: 'blur' }],
-  temperature: [{ required: true, message: '请输入温度参数', trigger: 'blur' }],
-  timeout: [{ required: true, message: '请输入超时时间', trigger: 'blur' }],
-  retry_times: [{ required: true, message: '请输入重试次数', trigger: 'blur' }],
-  priority: [{ required: true, message: '请输入优先级', trigger: 'blur' }]
-}
-
-// 模型选项
-const modelOptions = ref<Array<{ label: string; value: string }>>([])
-
-// 从后端获取的模型目录（包含完整信息）
-interface ModelInfo {
-  name: string
-  display_name: string
-  description?: string
-  context_length?: number
-  max_tokens?: number
-  input_price_per_1k?: number
-  output_price_per_1k?: number
-  currency?: string
-  is_deprecated?: boolean
-  release_date?: string
-  capabilities?: string[]
-  created_at?: string
-  updated_at?: string
-}
-
-const modelCatalog = ref<Record<string, Array<ModelInfo>>>({})
-
-const sortModelsByNewest = (models: ModelInfo[]) => {
-  const getTimestamp = (model: ModelInfo) => {
-    const timeValue = model.created_at || model.updated_at
-    const timestamp = timeValue ? new Date(timeValue).getTime() : 0
-    return Number.isNaN(timestamp) ? 0 : timestamp
-  }
-
-  return [...models].sort((a, b) => getTimestamp(b) - getTimestamp(a))
-}
-
-// 加载模型目录
-const loadModelCatalog = async () => {
-  try {
-    const catalog = await configApi.getModelCatalog()
-    // 转换为 provider -> models 的映射
-    const catalogMap: Record<string, Array<ModelInfo>> = {}
-    catalog.forEach(item => {
-      catalogMap[item.provider] = sortModelsByNewest(item.models || [])
-    })
-    modelCatalog.value = catalogMap
-    console.log('✅ 模型目录加载成功:', Object.keys(catalogMap))
-  } catch (error) {
-    console.error('❌ 加载模型目录失败:', error)
-    ElMessage.warning('加载模型列表失败，将使用默认列表')
-    // 失败时使用空目录，允许用户手动输入
-    modelCatalog.value = {}
-  }
-}
-
-// 根据供应商获取模型选项
-const getModelOptions = (provider: string) => {
-  // 优先从后端获取的目录中查找
-  const models = modelCatalog.value[provider]
-  if (models && models.length > 0) {
-    return sortModelsByNewest(models).map(m => ({
-      label: m.display_name,
-      value: m.name
-    }))
-  }
-
-  // 如果后端没有数据，返回空数组（允许用户手动输入）
-  return []
-}
-
-// 根据供应商和模型名称获取模型详细信息
-const getModelInfo = (provider: string, modelName: string): ModelInfo | null => {
-  const models = modelCatalog.value[provider]
-  if (!models) return null
-
-  return models.find(m => m.name === modelName) || null
-}
-
-// 处理供应商变更
-const handleProviderChange = async (provider: string) => {
-  // 先尝试从已加载的目录中获取
-  modelOptions.value = getModelOptions(provider)
-
-  // 如果没有找到模型，重新加载模型目录
-  if (modelOptions.value.length === 0) {
-    console.log(`⚠️ 供应商 ${provider} 没有模型数据，重新加载模型目录...`)
-    await loadModelCatalog()
-    // 重新获取模型选项
-    modelOptions.value = getModelOptions(provider)
-
-    if (modelOptions.value.length > 0) {
-      ElMessage.success(`已加载 ${modelOptions.value.length} 个可用模型`)
-    } else {
-      ElMessage.warning('该供应商暂无可用模型，请在"模型目录管理"中添加')
-    }
-  }
-
-  formData.value.model_name = ''
-  // 清空价格信息
-  formData.value.input_price_per_1k = 0
-  formData.value.output_price_per_1k = 0
-  formData.value.currency = 'CNY'
-}
-
-// 处理从下拉列表选择模型
-const handleModelSelect = (modelCode: string) => {
-  if (!modelCode) {
-    // 清空选择
-    selectedModelKey.value = ''
-    return
-  }
-
-  // 查找选中的模型信息
-  const selectedModel = modelOptions.value.find(m => m.value === modelCode)
-  if (selectedModel) {
-    // 自动填充模型代码和显示名称
-    formData.value.model_name = selectedModel.value
-    formData.value.model_display_name = selectedModel.label
-
-    console.log('📋 选择模型:', {
-      code: selectedModel.value,
-      display_name: selectedModel.label
-    })
-
-    // 自动填充价格信息
-    const modelInfo = getModelInfo(formData.value.provider, modelCode)
-    if (modelInfo) {
-      console.log('📋 自动填充模型信息:', modelInfo)
-
-      if (modelInfo.input_price_per_1k !== undefined) {
-        formData.value.input_price_per_1k = modelInfo.input_price_per_1k
-      }
-      if (modelInfo.output_price_per_1k !== undefined) {
-        formData.value.output_price_per_1k = modelInfo.output_price_per_1k
-      }
-      if (modelInfo.currency) {
-        formData.value.currency = modelInfo.currency
-      }
-
-      ElMessage.success('已自动填充模型信息和价格')
-    } else {
-      ElMessage.success('已填充模型名称')
-    }
-  }
-}
-
-// 监听配置变化
-watch(
-  () => props.config,
-  (config) => {
-    if (config) {
-      // 编辑模式：先使用默认值，再用配置覆盖
-      // 注意：对于数字类型的字段，即使是 0 也应该保留
-      formData.value = {
-        ...defaultFormData,
-        ...config,
-        // 确保价格字段正确加载，即使是 0 也要保留
-        input_price_per_1k: config.input_price_per_1k ?? defaultFormData.input_price_per_1k,
-        output_price_per_1k: config.output_price_per_1k ?? defaultFormData.output_price_per_1k,
-        currency: config.currency || defaultFormData.currency,
-        // 确保显示名称正确加载
-        model_display_name: config.model_display_name || '',
-        // 🆕 确保模型能力字段正确加载
-        capability_level: config.capability_level ?? defaultFormData.capability_level,
-        suitable_roles: config.suitable_roles || defaultFormData.suitable_roles,
-        features: config.features || defaultFormData.features,
-        recommended_depths: config.recommended_depths || defaultFormData.recommended_depths,
-        performance_metrics: normalizePerformanceMetrics(config.performance_metrics)
-      }
-      modelOptions.value = getModelOptions(config.provider)
-
-      // 如果有 model_name，尝试在下拉列表中选中它
-      if (config.model_name) {
-        selectedModelKey.value = config.model_name
-      }
-
-      console.log('📝 编辑模式加载配置:', formData.value)
-    } else {
-      formData.value = { ...defaultFormData }
-      modelOptions.value = getModelOptions('dashscope')
-      selectedModelKey.value = ''
-    }
-  },
-  { immediate: true }
-)
-
-// 监听visible变化
-watch(
-  () => props.visible,
-  async (visible) => {
-    if (visible) {
-      // 对话框打开时刷新供应商列表和模型目录，确保显示最新数据
-      await Promise.all([
-        loadProviders(),
-        loadModelCatalog()
-      ])
-
-      if (props.config) {
-        // 编辑模式：先使用默认值，再用配置覆盖
-        formData.value = {
-          ...defaultFormData,
-          ...props.config,
-          // 确保价格字段正确加载，即使是 0 也要保留
-          input_price_per_1k: props.config.input_price_per_1k ?? defaultFormData.input_price_per_1k,
-          output_price_per_1k: props.config.output_price_per_1k ?? defaultFormData.output_price_per_1k,
-          currency: props.config.currency || defaultFormData.currency,
-          // 确保显示名称正确加载
-          model_display_name: props.config.model_display_name || '',
-          // 🆕 确保模型能力字段正确加载
-          capability_level: props.config.capability_level ?? defaultFormData.capability_level,
-          suitable_roles: props.config.suitable_roles || defaultFormData.suitable_roles,
-          features: props.config.features || defaultFormData.features,
-          recommended_depths: props.config.recommended_depths || defaultFormData.recommended_depths,
-          performance_metrics: normalizePerformanceMetrics(props.config.performance_metrics)
-        }
-        modelOptions.value = getModelOptions(props.config.provider)
-
-        // 如果有 model_name，尝试在下拉列表中选中它
-        if (props.config.model_name) {
-          selectedModelKey.value = props.config.model_name
-        }
-
-        console.log('📝 对话框打开，加载配置:', formData.value)
-      } else {
-        // 新增模式：使用默认值
-        formData.value = { ...defaultFormData }
-        // 如果有供应商，加载其模型列表
-        if (formData.value.provider) {
-          modelOptions.value = getModelOptions(formData.value.provider)
-        } else {
-          modelOptions.value = []
-        }
-        selectedModelKey.value = ''
-      }
-    }
-  }
-)
-
-// 处理可见性变化
-const handleVisibleChange = (value: boolean) => {
-  emit('update:visible', value)
-}
-
-// 处理关闭
-const handleClose = () => {
-  emit('update:visible', false)
-  formRef.value?.resetFields()
-}
-
-// 处理提交
-const handleSubmit = async () => {
-  if (!formRef.value) return
-
-  try {
-    await formRef.value.validate()
-
-    // 验证配置数据
-    const errors = validateLLMConfig(formData.value)
-    if (errors.length > 0) {
-      ElMessage.error(`配置验证失败: ${errors.join(', ')}`)
-      return
-    }
-
-    loading.value = true
-
-    // 准备提交数据，移除api_key字段（由后端从厂家配置获取）
-    const submitData = { ...formData.value }
-    // 使用类型安全的方式移除api_key字段（如果存在的话）
-    if ('api_key' in submitData) {
-      delete (submitData as any).api_key  // 不发送api_key，让后端从厂家配置获取
-    }
-
-    console.log('🚀 提交大模型配置:', submitData)
-
-    // 调用API
-    await configApi.updateLLMConfig(submitData)
-
-    ElMessage.success(isEdit.value ? '模型配置更新成功' : '模型配置添加成功')
-    emit('success')
-    handleClose()
-  } catch (error) {
-    console.error('❌ 提交大模型配置失败:', error)
-    ElMessage.error(isEdit.value ? '模型配置更新失败' : '模型配置添加失败')
-  } finally {
-    loading.value = false
-  }
-}
-
-// 加载可用的厂家列表
-const loadProviders = async (showSuccessMessage = false) => {
-  providersLoading.value = true
-  try {
-    const providers = await configApi.getLLMProviders()
-    // 只显示启用的厂家
-    availableProviders.value = providers.filter(p => p.is_active)
-    console.log('✅ 加载厂家列表成功:', availableProviders.value.length)
-
-    if (showSuccessMessage) {
-      ElMessage.success(`已刷新供应商列表，共 ${availableProviders.value.length} 个启用的供应商`)
-    }
-
-    // 如果是新增模式且没有选择供应商，默认选择第一个
-    if (!isEdit.value && !formData.value.provider && availableProviders.value.length > 0) {
-      formData.value.provider = availableProviders.value[0].name
-      await handleProviderChange(formData.value.provider)
-    }
-  } catch (error) {
-    console.error('❌ 加载厂家列表失败:', error)
-    ElMessage.error('加载厂家列表失败')
-  } finally {
-    providersLoading.value = false
-  }
-}
-
-// 组件挂载时加载厂家数据和模型目录
-onMounted(() => {
-  loadProviders()
-  loadModelCatalog()
-})
-</script>
 
 <style lang="scss" scoped>
 .dialog-footer {

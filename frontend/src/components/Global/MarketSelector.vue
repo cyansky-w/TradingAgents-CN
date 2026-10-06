@@ -1,27 +1,3 @@
-<template>
-  <el-select
-    v-model="selectedMarket"
-    :placeholder="placeholder"
-    :size="size"
-    :clearable="clearable"
-    :disabled="disabled"
-    @change="handleChange"
-    class="market-selector"
-  >
-    <el-option
-      v-for="market in markets"
-      :key="market.code"
-      :label="market.label"
-      :value="market.code"
-    >
-      <span class="market-option">
-        <span class="market-flag">{{ market.flag }}</span>
-        <span class="market-name">{{ market.label }}</span>
-      </span>
-    </el-option>
-  </el-select>
-</template>
-
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 
@@ -62,7 +38,7 @@ const markets: Market[] = [
 
 const selectedMarket = ref(props.modelValue)
 
-watch(() => props.modelValue, (newValue) => {
+watch(() => props.modelValue, newValue => {
   selectedMarket.value = newValue
 })
 
@@ -71,6 +47,30 @@ const handleChange = (value: string) => {
   emit('change', value)
 }
 </script>
+
+<template>
+  <el-select
+    v-model="selectedMarket"
+    :placeholder="placeholder"
+    :size="size"
+    :clearable="clearable"
+    :disabled="disabled"
+    class="market-selector"
+    @change="handleChange"
+  >
+    <el-option
+      v-for="market in markets"
+      :key="market.code"
+      :label="market.label"
+      :value="market.code"
+    >
+      <span class="market-option">
+        <span class="market-flag">{{ market.flag }}</span>
+        <span class="market-name">{{ market.label }}</span>
+      </span>
+    </el-option>
+  </el-select>
+</template>
 
 <style scoped lang="scss">
 .market-selector {
@@ -91,4 +91,3 @@ const handleChange = (value: string) => {
   font-size: 14px;
 }
 </style>
-

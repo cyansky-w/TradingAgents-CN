@@ -7,11 +7,11 @@ import {
   SelectItem,
   SelectItemIndicator,
   SelectItemText,
-  useForwardProps,
+  useForwardProps
 } from 'reka-ui'
 import { cn } from '@/lib/utils'
 
-const props = defineProps<SelectItemProps & { class?: HTMLAttributes["class"] }>()
+const props = defineProps<SelectItemProps & { class?: HTMLAttributes['class'] }>()
 
 const delegatedProps = reactiveOmit(props, 'class')
 

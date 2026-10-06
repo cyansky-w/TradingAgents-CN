@@ -1,10 +1,11 @@
+import type { PortfolioPosition } from '@/api/realTrades'
 import { flushPromises, mount } from '@vue/test-utils'
 import { ElMessage } from 'element-plus'
-import { beforeEach, expect, it, vi } from 'vitest'
 
-import RealTradingPage from '../index.vue'
+import { beforeEach, expect, it, vi } from 'vitest'
+import { realTradesApi } from '@/api/realTrades'
 import TradeRecordForm from '../components/TradeRecordForm.vue'
-import { realTradesApi, type PortfolioPosition } from '@/api/realTrades'
+import RealTradingPage from '../index.vue'
 
 vi.mock('vue-router', async () => {
   const actual = await vi.importActual<typeof import('vue-router')>('vue-router')
@@ -15,8 +16,12 @@ vi.mock('@/api/realTrades', async () => {
   const actual = await vi.importActual<typeof import('@/api/realTrades')>('@/api/realTrades')
   return { ...actual, realTradesApi: {
     ...actual.realTradesApi,
-    getPortfolioPreference: vi.fn(), updatePortfolioPreference: vi.fn(),
-    getPositions: vi.fn(), getDashboard: vi.fn(), getRecords: vi.fn(), createRecord: vi.fn()
+    getPortfolioPreference: vi.fn(),
+    updatePortfolioPreference: vi.fn(),
+    getPositions: vi.fn(),
+    getDashboard: vi.fn(),
+    getRecords: vi.fn(),
+    createRecord: vi.fn()
   } }
 })
 
@@ -33,7 +38,7 @@ beforeEach(() => {
 function mountPage() {
   return mount(RealTradingPage, {
     global: {
-      stubs: { VChart: true, RouterLink: true },
+      stubs: { VChart: true, RouterLink: true }
     }
   })
 }
@@ -67,7 +72,7 @@ it('loads transaction records in the selected base currency', async () => {
   expect(realTradesApi.getRecords).toHaveBeenCalledWith({
     page: 1,
     page_size: 100,
-    base_currency: 'USDT',
+    base_currency: 'USDT'
   })
 })
 
@@ -75,12 +80,14 @@ it('keeps the newest base-currency valuation when an older request resolves late
   let resolveCnyPositions!: (value: unknown) => void
   let resolveCnyDashboard!: (value: unknown) => void
   vi.mocked(realTradesApi.getPortfolioPreference).mockResolvedValue({ success: true, data: { user_id: 'u1', base_currency: 'CNY' } } as never)
-  vi.mocked(realTradesApi.getPositions).mockImplementation((currency) => {
-    if (currency === 'CNY') return new Promise(resolve => { resolveCnyPositions = resolve }) as never
+  vi.mocked(realTradesApi.getPositions).mockImplementation(currency => {
+    if (currency === 'CNY')
+      return new Promise(resolve => { resolveCnyPositions = resolve }) as never
     return Promise.resolve({ success: true, data: { items: [{ symbol: 'USD-result' }], total_market_value: '100', excluded: [] } } as never)
   })
   vi.mocked(realTradesApi.getDashboard).mockImplementation((_days, currency) => {
-    if (currency === 'CNY') return new Promise(resolve => { resolveCnyDashboard = resolve }) as never
+    if (currency === 'CNY')
+      return new Promise(resolve => { resolveCnyDashboard = resolve }) as never
     return Promise.resolve({ success: true, data: { base_currency: 'USD', total_market_value: '100', total_cost: '90', realized_pnl: '1', unrealized_pnl: '9', total_pnl: '10', holding_count: 1, total_trade_count: 1, excluded: [], pnl_curve: [] } } as never)
   })
 
@@ -101,17 +108,38 @@ it('keeps an unavailable short position visible and explains excluded valuation'
   vi.mocked(realTradesApi.getPortfolioPreference).mockResolvedValue({ success: true, data: { user_id: 'u1', base_currency: 'USD' } } as never)
   vi.mocked(realTradesApi.getPositions).mockResolvedValue({ success: true, data: {
     items: [{
-      storage_key: 'US:NASDAQ:AAPL:equity', market: 'US', exchange: 'NASDAQ', symbol: 'AAPL',
-      instrument_type: 'equity', position_side: 'short', quote_asset: 'USD', quantity: '10',
-      average_entry_price: '100', mark_price: null, market_value: null, base_market_value: null,
-      base_unrealized_pnl: null, weight_percent: null, converted: false,
-      quote_unavailable: true, quote_error: '所有行情源均失败',
-    }], total_market_value: '0', excluded: [],
+      storage_key: 'US:NASDAQ:AAPL:equity',
+      market: 'US',
+      exchange: 'NASDAQ',
+      symbol: 'AAPL',
+      instrument_type: 'equity',
+      position_side: 'short',
+      quote_asset: 'USD',
+      quantity: '10',
+      average_entry_price: '100',
+      mark_price: null,
+      market_value: null,
+      base_market_value: null,
+      base_unrealized_pnl: null,
+      weight_percent: null,
+      converted: false,
+      quote_unavailable: true,
+      quote_error: '所有行情源均失败'
+    }],
+    total_market_value: '0',
+    excluded: []
   } } as never)
   vi.mocked(realTradesApi.getDashboard).mockResolvedValue({ success: true, data: {
-    base_currency: 'USD', total_market_value: '0', total_cost: '0', realized_pnl: '0',
-    unrealized_pnl: '0', total_pnl: '0', holding_count: 1, total_trade_count: 1,
-    excluded: [{ scope: 'quote', market: 'US', exchange: 'NASDAQ', symbol: 'AAPL', position_side: 'short', error: '所有行情源均失败' }], pnl_curve: [],
+    base_currency: 'USD',
+    total_market_value: '0',
+    total_cost: '0',
+    realized_pnl: '0',
+    unrealized_pnl: '0',
+    total_pnl: '0',
+    holding_count: 1,
+    total_trade_count: 1,
+    excluded: [{ scope: 'quote', market: 'US', exchange: 'NASDAQ', symbol: 'AAPL', position_side: 'short', error: '所有行情源均失败' }],
+    pnl_curve: []
   } } as never)
 
   const wrapper = mountPage()

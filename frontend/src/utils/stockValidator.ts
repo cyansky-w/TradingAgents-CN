@@ -21,8 +21,8 @@ export interface StockValidationResult {
  */
 export function validateAStock(code: string): StockValidationResult {
   // 移除空格和特殊字符
-  const cleanCode = code.trim().replace(/[^0-9]/g, '')
-  
+  const cleanCode = code.trim().replace(/\D/g, '')
+
   // 必须是6位数字
   if (!/^\d{6}$/.test(cleanCode)) {
     return {
@@ -30,18 +30,18 @@ export function validateAStock(code: string): StockValidationResult {
       message: 'A股代码必须是6位数字'
     }
   }
-  
+
   // 验证前缀
   const prefix = cleanCode.substring(0, 2)
   const validPrefixes = ['60', '68', '00', '30', '43', '83', '87']
-  
+
   if (!validPrefixes.includes(prefix)) {
     return {
       valid: false,
       message: 'A股代码前缀不正确（支持：60/68/00/30/43/83/87开头）'
     }
   }
-  
+
   return {
     valid: true,
     market: 'A股',
@@ -57,7 +57,7 @@ export function validateAStock(code: string): StockValidationResult {
 export function validateUSStock(code: string): StockValidationResult {
   // 移除空格，保留字母和点号
   const cleanCode = code.trim().toUpperCase().replace(/[^A-Z.]/g, '')
-  
+
   // 基本格式：1-5个字母，可能包含一个点号
   if (!/^[A-Z]{1,5}(\.[A-Z])?$/.test(cleanCode)) {
     return {
@@ -65,7 +65,7 @@ export function validateUSStock(code: string): StockValidationResult {
       message: '美股代码格式不正确（1-5个字母，如：AAPL、BRK.B）'
     }
   }
-  
+
   // 不能全是点号
   if (cleanCode.replace(/\./g, '').length === 0) {
     return {
@@ -73,7 +73,7 @@ export function validateUSStock(code: string): StockValidationResult {
       message: '美股代码不能为空'
     }
   }
-  
+
   return {
     valid: true,
     market: '美股',
@@ -89,8 +89,8 @@ export function validateUSStock(code: string): StockValidationResult {
  */
 export function validateHKStock(code: string): StockValidationResult {
   // 移除空格和特殊字符
-  const cleanCode = code.trim().replace(/[^0-9]/g, '')
-  
+  const cleanCode = code.trim().replace(/\D/g, '')
+
   // 必须是1-5位数字
   if (!/^\d{1,5}$/.test(cleanCode)) {
     return {
@@ -98,14 +98,14 @@ export function validateHKStock(code: string): StockValidationResult {
       message: '港股代码必须是1-5位数字'
     }
   }
-  
+
   // 转换为5位格式（补齐前导0）
   const normalizedCode = cleanCode.padStart(5, '0')
-  
+
   return {
     valid: true,
     market: '港股',
-    normalizedCode: normalizedCode
+    normalizedCode
   }
 }
 
@@ -124,9 +124,9 @@ export function validateStockCode(
       message: '请输入股票代码'
     }
   }
-  
+
   const trimmedCode = code.trim()
-  
+
   // 如果提供了市场提示，优先验证该市场
   if (marketHint) {
     switch (marketHint) {
@@ -138,34 +138,34 @@ export function validateStockCode(
         return validateHKStock(trimmedCode)
     }
   }
-  
+
   // 自动识别：先判断是否全是数字
-  const isNumeric = /^\d+$/.test(trimmedCode.replace(/[^0-9]/g, ''))
-  
+  const isNumeric = /^\d+$/.test(trimmedCode.replace(/\D/g, ''))
+
   if (isNumeric) {
-    const cleanCode = trimmedCode.replace(/[^0-9]/g, '')
-    
+    const cleanCode = trimmedCode.replace(/\D/g, '')
+
     // 6位数字 -> A股
     if (cleanCode.length === 6) {
       return validateAStock(cleanCode)
     }
-    
+
     // 1-5位数字 -> 港股
     if (cleanCode.length >= 1 && cleanCode.length <= 5) {
       return validateHKStock(cleanCode)
     }
-    
+
     return {
       valid: false,
       message: '数字代码长度不正确（A股6位，港股1-5位）'
     }
   }
-  
+
   // 包含字母 -> 美股
-  if (/[A-Za-z]/.test(trimmedCode)) {
+  if (/[A-Z]/i.test(trimmedCode)) {
     return validateUSStock(trimmedCode)
   }
-  
+
   return {
     valid: false,
     message: '无法识别的股票代码格式'
@@ -213,4 +213,3 @@ export function formatStockCode(code: string, market: 'A股' | '美股' | '港�
   const validation = validateStockCode(code, market)
   return validation.normalizedCode || code
 }
-

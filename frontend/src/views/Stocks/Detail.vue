@@ -1,386 +1,29 @@
-<template>
-  <div class="stock-detail">
-    <!-- 顶部：代码 / 名称 / 操作 -->
-    <div class="header">
-      <div class="title">
-        <div class="code">{{ code }}</div>
-        <div class="name">{{ stockName || '-' }}</div>
-        <el-tag size="small">{{ market || '-' }}</el-tag>
-      </div>
-      <div class="actions">
-        <el-button @click="onToggleFavorite">
-          <el-icon><Star /></el-icon> {{ isFav ? '已自选' : '加自选' }}
-        </el-button>
-        <!-- 🔥 港股和美股不显示"同步数据"按钮 -->
-        <el-button
-          v-if="market !== 'HK' && market !== 'US'"
-          type="primary"
-          @click="showSyncDialog"
-          :loading="syncLoading"
-        >
-          <el-icon><Refresh /></el-icon> 同步数据
-        </el-button>
-        <el-button type="warning" @click="clearCache" :loading="clearCacheLoading">
-          <el-icon><Delete /></el-icon> 清除缓存
-        </el-button>
-        <el-button type="success" @click="goPaperTrading">
-          <el-icon><CreditCard /></el-icon> 模拟交易
-        </el-button>
-      </div>
-    </div>
-
-    <!-- 报价条 -->
-    <el-card class="quote-card" shadow="hover">
-      <div class="quote">
-        <div class="price-row">
-          <div class="price" :class="changeClass">{{ fmtPrice(quote.price) }}</div>
-          <div class="change" :class="changeClass">
-            <span>{{ fmtPercent(quote.changePercent) }}</span>
-          </div>
-          <el-tag type="info" size="small">{{ refreshText }}</el-tag>
-          <el-button text size="small" @click="refreshMockQuote" :icon="Refresh">刷新</el-button>
-        </div>
-        <div class="stats">
-          <div class="item"><span>今开</span><b>{{ fmtPrice(quote.open) }}</b></div>
-          <div class="item"><span>最高</span><b>{{ fmtPrice(quote.high) }}</b></div>
-          <div class="item"><span>最低</span><b>{{ fmtPrice(quote.low) }}</b></div>
-          <div class="item"><span>昨收</span><b>{{ fmtPrice(quote.prevClose) }}</b></div>
-          <div class="item">
-            <span>成交量</span>
-            <b>
-              {{ fmtVolume(quote.volume) }}
-              <el-tooltip v-if="quote.tradeDate && !isToday(quote.tradeDate)" :content="`数据日期: ${quote.tradeDate}`" placement="top">
-                <el-tag size="small" type="warning" style="margin-left: 4px;">{{ formatDateTag(quote.tradeDate) }}</el-tag>
-              </el-tooltip>
-            </b>
-          </div>
-          <div class="item">
-            <span>成交额</span>
-            <b>
-              {{ fmtAmount(quote.amount) }}
-              <el-tooltip v-if="quote.tradeDate && !isToday(quote.tradeDate)" :content="`数据日期: ${quote.tradeDate}`" placement="top">
-                <el-tag size="small" type="warning" style="margin-left: 4px;">{{ formatDateTag(quote.tradeDate) }}</el-tag>
-              </el-tooltip>
-            </b>
-          </div>
-          <div class="item">
-            <span>换手率</span>
-            <b>
-              {{ fmtPercent(quote.turnover) }}
-              <el-tooltip v-if="quote.turnoverDate && !isToday(quote.turnoverDate)" :content="`数据日期: ${quote.turnoverDate}`" placement="top">
-                <el-tag size="small" type="warning" style="margin-left: 4px;">{{ formatDateTag(quote.turnoverDate) }}</el-tag>
-              </el-tooltip>
-            </b>
-          </div>
-          <div class="item">
-            <span>振幅</span>
-            <b>
-              {{ Number.isFinite(quote.amplitude) ? quote.amplitude.toFixed(2) + '%' : '-' }}
-              <el-tooltip v-if="quote.amplitudeDate && !isToday(quote.amplitudeDate)" :content="`数据日期: ${quote.amplitudeDate}`" placement="top">
-                <el-tag size="small" type="warning" style="margin-left: 4px;">{{ formatDateTag(quote.amplitudeDate) }}</el-tag>
-              </el-tooltip>
-            </b>
-          </div>
-        </div>
-        <!-- 同步状态提示 -->
-        <div class="sync-status" v-if="quote.updatedAt || syncStatus">
-          <el-icon><Clock /></el-icon>
-          <span class="sync-info">
-            <!-- 🔥 优先显示股票自己的更新时间 -->
-            <template v-if="quote.updatedAt">
-              数据更新: {{ formatQuoteUpdateTime(quote.updatedAt) }}
-            </template>
-            <template v-else-if="syncStatus">
-              后端同步: {{ formatSyncTime(syncStatus.last_sync_time) }}
-              <span v-if="syncStatus.interval_seconds">{{ formatSyncInterval(syncStatus.interval_seconds) }}</span>
-            </template>
-            <el-tag
-              v-if="syncStatus?.data_source"
-              size="small"
-              type="success"
-              style="margin-left: 4px"
-            >
-              {{ syncStatus.data_source }}
-            </el-tag>
-          </span>
-        </div>
-      </div>
-    </el-card>
-
-    <el-row :gutter="16" class="body">
-      <el-col :span="18">
-        <!-- K线蜡烛图 -->
-        <el-card shadow="hover">
-          <template #header>
-            <div class="card-hd">
-              <div>价格K线</div>
-              <div class="periods">
-                <el-segmented v-model="period" :options="periodOptions" size="small" />
-              </div>
-            </div>
-          </template>
-          <div class="kline-container">
-            <v-chart class="k-chart" :option="kOption" autoresize />
-            <div class="legend">当前周期：{{ period }} · 数据源：{{ klineSource || '-' }} · 最近：{{ lastKTime || '-' }} · 收：{{ fmtPrice(lastKClose) }}</div>
-          </div>
-        </el-card>
-
-        <!-- 详细分析结果（方案B）：仅在进行中或有结果时显示 -->
-        <el-card v-if="analysisStatus==='running' || lastAnalysis" shadow="hover" class="analysis-detail-card" id="analysis-detail">
-          <template #header><div class="card-hd">详细分析结果</div></template>
-          <div v-if="analysisStatus==='running'" class="running">
-            <el-progress :percentage="analysisProgress" :text-inside="true" style="width:100%" />
-            <div class="hint">{{ analysisMessage || '正在生成分析报告…' }}</div>
-          </div>
-          <div v-else class="detail">
-            <!-- 分析时间和信心度 -->
-            <div class="analysis-meta">
-              <span class="analysis-time">
-                <el-icon><Clock /></el-icon>
-                分析时间：{{ formatAnalysisTime(lastTaskInfo?.end_time) }}
-              </span>
-              <span class="confidence">
-                <el-icon><TrendCharts /></el-icon>
-                信心度：{{ fmtConf(lastAnalysis?.confidence_score ?? lastAnalysis?.overall_score) }}
-              </span>
-            </div>
-
-            <!-- 投资建议 - 重点突出 -->
-            <div class="recommendation-box">
-              <div class="recommendation-header">
-                <el-icon class="icon"><TrendCharts /></el-icon>
-                <span class="title">投资建议</span>
-              </div>
-              <div class="recommendation-content">
-                <div class="recommendation-text">
-                  {{ lastAnalysis?.recommendation || '-' }}
-                </div>
-              </div>
-            </div>
-
-            <!-- 分析摘要 -->
-            <div class="summary-section">
-              <div class="summary-title">
-                <el-icon><Reading /></el-icon>
-                分析摘要
-              </div>
-              <div class="summary-text markdown-body" v-html="renderMarkdown(lastAnalysis?.summary || '-')"></div>
-            </div>
-
-            <!-- 详细报告展示 -->
-            <div v-if="lastAnalysis?.reports && Object.keys(lastAnalysis.reports).length > 0" class="reports-section">
-              <el-divider />
-              <div class="reports-header">
-                <span class="reports-title">📊 详细分析报告 ({{ Object.keys(lastAnalysis.reports).length }})</span>
-                <el-button
-                  type="primary"
-                  plain
-                  @click="showReportsDialog = true"
-                  :icon="Document"
-                >
-                  查看完整报告
-                </el-button>
-              </div>
-
-              <!-- 报告列表预览 -->
-              <div class="reports-preview">
-                <el-tag
-                  v-for="reportKey in reportKeys"
-                  :key="reportKey"
-                  size="small"
-                  effect="plain"
-                  class="report-tag"
-                  @click="openReport(reportKey)"
-                >
-                  {{ formatReportName(reportKey) }}
-                </el-tag>
-              </div>
-            </div>
-          </div>
-        </el-card>
-
-        <!-- 新闻与公告：位于详细分析结果下方 -->
-        <el-card shadow="hover" class="news-card">
-          <template #header>
-            <div class="card-hd">
-              <div>近期新闻与公告</div>
-              <el-select v-model="newsFilter" size="small" style="width: 160px">
-                <el-option label="全部" value="all" />
-                <el-option label="新闻" value="news" />
-                <el-option label="公告" value="announcement" />
-              </el-select>
-            </div>
-          </template>
-          <el-empty v-if="newsItems.length === 0" description="暂无新闻" />
-          <div v-else class="news-list">
-            <div v-for="(n, i) in filteredNews" :key="i" class="news-item">
-              <div class="row">
-                <div class="left">
-                  <el-tag size="small" effect="plain" :type="n.type==='announcement' ? 'warning' : 'info'" class="tag">{{ n.type==='announcement' ? '公告' : '新闻' }}</el-tag>
-                  <div class="title">
-                    <template v-if="n.url && n.url !== '#'">
-                      <a :href="n.url" target="_blank" rel="noopener">{{ n.title || '查看详情' }}</a>
-                      <el-icon class="ext"><Link /></el-icon>
-                    </template>
-                    <template v-else>
-                      <span>{{ n.title || '（无标题）' }}</span>
-                    </template>
-                  </div>
-                </div>
-                <div class="right">{{ formatNewsTime(n.time) }}</div>
-              </div>
-              <div class="meta">{{ n.source || '-' }} · {{ newsSource || '-' }}</div>
-            </div>
-          </div>
-        </el-card>
-
-
-
-
-      </el-col>
-
-      <el-col :span="6">
-        <!-- 基本面快照 -->
-        <el-card shadow="hover">
-          <template #header><div class="card-hd">基本面快照</div></template>
-          <div class="facts">
-            <div class="fact"><span>行业</span><b>{{ basics.industry }}</b></div>
-            <div class="fact"><span>板块</span><b>{{ basics.sector }}</b></div>
-            <div class="fact"><span>总市值</span><b>{{ fmtAmount(basics.marketCap) }}</b></div>
-            <div class="fact">
-              <span>PE(TTM)</span>
-              <b>
-                {{ Number.isFinite(basics.pe) ? basics.pe.toFixed(2) : '-' }}
-                <el-tag v-if="basics.peIsRealtime" type="success" size="small" style="margin-left: 4px">实时</el-tag>
-              </b>
-            </div>
-            <div class="fact">
-              <span>PB(市净率)</span>
-              <b>
-                {{ Number.isFinite(basics.pb) ? basics.pb.toFixed(2) : '-' }}
-                <el-tag v-if="basics.peIsRealtime" type="success" size="small" style="margin-left: 4px">实时</el-tag>
-              </b>
-            </div>
-            <div class="fact"><span>PS(TTM)</span><b>{{ Number.isFinite(basics.ps) ? basics.ps.toFixed(2) : '-' }}</b></div>
-            <div class="fact"><span>ROE</span><b>{{ fmtPercent(basics.roe) }}</b></div>
-            <div class="fact"><span>负债率</span><b>{{ fmtPercent(basics.debtRatio) }}</b></div>
-          </div>
-        </el-card>
-
-
-
-        <!-- 快捷操作 -->
-        <el-card shadow="hover" class="actions-card">
-          <template #header><div class="card-hd">快捷操作</div></template>
-          <div class="quick-actions">
-            <el-button type="primary" @click="onAnalyze" :icon="TrendCharts" plain>发起分析</el-button>
-            <el-button @click="onToggleFavorite" :icon="Star">{{ isFav ? '移出自选' : '加入自选' }}</el-button>
-            <el-button type="success" :icon="CreditCard" @click="goPaperTrading">模拟交易</el-button>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <!-- 详细报告对话框 -->
-    <el-dialog
-      v-model="showReportsDialog"
-      title="📊 详细分析报告"
-      width="80%"
-      :close-on-click-modal="false"
-      class="reports-dialog"
-    >
-      <el-tabs v-model="activeReportTab" type="border-card">
-        <el-tab-pane
-          v-for="reportKey in reportKeys"
-          :key="reportKey"
-          :label="formatReportName(reportKey)"
-          :name="reportKey"
-        >
-          <div class="report-content">
-            <el-scrollbar height="500px">
-              <div class="markdown-body" v-html="renderMarkdown(lastAnalysis?.reports?.[reportKey] || '')"></div>
-            </el-scrollbar>
-          </div>
-        </el-tab-pane>
-      </el-tabs>
-
-      <template #footer>
-        <el-button @click="showReportsDialog = false">关闭</el-button>
-        <el-button type="primary" @click="exportReport">导出报告</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 数据同步对话框 -->
-    <el-dialog
-      v-model="syncDialogVisible"
-      title="同步股票数据"
-      width="500px"
-    >
-      <el-form :model="syncForm" label-width="120px">
-        <el-form-item label="股票代码">
-          <el-input v-model="code" disabled />
-        </el-form-item>
-        <el-form-item label="股票名称">
-          <el-input v-model="stockName" disabled />
-        </el-form-item>
-        <el-form-item label="同步内容">
-          <el-checkbox-group v-model="syncForm.syncTypes">
-            <el-checkbox label="realtime">实时行情</el-checkbox>
-            <el-checkbox label="historical">历史行情数据</el-checkbox>
-            <el-checkbox label="financial">财务数据</el-checkbox>
-            <el-checkbox label="basic">基础数据</el-checkbox>
-          </el-checkbox-group>
-        </el-form-item>
-        <el-form-item label="数据源">
-          <el-radio-group v-model="syncForm.dataSource">
-            <el-radio label="tushare">Tushare</el-radio>
-            <el-radio label="akshare">AKShare</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item label="历史数据天数" v-if="syncForm.syncTypes.includes('historical')">
-          <el-input-number v-model="syncForm.days" :min="1" :max="3650" />
-          <span style="margin-left: 10px; color: #909399; font-size: 12px;">
-            (最多3650天，约10年)
-          </span>
-        </el-form-item>
-      </el-form>
-
-      <template #footer>
-        <el-button @click="syncDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSync" :loading="syncLoading">
-          开始同步
-        </el-button>
-      </template>
-    </el-dialog>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { TrendCharts, Star, Refresh, Link, Document, Clock, Reading, CreditCard, Delete } from '@element-plus/icons-vue'
-import { marked } from 'marked'
-import { stocksApi } from '@/api/stocks'
-import { analysisApi } from '@/api/analysis'
-import { ApiClient } from '@/api/request'
-import { stockSyncApi } from '@/api/stockSync'
-import { clearAllCache } from '@/api/cache'
-import { use as echartsUse } from 'echarts/core'
-import { CandlestickChart } from 'echarts/charts'
-
-import { GridComponent, TooltipComponent, DataZoomComponent, LegendComponent, TitleComponent } from 'echarts/components'
-import { CanvasRenderer } from 'echarts/renderers'
-import VChart from 'vue-echarts'
 import type { EChartsOption } from 'echarts'
-import { favoritesApi } from '@/api/favorites'
+import { Clock, CreditCard, Delete, Document, Link, Reading, Refresh, Star, TrendCharts } from '@element-plus/icons-vue'
+import { CandlestickChart } from 'echarts/charts'
+import { DataZoomComponent, GridComponent, LegendComponent, TitleComponent, TooltipComponent } from 'echarts/components'
+import { use as echartsUse } from 'echarts/core'
+import { CanvasRenderer } from 'echarts/renderers'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { marked } from 'marked'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import VChart from 'vue-echarts'
+import { useRoute, useRouter } from 'vue-router'
+import { analysisApi } from '@/api/analysis'
 
+import { clearAllCache } from '@/api/cache'
+import { favoritesApi } from '@/api/favorites'
+import { ApiClient } from '@/api/request'
+import { stocksApi } from '@/api/stocks'
+import { stockSyncApi } from '@/api/stockSync'
+
+import { formatDateTime, formatDateTimeWithRelative } from '@/utils/datetime'
 
 echartsUse([CandlestickChart, GridComponent, TooltipComponent, DataZoomComponent, LegendComponent, TitleComponent, CanvasRenderer])
 
 const route = useRoute()
 const router = useRouter()
-
 
 // 分析状态
 const analysisStatus = ref<'idle' | 'running' | 'completed' | 'failed'>('idle')
@@ -404,7 +47,7 @@ const code = computed(() => {
   }
   return routeCode
 })
-const symbol = computed(() => code.value.split('.')[0])  // 提取6位代码
+const symbol = computed(() => code.value.split('.')[0]) // 提取6位代码
 const stockName = ref('')
 const market = ref('')
 const isFav = ref(false)
@@ -449,20 +92,20 @@ const lastKClose = ref<number | null>(null)
 
 // 报价（初始化）
 const quote = reactive({
-  price: NaN,
-  changePercent: NaN,
-  open: NaN,
-  high: NaN,
-  low: NaN,
-  prevClose: NaN,
-  volume: NaN,
-  amount: NaN,
-  turnover: NaN,
-  amplitude: NaN,  // 振幅（替代量比）
-  tradeDate: null as string | null,  // 交易日期（用于成交量、成交额）
-  turnoverDate: null as string | null,  // 换手率数据日期
-  amplitudeDate: null as string | null,  // 振幅数据日期
-  updatedAt: null as string | null  // 🔥 数据更新时间
+  price: Number.NaN,
+  changePercent: Number.NaN,
+  open: Number.NaN,
+  high: Number.NaN,
+  low: Number.NaN,
+  prevClose: Number.NaN,
+  volume: Number.NaN,
+  amount: Number.NaN,
+  turnover: Number.NaN,
+  amplitude: Number.NaN, // 振幅（替代量比）
+  tradeDate: null as string | null, // 交易日期（用于成交量、成交额）
+  turnoverDate: null as string | null, // 换手率数据日期
+  amplitudeDate: null as string | null, // 振幅数据日期
+  updatedAt: null as string | null // 🔥 数据更新时间
 })
 
 const lastRefreshAt = ref<Date | null>(null)
@@ -471,14 +114,16 @@ const changeClass = computed(() => quote.changePercent > 0 ? 'up' : quote.change
 
 // 🔥 日期判断和格式化函数
 function isToday(dateStr: string | null): boolean {
-  if (!dateStr) return false
+  if (!dateStr)
+    return false
   const today = new Date().toISOString().split('T')[0].replace(/-/g, '')
   const targetDate = dateStr.replace(/-/g, '')
   return today === targetDate
 }
 
 function formatDateTag(dateStr: string | null): string {
-  if (!dateStr) return ''
+  if (!dateStr)
+    return ''
   // 将 YYYYMMDD 或 YYYY-MM-DD 格式转换为 MM-DD
   const cleaned = dateStr.replace(/-/g, '')
   if (cleaned.length === 8) {
@@ -494,7 +139,7 @@ const syncStatus = ref<any>(null)
 const syncDialogVisible = ref(false)
 const syncLoading = ref(false)
 const syncForm = reactive({
-  syncTypes: ['realtime'],  // 默认选中实时行情
+  syncTypes: ['realtime'], // 默认选中实时行情
   dataSource: 'tushare' as 'tushare' | 'akshare',
   days: 365
 })
@@ -672,13 +317,15 @@ async function fetchQuote() {
     quote.amplitude = Number.isFinite(d.amplitude) ? Number(d.amplitude) : quote.amplitude
 
     // 🔥 获取数据日期（用于标注非当天数据）
-    quote.tradeDate = d.trade_date || null  // 交易日期（用于成交量、成交额）
+    quote.tradeDate = d.trade_date || null // 交易日期（用于成交量、成交额）
     quote.turnoverDate = d.turnover_rate_date || d.trade_date || null
     quote.amplitudeDate = d.amplitude_date || d.trade_date || null
-    quote.updatedAt = d.updated_at || null  // 🔥 数据更新时间
+    quote.updatedAt = d.updated_at || null // 🔥 数据更新时间
 
-    if (d.name) stockName.value = d.name
-    if (d.market) market.value = d.market
+    if (d.name)
+      stockName.value = d.name
+    if (d.market)
+      market.value = d.market
     lastRefreshAt.value = new Date()
   } catch (e) {
     console.error('获取报价失败', e)
@@ -690,8 +337,10 @@ async function fetchFundamentals() {
     const res = await stocksApi.getFundamentals(code.value)
     const f: any = (res as any)?.data || {}
     // 基本面快照映射（以后台为准）
-    if (f.name) stockName.value = f.name
-    if (f.market) market.value = f.market
+    if (f.name)
+      stockName.value = f.name
+    if (f.market)
+      market.value = f.market
     basics.industry = f.industry || basics.industry
     basics.sector = f.sector || basics.sector || '—'
     // 后端 total_mv 单位：亿元，这里转为元以便与金额格式化函数配合
@@ -744,8 +393,8 @@ async function loadPageData() {
     fetchKline(),
     fetchNews(),
     checkFavorite(),
-    fetchLatestAnalysis(),  // 获取最新的历史分析报告
-    fetchSyncStatus()  // 获取同步状态
+    fetchLatestAnalysis(), // 获取最新的历史分析报告
+    fetchSyncStatus() // 获取同步状态
   ])
 }
 
@@ -770,7 +419,10 @@ onMounted(async () => {
   // 每30秒刷新一次报价
   timer = setInterval(fetchQuote, 30000)
 })
-onUnmounted(() => { if (timer) clearInterval(timer) })
+onUnmounted(() => {
+  if (timer)
+    clearInterval(timer)
+})
 
 watch(() => route.params.code, async (newCode, oldCode) => {
   if (!newCode || newCode === oldCode) {
@@ -781,21 +433,25 @@ watch(() => route.params.code, async (newCode, oldCode) => {
   await loadPageData()
 })
 
-
-
 // K线占位相关
-const periodOptions = ['日K','周K','月K']
+const periodOptions = ['日K', '周K', '月K']
 const period = ref('日K')
 
 const klineSource = ref<string | undefined>(undefined)
 
 function periodLabelToParam(p: string): string {
-  if (p.includes('5')) return '5m'
-  if (p.includes('15')) return '15m'
-  if (p.includes('60')) return '60m'
-  if (p.includes('日')) return 'day'
-  if (p.includes('周')) return 'week'
-  if (p.includes('月')) return 'month'
+  if (p.includes('5'))
+    return '5m'
+  if (p.includes('15'))
+    return '15m'
+  if (p.includes('60'))
+    return '60m'
+  if (p.includes('日'))
+    return 'day'
+  if (p.includes('周'))
+    return 'week'
+  if (p.includes('月'))
+    return 'month'
   return '5m'
 }
 
@@ -815,11 +471,12 @@ async function fetchKline() {
 
     for (const it of items) {
       const t = String(it.time || it.trade_time || it.trade_date || '')
-      const o = Number(it.open ?? NaN)
-      const h = Number(it.high ?? NaN)
-      const l = Number(it.low ?? NaN)
-      const c = Number(it.close ?? NaN)
-      if (!Number.isFinite(o) || !Number.isFinite(h) || !Number.isFinite(l) || !Number.isFinite(c) || !t) continue
+      const o = Number(it.open ?? Number.NaN)
+      const h = Number(it.high ?? Number.NaN)
+      const l = Number(it.low ?? Number.NaN)
+      const c = Number(it.close ?? Number.NaN)
+      if (!Number.isFinite(o) || !Number.isFinite(h) || !Number.isFinite(l) || !Number.isFinite(c) || !t)
+        continue
       category.push(t)
       values.push([o, c, l, h])
     }
@@ -851,7 +508,6 @@ async function fetchKline() {
   }
 }
 
-
 // 新闻
 const newsFilter = ref('all')
 const newsItems = ref<any[]>([])
@@ -882,8 +538,10 @@ async function fetchNews() {
 }
 
 const filteredNews = computed(() => {
-  if (newsFilter.value === 'news') return newsItems.value.filter(x => x.type === 'news')
-  if (newsFilter.value === 'announcement') return newsItems.value.filter(x => x.type === 'announcement')
+  if (newsFilter.value === 'news')
+    return newsItems.value.filter(x => x.type === 'news')
+  if (newsFilter.value === 'announcement')
+    return newsItems.value.filter(x => x.type === 'announcement')
   return newsItems.value
 })
 
@@ -891,15 +549,15 @@ const filteredNews = computed(() => {
 const basics = reactive({
   industry: '-',
   sector: '-',
-  marketCap: NaN,
-  pe: NaN,
-  pb: NaN,              // 🔥 新增：市净率
-  ps: NaN,              // 🔥 新增：市销率
-  roe: NaN,
-  debtRatio: NaN,
-  peIsRealtime: false,  // PE是否为实时数据
-  peSource: '',         // PE数据来源
-  peUpdatedAt: null     // PE更新时间
+  marketCap: Number.NaN,
+  pe: Number.NaN,
+  pb: Number.NaN, // 🔥 新增：市净率
+  ps: Number.NaN, // 🔥 新增：市销率
+  roe: Number.NaN,
+  debtRatio: Number.NaN,
+  peIsRealtime: false, // PE是否为实时数据
+  peSource: '', // PE数据来源
+  peUpdatedAt: null // PE更新时间
 })
 
 // 操作
@@ -911,7 +569,7 @@ async function onToggleFavorite() {
     if (!isFav.value) {
       const payload = {
         symbol: symbol.value,
-        stock_code: symbol.value,  // 兼容字段
+        stock_code: symbol.value, // 兼容字段
         stock_name: stockName.value,
         market: market.value
       }
@@ -940,7 +598,7 @@ async function fetchLatestAnalysis() {
 
     const resp: any = await analysisApi.getHistory({
       symbol: symbol.value,
-      stock_code: symbol.value,  // 兼容字段
+      stock_code: symbol.value, // 兼容字段
       page: 1,
       page_size: 1,
       status: 'completed'
@@ -1014,34 +672,43 @@ async function fetchLatestAnalysis() {
 
 // 格式化
 function fmtPrice(v: any) { const n = Number(v); return Number.isFinite(n) ? n.toFixed(2) : '-' }
-function fmtPercent(v: any) { const n = Number(v); return Number.isFinite(n) ? `${n>0?'+':''}${n.toFixed(2)}%` : '-' }
+function fmtPercent(v: any) { const n = Number(v); return Number.isFinite(n) ? `${n > 0 ? '+' : ''}${n.toFixed(2)}%` : '-' }
 function fmtVolume(v: any) {
   const n = Number(v)
-  if (!Number.isFinite(n)) return '-'
+  if (!Number.isFinite(n))
+    return '-'
 
   // 🔥 数据库存储的是"股"，直接显示为"万股"或"亿股"
-  if (n >= 1e8) return (n/1e8).toFixed(2) + '亿股'
-  if (n >= 1e4) return (n/1e4).toFixed(2) + '万股'
-  return n.toFixed(0) + '股'
+  if (n >= 1e8)
+    return `${(n / 1e8).toFixed(2)}亿股`
+  if (n >= 1e4)
+    return `${(n / 1e4).toFixed(2)}万股`
+  return `${n.toFixed(0)}股`
 }
 function fmtAmount(v: any) {
   const n = Number(v)
-  if (!Number.isFinite(n)) return '-'
-  if (n >= 1e12) return (n/1e12).toFixed(2) + '万亿'
-  if (n >= 1e8) return (n/1e8).toFixed(2) + '亿'
-  if (n >= 1e4) return (n/1e4).toFixed(2) + '万'
+  if (!Number.isFinite(n))
+    return '-'
+  if (n >= 1e12)
+    return `${(n / 1e12).toFixed(2)}万亿`
+  if (n >= 1e8)
+    return `${(n / 1e8).toFixed(2)}亿`
+  if (n >= 1e4)
+    return `${(n / 1e4).toFixed(2)}万`
   return n.toFixed(0)
 }
 // 🔥 新增：格式化同步时间（添加时区标识）
 function formatSyncTime(timeStr: string | null | undefined): string {
-  if (!timeStr) return '未同步'
+  if (!timeStr)
+    return '未同步'
   // 后端返回的时间已经是 UTC+8 时区，添加时区标识
   return `${timeStr} (UTC+8)`
 }
 
 // 🔥 新增：格式化股票更新时间
 function formatQuoteUpdateTime(timeStr: string | null | undefined): string {
-  if (!timeStr) return '未更新'
+  if (!timeStr)
+    return '未更新'
   try {
     // 后端返回的时间已经是 UTC+8 时区，但没有时区标识
     // 需要手动添加 +08:00 时区标识，然后转换为本地时间显示
@@ -1065,7 +732,8 @@ function formatQuoteUpdateTime(timeStr: string | null | undefined): string {
 
 // 🔥 新增：格式化同步间隔
 function formatSyncInterval(seconds: number): string {
-  if (!seconds || seconds <= 0) return ''
+  if (!seconds || seconds <= 0)
+    return ''
 
   if (seconds < 60) {
     // 小于60秒，显示秒数
@@ -1082,12 +750,11 @@ function formatSyncInterval(seconds: number): string {
 }
 function fmtConf(v: any) {
   const n = Number(v)
-  if (!Number.isFinite(n)) return '-'
+  if (!Number.isFinite(n))
+    return '-'
   const pct = n <= 1 ? n * 100 : n
   return `${Math.round(pct)}%`
 }
-
-import { formatDateTimeWithRelative, formatDateTime } from '@/utils/datetime'
 
 // 格式化分析时间（处理UTC时间转换为中国本地时间）
 function formatAnalysisTime(dateStr: any): string {
@@ -1096,7 +763,8 @@ function formatAnalysisTime(dateStr: any): string {
 
 // 格式化新闻时间（简洁格式：MM-DD HH:mm）
 function formatNewsTime(dateStr: string | null | undefined): string {
-  if (!dateStr) return '-'
+  if (!dateStr)
+    return '-'
 
   try {
     // 使用 formatDateTime 工具函数，自定义格式
@@ -1107,7 +775,7 @@ function formatNewsTime(dateStr: string | null | undefined): string {
       hour: '2-digit',
       minute: '2-digit',
       hour12: false
-    }).replace(/\//g, '-').replace(/,/g, '')  // 移除逗号和斜杠
+    }).replace(/\//g, '-').replace(/,/g, '') // 移除逗号和斜杠
   } catch (e) {
     console.error('新闻时间格式化错误:', e, dateStr)
     return String(dateStr)
@@ -1119,39 +787,40 @@ function formatReportName(key: string): string {
   // 完整的13个报告映射
   const nameMap: Record<string, string> = {
     // 分析师团队 (4个)
-    'market_report': '📈 市场技术分析',
-    'sentiment_report': '💭 市场情绪分析',
-    'news_report': '📰 新闻事件分析',
-    'fundamentals_report': '💰 基本面分析',
+    market_report: '📈 市场技术分析',
+    sentiment_report: '💭 市场情绪分析',
+    news_report: '📰 新闻事件分析',
+    fundamentals_report: '💰 基本面分析',
 
     // 研究团队 (3个)
-    'bull_researcher': '🐂 多头研究员',
-    'bear_researcher': '🐻 空头研究员',
-    'research_team_decision': '🔬 研究经理决策',
+    bull_researcher: '🐂 多头研究员',
+    bear_researcher: '🐻 空头研究员',
+    research_team_decision: '🔬 研究经理决策',
 
     // 交易团队 (1个)
-    'trader_investment_plan': '💼 交易员计划',
+    trader_investment_plan: '💼 交易员计划',
 
     // 风险管理团队 (4个)
-    'risky_analyst': '⚡ 激进分析师',
-    'safe_analyst': '🛡️ 保守分析师',
-    'neutral_analyst': '⚖️ 中性分析师',
-    'risk_management_decision': '👔 投资组合经理',
+    risky_analyst: '⚡ 激进分析师',
+    safe_analyst: '🛡️ 保守分析师',
+    neutral_analyst: '⚖️ 中性分析师',
+    risk_management_decision: '👔 投资组合经理',
 
     // 最终决策 (1个)
-    'final_trade_decision': '🎯 最终交易决策',
+    final_trade_decision: '🎯 最终交易决策',
 
     // 兼容旧字段
-    'investment_plan': '📋 投资建议',
-    'investment_debate_state': '🔬 研究团队决策（旧）',
-    'risk_debate_state': '⚖️ 风险管理团队（旧）'
+    investment_plan: '📋 投资建议',
+    investment_debate_state: '🔬 研究团队决策（旧）',
+    risk_debate_state: '⚖️ 风险管理团队（旧）'
   }
   return nameMap[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
 }
 
 // 渲染Markdown
 function renderMarkdown(content: string): string {
-  if (!content) return '<p>暂无内容</p>'
+  if (!content)
+    return '<p>暂无内容</p>'
   try {
     return String(marked.parse(content))
   } catch (e) {
@@ -1221,8 +890,440 @@ function exportReport() {
 
   ElMessage.success('报告已导出')
 }
-
 </script>
+
+<template>
+  <div class="stock-detail">
+    <!-- 顶部：代码 / 名称 / 操作 -->
+    <div class="header">
+      <div class="title">
+        <div class="code">
+          {{ code }}
+        </div>
+        <div class="name">
+          {{ stockName || '-' }}
+        </div>
+        <el-tag size="small">
+          {{ market || '-' }}
+        </el-tag>
+      </div>
+      <div class="actions">
+        <el-button @click="onToggleFavorite">
+          <el-icon><Star /></el-icon> {{ isFav ? '已自选' : '加自选' }}
+        </el-button>
+        <!-- 🔥 港股和美股不显示"同步数据"按钮 -->
+        <el-button
+          v-if="market !== 'HK' && market !== 'US'"
+          type="primary"
+          :loading="syncLoading"
+          @click="showSyncDialog"
+        >
+          <el-icon><Refresh /></el-icon> 同步数据
+        </el-button>
+        <el-button type="warning" :loading="clearCacheLoading" @click="clearCache">
+          <el-icon><Delete /></el-icon> 清除缓存
+        </el-button>
+        <el-button type="success" @click="goPaperTrading">
+          <el-icon><CreditCard /></el-icon> 模拟交易
+        </el-button>
+      </div>
+    </div>
+
+    <!-- 报价条 -->
+    <el-card class="quote-card" shadow="hover">
+      <div class="quote">
+        <div class="price-row">
+          <div class="price" :class="changeClass">
+            {{ fmtPrice(quote.price) }}
+          </div>
+          <div class="change" :class="changeClass">
+            <span>{{ fmtPercent(quote.changePercent) }}</span>
+          </div>
+          <el-tag type="info" size="small">
+            {{ refreshText }}
+          </el-tag>
+          <el-button text size="small" :icon="Refresh" @click="refreshMockQuote">
+            刷新
+          </el-button>
+        </div>
+        <div class="stats">
+          <div class="item">
+            <span>今开</span><b>{{ fmtPrice(quote.open) }}</b>
+          </div>
+          <div class="item">
+            <span>最高</span><b>{{ fmtPrice(quote.high) }}</b>
+          </div>
+          <div class="item">
+            <span>最低</span><b>{{ fmtPrice(quote.low) }}</b>
+          </div>
+          <div class="item">
+            <span>昨收</span><b>{{ fmtPrice(quote.prevClose) }}</b>
+          </div>
+          <div class="item">
+            <span>成交量</span>
+            <b>
+              {{ fmtVolume(quote.volume) }}
+              <el-tooltip v-if="quote.tradeDate && !isToday(quote.tradeDate)" :content="`数据日期: ${quote.tradeDate}`" placement="top">
+                <el-tag size="small" type="warning" style="margin-left: 4px;">{{ formatDateTag(quote.tradeDate) }}</el-tag>
+              </el-tooltip>
+            </b>
+          </div>
+          <div class="item">
+            <span>成交额</span>
+            <b>
+              {{ fmtAmount(quote.amount) }}
+              <el-tooltip v-if="quote.tradeDate && !isToday(quote.tradeDate)" :content="`数据日期: ${quote.tradeDate}`" placement="top">
+                <el-tag size="small" type="warning" style="margin-left: 4px;">{{ formatDateTag(quote.tradeDate) }}</el-tag>
+              </el-tooltip>
+            </b>
+          </div>
+          <div class="item">
+            <span>换手率</span>
+            <b>
+              {{ fmtPercent(quote.turnover) }}
+              <el-tooltip v-if="quote.turnoverDate && !isToday(quote.turnoverDate)" :content="`数据日期: ${quote.turnoverDate}`" placement="top">
+                <el-tag size="small" type="warning" style="margin-left: 4px;">{{ formatDateTag(quote.turnoverDate) }}</el-tag>
+              </el-tooltip>
+            </b>
+          </div>
+          <div class="item">
+            <span>振幅</span>
+            <b>
+              {{ Number.isFinite(quote.amplitude) ? `${quote.amplitude.toFixed(2)}%` : '-' }}
+              <el-tooltip v-if="quote.amplitudeDate && !isToday(quote.amplitudeDate)" :content="`数据日期: ${quote.amplitudeDate}`" placement="top">
+                <el-tag size="small" type="warning" style="margin-left: 4px;">{{ formatDateTag(quote.amplitudeDate) }}</el-tag>
+              </el-tooltip>
+            </b>
+          </div>
+        </div>
+        <!-- 同步状态提示 -->
+        <div v-if="quote.updatedAt || syncStatus" class="sync-status">
+          <el-icon><Clock /></el-icon>
+          <span class="sync-info">
+            <!-- 🔥 优先显示股票自己的更新时间 -->
+            <template v-if="quote.updatedAt">
+              数据更新: {{ formatQuoteUpdateTime(quote.updatedAt) }}
+            </template>
+            <template v-else-if="syncStatus">
+              后端同步: {{ formatSyncTime(syncStatus.last_sync_time) }}
+              <span v-if="syncStatus.interval_seconds">{{ formatSyncInterval(syncStatus.interval_seconds) }}</span>
+            </template>
+            <el-tag
+              v-if="syncStatus?.data_source"
+              size="small"
+              type="success"
+              style="margin-left: 4px"
+            >
+              {{ syncStatus.data_source }}
+            </el-tag>
+          </span>
+        </div>
+      </div>
+    </el-card>
+
+    <el-row :gutter="16" class="body">
+      <el-col :span="18">
+        <!-- K线蜡烛图 -->
+        <el-card shadow="hover">
+          <template #header>
+            <div class="card-hd">
+              <div>价格K线</div>
+              <div class="periods">
+                <el-segmented v-model="period" :options="periodOptions" size="small" />
+              </div>
+            </div>
+          </template>
+          <div class="kline-container">
+            <VChart class="k-chart" :option="kOption" autoresize />
+            <div class="legend">
+              当前周期：{{ period }} · 数据源：{{ klineSource || '-' }} · 最近：{{ lastKTime || '-' }} · 收：{{ fmtPrice(lastKClose) }}
+            </div>
+          </div>
+        </el-card>
+
+        <!-- 详细分析结果（方案B）：仅在进行中或有结果时显示 -->
+        <el-card v-if="analysisStatus === 'running' || lastAnalysis" id="analysis-detail" shadow="hover" class="analysis-detail-card">
+          <template #header>
+            <div class="card-hd">
+              详细分析结果
+            </div>
+          </template>
+          <div v-if="analysisStatus === 'running'" class="running">
+            <el-progress :percentage="analysisProgress" :text-inside="true" style="width:100%" />
+            <div class="hint">
+              {{ analysisMessage || '正在生成分析报告…' }}
+            </div>
+          </div>
+          <div v-else class="detail">
+            <!-- 分析时间和信心度 -->
+            <div class="analysis-meta">
+              <span class="analysis-time">
+                <el-icon><Clock /></el-icon>
+                分析时间：{{ formatAnalysisTime(lastTaskInfo?.end_time) }}
+              </span>
+              <span class="confidence">
+                <el-icon><TrendCharts /></el-icon>
+                信心度：{{ fmtConf(lastAnalysis?.confidence_score ?? lastAnalysis?.overall_score) }}
+              </span>
+            </div>
+
+            <!-- 投资建议 - 重点突出 -->
+            <div class="recommendation-box">
+              <div class="recommendation-header">
+                <el-icon class="icon">
+                  <TrendCharts />
+                </el-icon>
+                <span class="title">投资建议</span>
+              </div>
+              <div class="recommendation-content">
+                <div class="recommendation-text">
+                  {{ lastAnalysis?.recommendation || '-' }}
+                </div>
+              </div>
+            </div>
+
+            <!-- 分析摘要 -->
+            <div class="summary-section">
+              <div class="summary-title">
+                <el-icon><Reading /></el-icon>
+                分析摘要
+              </div>
+              <div class="summary-text markdown-body" v-html="renderMarkdown(lastAnalysis?.summary || '-')" />
+            </div>
+
+            <!-- 详细报告展示 -->
+            <div v-if="lastAnalysis?.reports && Object.keys(lastAnalysis.reports).length > 0" class="reports-section">
+              <el-divider />
+              <div class="reports-header">
+                <span class="reports-title">📊 详细分析报告 ({{ Object.keys(lastAnalysis.reports).length }})</span>
+                <el-button
+                  type="primary"
+                  plain
+                  :icon="Document"
+                  @click="showReportsDialog = true"
+                >
+                  查看完整报告
+                </el-button>
+              </div>
+
+              <!-- 报告列表预览 -->
+              <div class="reports-preview">
+                <el-tag
+                  v-for="reportKey in reportKeys"
+                  :key="reportKey"
+                  size="small"
+                  effect="plain"
+                  class="report-tag"
+                  @click="openReport(reportKey)"
+                >
+                  {{ formatReportName(reportKey) }}
+                </el-tag>
+              </div>
+            </div>
+          </div>
+        </el-card>
+
+        <!-- 新闻与公告：位于详细分析结果下方 -->
+        <el-card shadow="hover" class="news-card">
+          <template #header>
+            <div class="card-hd">
+              <div>近期新闻与公告</div>
+              <el-select v-model="newsFilter" size="small" style="width: 160px">
+                <el-option label="全部" value="all" />
+                <el-option label="新闻" value="news" />
+                <el-option label="公告" value="announcement" />
+              </el-select>
+            </div>
+          </template>
+          <el-empty v-if="newsItems.length === 0" description="暂无新闻" />
+          <div v-else class="news-list">
+            <div v-for="(n, i) in filteredNews" :key="i" class="news-item">
+              <div class="row">
+                <div class="left">
+                  <el-tag size="small" effect="plain" :type="n.type === 'announcement' ? 'warning' : 'info'" class="tag">
+                    {{ n.type === 'announcement' ? '公告' : '新闻' }}
+                  </el-tag>
+                  <div class="title">
+                    <template v-if="n.url && n.url !== '#'">
+                      <a :href="n.url" target="_blank" rel="noopener">{{ n.title || '查看详情' }}</a>
+                      <el-icon class="ext">
+                        <Link />
+                      </el-icon>
+                    </template>
+                    <template v-else>
+                      <span>{{ n.title || '（无标题）' }}</span>
+                    </template>
+                  </div>
+                </div>
+                <div class="right">
+                  {{ formatNewsTime(n.time) }}
+                </div>
+              </div>
+              <div class="meta">
+                {{ n.source || '-' }} · {{ newsSource || '-' }}
+              </div>
+            </div>
+          </div>
+        </el-card>
+      </el-col>
+
+      <el-col :span="6">
+        <!-- 基本面快照 -->
+        <el-card shadow="hover">
+          <template #header>
+            <div class="card-hd">
+              基本面快照
+            </div>
+          </template>
+          <div class="facts">
+            <div class="fact">
+              <span>行业</span><b>{{ basics.industry }}</b>
+            </div>
+            <div class="fact">
+              <span>板块</span><b>{{ basics.sector }}</b>
+            </div>
+            <div class="fact">
+              <span>总市值</span><b>{{ fmtAmount(basics.marketCap) }}</b>
+            </div>
+            <div class="fact">
+              <span>PE(TTM)</span>
+              <b>
+                {{ Number.isFinite(basics.pe) ? basics.pe.toFixed(2) : '-' }}
+                <el-tag v-if="basics.peIsRealtime" type="success" size="small" style="margin-left: 4px">实时</el-tag>
+              </b>
+            </div>
+            <div class="fact">
+              <span>PB(市净率)</span>
+              <b>
+                {{ Number.isFinite(basics.pb) ? basics.pb.toFixed(2) : '-' }}
+                <el-tag v-if="basics.peIsRealtime" type="success" size="small" style="margin-left: 4px">实时</el-tag>
+              </b>
+            </div>
+            <div class="fact">
+              <span>PS(TTM)</span><b>{{ Number.isFinite(basics.ps) ? basics.ps.toFixed(2) : '-' }}</b>
+            </div>
+            <div class="fact">
+              <span>ROE</span><b>{{ fmtPercent(basics.roe) }}</b>
+            </div>
+            <div class="fact">
+              <span>负债率</span><b>{{ fmtPercent(basics.debtRatio) }}</b>
+            </div>
+          </div>
+        </el-card>
+
+        <!-- 快捷操作 -->
+        <el-card shadow="hover" class="actions-card">
+          <template #header>
+            <div class="card-hd">
+              快捷操作
+            </div>
+          </template>
+          <div class="quick-actions">
+            <el-button type="primary" :icon="TrendCharts" plain @click="onAnalyze">
+              发起分析
+            </el-button>
+            <el-button :icon="Star" @click="onToggleFavorite">
+              {{ isFav ? '移出自选' : '加入自选' }}
+            </el-button>
+            <el-button type="success" :icon="CreditCard" @click="goPaperTrading">
+              模拟交易
+            </el-button>
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <!-- 详细报告对话框 -->
+    <el-dialog
+      v-model="showReportsDialog"
+      title="📊 详细分析报告"
+      width="80%"
+      :close-on-click-modal="false"
+      class="reports-dialog"
+    >
+      <el-tabs v-model="activeReportTab" type="border-card">
+        <el-tab-pane
+          v-for="reportKey in reportKeys"
+          :key="reportKey"
+          :label="formatReportName(reportKey)"
+          :name="reportKey"
+        >
+          <div class="report-content">
+            <el-scrollbar height="500px">
+              <div class="markdown-body" v-html="renderMarkdown(lastAnalysis?.reports?.[reportKey] || '')" />
+            </el-scrollbar>
+          </div>
+        </el-tab-pane>
+      </el-tabs>
+
+      <template #footer>
+        <el-button @click="showReportsDialog = false">
+          关闭
+        </el-button>
+        <el-button type="primary" @click="exportReport">
+          导出报告
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 数据同步对话框 -->
+    <el-dialog
+      v-model="syncDialogVisible"
+      title="同步股票数据"
+      width="500px"
+    >
+      <el-form :model="syncForm" label-width="120px">
+        <el-form-item label="股票代码">
+          <el-input v-model="code" disabled />
+        </el-form-item>
+        <el-form-item label="股票名称">
+          <el-input v-model="stockName" disabled />
+        </el-form-item>
+        <el-form-item label="同步内容">
+          <el-checkbox-group v-model="syncForm.syncTypes">
+            <el-checkbox label="realtime">
+              实时行情
+            </el-checkbox>
+            <el-checkbox label="historical">
+              历史行情数据
+            </el-checkbox>
+            <el-checkbox label="financial">
+              财务数据
+            </el-checkbox>
+            <el-checkbox label="basic">
+              基础数据
+            </el-checkbox>
+          </el-checkbox-group>
+        </el-form-item>
+        <el-form-item label="数据源">
+          <el-radio-group v-model="syncForm.dataSource">
+            <el-radio label="tushare">
+              Tushare
+            </el-radio>
+            <el-radio label="akshare">
+              AKShare
+            </el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item v-if="syncForm.syncTypes.includes('historical')" label="历史数据天数">
+          <el-input-number v-model="syncForm.days" :min="1" :max="3650" />
+          <span style="margin-left: 10px; color: #909399; font-size: 12px;">
+            (最多3650天，约10年)
+          </span>
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="syncDialogVisible = false">
+          取消
+        </el-button>
+        <el-button type="primary" :loading="syncLoading" @click="handleSync">
+          开始同步
+        </el-button>
+      </template>
+    </el-dialog>
+  </div>
+</template>
 
 <style scoped lang="scss">
 .stock-detail {

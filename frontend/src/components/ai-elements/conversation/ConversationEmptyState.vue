@@ -10,7 +10,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   title: 'No messages yet',
-  description: 'Start a conversation to see messages here',
+  description: 'Start a conversation to see messages here'
 })
 </script>
 

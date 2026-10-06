@@ -5,10 +5,10 @@ import { cn } from '@/lib/utils'
 import { inputGroupAddonVariants } from '.'
 
 const props = withDefaults(defineProps<{
-  align?: InputGroupVariants["align"]
-  class?: HTMLAttributes["class"]
+  align?: InputGroupVariants['align']
+  class?: HTMLAttributes['class']
 }>(), {
-  align: 'inline-start',
+  align: 'inline-start'
 })
 
 function handleInputGroupAddonClick(e: MouseEvent) {

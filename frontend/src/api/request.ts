@@ -1,9 +1,9 @@
-import axios from 'axios'
 import type { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
+import axios from 'axios'
 import { ElMessage } from 'element-plus'
-import { useAuthStore } from '@/stores/auth'
-import { useAppStore } from '@/stores/app'
 import router from '@/router'
+import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 
 // API响应接口
 export interface ApiResponse<T = any> {
@@ -18,12 +18,12 @@ export interface ApiResponse<T = any> {
 // 请求配置接口
 export interface RequestConfig extends AxiosRequestConfig {
   skipAuth?: boolean
-  skipAuthError?: boolean  // 跳过 401 错误的自动处理（用于登录等接口）
+  skipAuthError?: boolean // 跳过 401 错误的自动处理（用于登录等接口）
   skipErrorHandler?: boolean
   showLoading?: boolean
   loadingText?: string
-  retryCount?: number  // 重试次数
-  retryDelay?: number  // 重试延迟（毫秒）
+  retryCount?: number // 重试次数
+  retryDelay?: number // 重试延迟（毫秒）
 }
 
 // 消息去重：记录最近显示的错误消息
@@ -87,7 +87,7 @@ const createAxiosInstance = (): AxiosInstance => {
     timeout: 60000, // 增加超时时间到60秒（数据同步等长时间操作）
     headers: {
       'Content-Type': 'application/json',
-      'Cache-Control': 'no-cache',  // 禁用客户端缓存
+      'Cache-Control': 'no-cache', // 禁用客户端缓存
       'Pragma': 'no-cache'
     }
   })
@@ -165,7 +165,7 @@ const createAxiosInstance = (): AxiosInstance => {
 
       return config
     },
-    (error) => {
+    error => {
       console.error('❌ 请求拦截器错误:', error)
       return Promise.reject(error)
     }
@@ -211,7 +211,7 @@ const createAxiosInstance = (): AxiosInstance => {
       // 返回 response.data 而不是 response，这样调用方可以直接访问 ApiResponse
       return response.data
     },
-    async (error) => {
+    async error => {
       const appStore = useAppStore()
       const authStore = useAuthStore()
       const config = error.config as RequestConfig
@@ -222,7 +222,7 @@ const createAxiosInstance = (): AxiosInstance => {
       }
 
       console.error(`❌ API错误: ${error.response?.status} ${error.config?.url}`, {
-        error: error,
+        error,
         message: error.message,
         code: error.code,
         response: error.response,
@@ -373,9 +373,9 @@ const handleBusinessError = (data: ApiResponse) => {
 
   switch (code) {
     case 401:
-    case 40101:  // 未授权
-    case 40102:  // Token 无效
-    case 40103:  // Token 过期
+    case 40101: // 未授权
+    case 40102: // Token 无效
+    case 40103: // Token 过期
       console.log('🔒 业务错误：认证失败')
       handle401Error(authStore, message || '登录已过期，请重新登录')
       break
@@ -409,7 +409,8 @@ const generateRequestId = (): string => {
 
 // 判断是否应该重试
 const shouldRetry = async (config: RequestConfig | undefined, error: any): Promise<boolean> => {
-  if (!config) return false
+  if (!config)
+    return false
 
   // 获取重试配置（默认重试 2 次）
   let retryCount = 2
@@ -425,11 +426,11 @@ const shouldRetry = async (config: RequestConfig | undefined, error: any): Promi
   }
 
   // 只对网络错误和超时错误重试
-  const shouldRetryError =
-    error.code === 'ECONNABORTED' ||
-    error.message === 'Network Error' ||
-    error.message.includes('Failed to fetch') ||
-    (error.response && [502, 503, 504].includes(error.response.status))
+  const shouldRetryError
+    = error.code === 'ECONNABORTED'
+      || error.message === 'Network Error'
+      || error.message.includes('Failed to fetch')
+      || (error.response && [502, 503, 504].includes(error.response.status))
 
   return shouldRetryError
 }
@@ -554,7 +555,7 @@ export class ApiClient {
       headers: {
         'Content-Type': 'multipart/form-data'
       },
-      onUploadProgress: (progressEvent) => {
+      onUploadProgress: progressEvent => {
         if (onProgress && progressEvent.total) {
           const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total)
           onProgress(progress)

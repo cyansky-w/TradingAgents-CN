@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ConversationEmptyState } from '@/components/ai-elements/conversation'
 import { MessageCircleIcon } from 'lucide-vue-next'
+import { ConversationEmptyState } from '@/components/ai-elements/conversation'
 </script>
 
 <template>

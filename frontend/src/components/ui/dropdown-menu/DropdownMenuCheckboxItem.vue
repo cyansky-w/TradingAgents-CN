@@ -6,11 +6,11 @@ import { Check } from 'lucide-vue-next'
 import {
   DropdownMenuCheckboxItem,
   DropdownMenuItemIndicator,
-  useForwardPropsEmits,
+  useForwardPropsEmits
 } from 'reka-ui'
 import { cn } from '@/lib/utils'
 
-const props = defineProps<DropdownMenuCheckboxItemProps & { class?: HTMLAttributes["class"] }>()
+const props = defineProps<DropdownMenuCheckboxItemProps & { class?: HTMLAttributes['class'] }>()
 const emits = defineEmits<DropdownMenuCheckboxItemEmits>()
 
 const delegatedProps = reactiveOmit(props, 'class')

@@ -19,7 +19,7 @@ export interface NotificationListResponse {
 }
 
 export const notificationsApi = {
-  async getUnreadCount(): Promise<{ success: boolean; data: { count: number } }> {
+  async getUnreadCount(): Promise<{ success: boolean, data: { count: number } }> {
     // 后端尚未提供时兜底为0
     try {
       return await request.get('/api/notifications/unread_count')
@@ -28,12 +28,16 @@ export const notificationsApi = {
     }
   },
 
-  async getList(params?: { status?: 'unread' | 'all'; page?: number; page_size?: number; type?: string }): Promise<{ success: boolean; data: NotificationListResponse }> {
+  async getList(params?: { status?: 'unread' | 'all', page?: number, page_size?: number, type?: string }): Promise<{ success: boolean, data: NotificationListResponse }> {
     const query = new URLSearchParams()
-    if (params?.status) query.set('status', params.status)
-    if (params?.page) query.set('page', String(params.page))
-    if (params?.page_size) query.set('page_size', String(params.page_size))
-    if (params?.type) query.set('type', params.type)
+    if (params?.status)
+      query.set('status', params.status)
+    if (params?.page)
+      query.set('page', String(params.page))
+    if (params?.page_size)
+      query.set('page_size', String(params.page_size))
+    if (params?.type)
+      query.set('type', params.type)
     const url = query.toString() ? `/api/notifications?${query.toString()}` : '/api/notifications'
     try {
       return await request.get(url)
@@ -58,4 +62,3 @@ export const notificationsApi = {
     }
   }
 }
-

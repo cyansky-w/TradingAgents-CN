@@ -1,204 +1,21 @@
-<template>
-  <div class="reports">
-    <!-- 页面标题 -->
-    <div class="page-header">
-      <h1 class="page-title">
-        <el-icon><Document /></el-icon>
-        分析报告
-      </h1>
-      <p class="page-description">
-        查看和管理股票分析报告，支持多种格式导出
-      </p>
-    </div>
-
-    <!-- 筛选和操作栏 -->
-    <el-card class="filter-card" shadow="never">
-      <el-row :gutter="16" align="middle">
-        <el-col :span="6">
-          <el-input
-            v-model="searchKeyword"
-            placeholder="搜索股票代码或名称"
-            clearable
-            @input="handleSearch"
-          >
-            <template #prefix>
-              <el-icon><Search /></el-icon>
-            </template>
-          </el-input>
-        </el-col>
-        
-        <el-col :span="4">
-          <el-select v-model="marketFilter" placeholder="市场筛选" clearable @change="handleMarketChange">
-            <el-option label="A股" value="A股" />
-            <el-option label="港股" value="港股" />
-            <el-option label="美股" value="美股" />
-          </el-select>
-        </el-col>
-        
-        <el-col :span="6">
-          <el-date-picker
-            v-model="dateRange"
-            type="daterange"
-            range-separator="至"
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
-            format="YYYY-MM-DD"
-            value-format="YYYY-MM-DD"
-            @change="handleDateChange"
-          />
-        </el-col>
-        
-        <el-col :span="8">
-          <div class="action-buttons">
-            <el-button @click="exportSelected" :disabled="selectedReports.length === 0">
-              <el-icon><Download /></el-icon>
-              批量导出
-            </el-button>
-            <el-button @click="refreshReports">
-              <el-icon><Refresh /></el-icon>
-              刷新
-            </el-button>
-          </div>
-        </el-col>
-      </el-row>
-    </el-card>
-
-    <!-- 报告列表 -->
-    <el-card class="reports-list-card" shadow="never">
-      <el-table
-        :data="filteredReports"
-        @selection-change="handleSelectionChange"
-        v-loading="loading"
-        style="width: 100%"
-      >
-        <el-table-column type="selection" width="55" />
-        
-        <el-table-column prop="title" label="报告标题" min-width="200">
-          <template #default="{ row }">
-            <div class="report-title">
-              <el-link type="primary" @click="viewReport(row)">
-                {{ row.title }}
-              </el-link>
-              <div class="report-subtitle">
-                {{ row.stock_code }} - {{ row.stock_name }}
-              </div>
-            </div>
-          </template>
-        </el-table-column>
-        
-        <el-table-column prop="type" label="报告类型" width="120">
-          <template #default="{ row }">
-            <el-tag :type="getTypeColor(row.type)">
-              {{ getTypeText(row.type) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        
-        <el-table-column prop="format" label="格式" width="100">
-          <template #default="{ row }">
-            <el-tag size="small" effect="plain">
-              {{ row.format.toUpperCase() }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        
-        <el-table-column prop="status" label="状态" width="100">
-          <template #default="{ row }">
-            <el-tag :type="getStatusType(row.status)">
-              {{ getStatusText(row.status) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-
-        <el-table-column prop="model_info" label="分析模型" width="180">
-          <template #default="{ row }">
-            <el-tag v-if="row.model_info && row.model_info !== 'Unknown'" type="info" size="small">
-              {{ row.model_info }}
-            </el-tag>
-            <span v-else class="text-gray">-</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column prop="created_at" label="创建时间" width="180">
-          <template #default="{ row }">
-            {{ formatTime(row.created_at) }}
-          </template>
-        </el-table-column>
-
-        <el-table-column label="操作" width="250" fixed="right">
-          <template #default="{ row }">
-            <el-button type="text" size="small" @click="viewReport(row)">
-              查看
-            </el-button>
-            <el-dropdown
-              v-if="row.status === 'completed'"
-              trigger="click"
-              @command="(format) => downloadReport(row, format)"
-            >
-              <el-button type="text" size="small">
-                下载 <el-icon class="el-icon--right"><arrow-down /></el-icon>
-              </el-button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="markdown">
-                    <el-icon><document /></el-icon> Markdown
-                  </el-dropdown-item>
-                  <el-dropdown-item command="docx">
-                    <el-icon><document /></el-icon> Word 文档
-                  </el-dropdown-item>
-                  <el-dropdown-item command="pdf">
-                    <el-icon><document /></el-icon> PDF
-                  </el-dropdown-item>
-                  <el-dropdown-item command="json" divided>
-                    <el-icon><document /></el-icon> JSON (原始数据)
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-            <el-button
-              type="text"
-              size="small"
-              @click="deleteReport(row)"
-              style="color: var(--el-color-danger)"
-            >
-              删除
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <!-- 分页 -->
-      <div class="pagination-wrapper">
-        <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
-          :page-sizes="[20, 50, 100]"
-          :total="totalReports"
-          layout="total, sizes, prev, pager, next, jumper"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-        />
-      </div>
-    </el-card>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import {
+  ArrowDown,
   Document,
-  Search,
   Download,
   Refresh,
-  ArrowDown
+  Search
 } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+
+import { formatDateTime } from '@/utils/datetime'
 
 type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
 
-type ReportListItem = {
+interface ReportListItem {
   id: string
   title: string
   stock_code: string
@@ -316,7 +133,7 @@ const downloadReport = async (report: ReportListItem, format: string = 'markdown
 
     const response = await fetch(`/api/reports/${report.id}/download?format=${format}`, {
       headers: {
-        'Authorization': `Bearer ${authStore.token}`
+        Authorization: `Bearer ${authStore.token}`
       }
     })
 
@@ -361,10 +178,10 @@ const downloadReport = async (report: ReportListItem, format: string = 'markdown
 // 辅助函数：获取格式名称
 const getFormatName = (format: string): string => {
   const names: Record<string, string> = {
-    'markdown': 'Markdown',
-    'docx': 'Word',
-    'pdf': 'PDF',
-    'json': 'JSON'
+    markdown: 'Markdown',
+    docx: 'Word',
+    pdf: 'PDF',
+    json: 'JSON'
   }
   return names[format] || format
 }
@@ -372,10 +189,10 @@ const getFormatName = (format: string): string => {
 // 辅助函数：获取文件扩展名
 const getFileExtension = (format: string): string => {
   const extensions: Record<string, string> = {
-    'markdown': 'md',
-    'docx': 'docx',
-    'pdf': 'pdf',
-    'json': 'json'
+    markdown: 'md',
+    docx: 'docx',
+    pdf: 'pdf',
+    json: 'json'
   }
   return extensions[format] || 'txt'
 }
@@ -466,8 +283,6 @@ const getStatusText = (status: string) => {
   return statusMap[status] || status
 }
 
-import { formatDateTime } from '@/utils/datetime'
-
 const formatTime = (time: string) => {
   return formatDateTime(time)
 }
@@ -488,6 +303,193 @@ onMounted(() => {
   fetchReports()
 })
 </script>
+
+<template>
+  <div class="reports">
+    <!-- 页面标题 -->
+    <div class="page-header">
+      <h1 class="page-title">
+        <el-icon><Document /></el-icon>
+        分析报告
+      </h1>
+      <p class="page-description">
+        查看和管理股票分析报告，支持多种格式导出
+      </p>
+    </div>
+
+    <!-- 筛选和操作栏 -->
+    <el-card class="filter-card" shadow="never">
+      <el-row :gutter="16" align="middle">
+        <el-col :span="6">
+          <el-input
+            v-model="searchKeyword"
+            placeholder="搜索股票代码或名称"
+            clearable
+            @input="handleSearch"
+          >
+            <template #prefix>
+              <el-icon><Search /></el-icon>
+            </template>
+          </el-input>
+        </el-col>
+
+        <el-col :span="4">
+          <el-select v-model="marketFilter" placeholder="市场筛选" clearable @change="handleMarketChange">
+            <el-option label="A股" value="A股" />
+            <el-option label="港股" value="港股" />
+            <el-option label="美股" value="美股" />
+          </el-select>
+        </el-col>
+
+        <el-col :span="6">
+          <el-date-picker
+            v-model="dateRange"
+            type="daterange"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
+            @change="handleDateChange"
+          />
+        </el-col>
+
+        <el-col :span="8">
+          <div class="action-buttons">
+            <el-button :disabled="selectedReports.length === 0" @click="exportSelected">
+              <el-icon><Download /></el-icon>
+              批量导出
+            </el-button>
+            <el-button @click="refreshReports">
+              <el-icon><Refresh /></el-icon>
+              刷新
+            </el-button>
+          </div>
+        </el-col>
+      </el-row>
+    </el-card>
+
+    <!-- 报告列表 -->
+    <el-card class="reports-list-card" shadow="never">
+      <el-table
+        v-loading="loading"
+        :data="filteredReports"
+        style="width: 100%"
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" width="55" />
+
+        <el-table-column prop="title" label="报告标题" min-width="200">
+          <template #default="{ row }">
+            <div class="report-title">
+              <el-link type="primary" @click="viewReport(row)">
+                {{ row.title }}
+              </el-link>
+              <div class="report-subtitle">
+                {{ row.stock_code }} - {{ row.stock_name }}
+              </div>
+            </div>
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="type" label="报告类型" width="120">
+          <template #default="{ row }">
+            <el-tag :type="getTypeColor(row.type)">
+              {{ getTypeText(row.type) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="format" label="格式" width="100">
+          <template #default="{ row }">
+            <el-tag size="small" effect="plain">
+              {{ row.format.toUpperCase() }}
+            </el-tag>
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="status" label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="getStatusType(row.status)">
+              {{ getStatusText(row.status) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="model_info" label="分析模型" width="180">
+          <template #default="{ row }">
+            <el-tag v-if="row.model_info && row.model_info !== 'Unknown'" type="info" size="small">
+              {{ row.model_info }}
+            </el-tag>
+            <span v-else class="text-gray">-</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="created_at" label="创建时间" width="180">
+          <template #default="{ row }">
+            {{ formatTime(row.created_at) }}
+          </template>
+        </el-table-column>
+
+        <el-table-column label="操作" width="250" fixed="right">
+          <template #default="{ row }">
+            <el-button type="text" size="small" @click="viewReport(row)">
+              查看
+            </el-button>
+            <el-dropdown
+              v-if="row.status === 'completed'"
+              trigger="click"
+              @command="(format) => downloadReport(row, format)"
+            >
+              <el-button type="text" size="small">
+                下载 <el-icon class="el-icon--right">
+                  <ArrowDown />
+                </el-icon>
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="markdown">
+                    <el-icon><Document /></el-icon> Markdown
+                  </el-dropdown-item>
+                  <el-dropdown-item command="docx">
+                    <el-icon><Document /></el-icon> Word 文档
+                  </el-dropdown-item>
+                  <el-dropdown-item command="pdf">
+                    <el-icon><Document /></el-icon> PDF
+                  </el-dropdown-item>
+                  <el-dropdown-item command="json" divided>
+                    <el-icon><Document /></el-icon> JSON (原始数据)
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+            <el-button
+              type="text"
+              size="small"
+              style="color: var(--el-color-danger)"
+              @click="deleteReport(row)"
+            >
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <!-- 分页 -->
+      <div class="pagination-wrapper">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="[20, 50, 100]"
+          :total="totalReports"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
+    </el-card>
+  </div>
+</template>
 
 <style lang="scss" scoped>
 .reports {

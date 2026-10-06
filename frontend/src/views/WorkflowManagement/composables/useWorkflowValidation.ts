@@ -1,4 +1,4 @@
-import type { FlowNode, FlowEdge } from './useWorkflowSync'
+import type { FlowEdge, FlowNode } from './useWorkflowSync'
 
 export interface ValidationError {
   level: 'error' | 'warning'
@@ -47,7 +47,7 @@ export function validateDag(nodes: FlowNode[], edges: FlowEdge[], currentWorkflo
     }
   }
 
-  const WHITE = 0, GRAY = 1, BLACK = 2
+  const WHITE = 0; const GRAY = 1; const BLACK = 2
   const color = new Map<string, number>()
   for (const node of nodes) color.set(node.id, WHITE)
 
@@ -55,8 +55,10 @@ export function validateDag(nodes: FlowNode[], edges: FlowEdge[], currentWorkflo
     color.set(nodeId, GRAY)
     for (const neighbor of adj.get(nodeId) || []) {
       const c = color.get(neighbor) || WHITE
-      if (c === GRAY) return true
-      if (c === WHITE && dfs(neighbor)) return true
+      if (c === GRAY)
+        return true
+      if (c === WHITE && dfs(neighbor))
+        return true
     }
     color.set(nodeId, BLACK)
     return false

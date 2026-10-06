@@ -1,12 +1,14 @@
-import { defineStore } from 'pinia'
-import { ElMessage } from 'element-plus'
-import { chatApi, streamChat } from '@/api/chat'
-import type { Conversation, ConversationCreate, ChatMessage, ToolInfo } from '@/types/chat'
 import type { ApiResponse } from '@/api/request'
+import type { ChatMessage, Conversation, ConversationCreate, ToolInfo } from '@/types/chat'
+import { ElMessage } from 'element-plus'
+import { defineStore } from 'pinia'
+import { chatApi, streamChat } from '@/api/chat'
 
 function unwrap<T>(res: any): T {
-  if (Array.isArray(res)) return res as T
-  if (res && typeof res === 'object' && 'success' in res) return (res as ApiResponse<T>).data as T
+  if (Array.isArray(res))
+    return res as T
+  if (res && typeof res === 'object' && 'success' in res)
+    return (res as ApiResponse<T>).data as T
   return res as T
 }
 
@@ -32,7 +34,7 @@ export const useChatStore = defineStore('chat', {
     isSending: false,
     abortController: null,
     tools: [],
-    toolsLoaded: false,
+    toolsLoaded: false
   }),
 
   getters: {
@@ -44,7 +46,7 @@ export const useChatStore = defineStore('chat', {
       return [...this.conversations].sort(
         (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
       )
-    },
+    }
   },
 
   actions: {
@@ -84,7 +86,8 @@ export const useChatStore = defineStore('chat', {
 
     async loadMessages(convId?: string) {
       const id = convId || this.activeConversationId
-      if (!id) return
+      if (!id)
+        return
 
       try {
         const res: any = await chatApi.getMessages(id)
@@ -96,7 +99,8 @@ export const useChatStore = defineStore('chat', {
 
     async sendMessage(content: string) {
       const convId = this.activeConversationId
-      if (!convId || !content.trim()) return
+      if (!convId || !content.trim())
+        return
 
       if (this.isStreaming) {
         ElMessage.warning('正在接收回复中，请稍候')
@@ -112,7 +116,7 @@ export const useChatStore = defineStore('chat', {
         conversation_id: convId,
         role: 'user',
         content: content.trim(),
-        created_at: new Date().toISOString(),
+        created_at: new Date().toISOString()
       })
 
       try {
@@ -125,7 +129,8 @@ export const useChatStore = defineStore('chat', {
         }
 
         const reader = response.body?.getReader()
-        if (!reader) throw new Error('No response body')
+        if (!reader)
+          throw new Error('No response body')
 
         const decoder = new TextDecoder()
         let buffer = ''
@@ -133,7 +138,8 @@ export const useChatStore = defineStore('chat', {
 
         while (true) {
           const { done, value } = await reader.read()
-          if (done) break
+          if (done)
+            break
 
           buffer += decoder.decode(value, { stream: true })
           const lines = buffer.split('\n')
@@ -144,7 +150,8 @@ export const useChatStore = defineStore('chat', {
               currentEvent = line.slice(7).trim()
               continue
             }
-            if (!line.startsWith('data: ')) continue
+            if (!line.startsWith('data: '))
+              continue
             const jsonStr = line.slice(6).trim()
             if (!jsonStr) { currentEvent = ''; continue }
 
@@ -161,27 +168,27 @@ export const useChatStore = defineStore('chat', {
                       conversation_id: convId,
                       role: 'assistant',
                       content: payload.content || this.streamingContent,
-                      created_at: new Date().toISOString(),
+                      created_at: new Date().toISOString()
                     })
                   }
                   break
                 case 'tool_call':
                   this.messages.push({
-                    id: `tool-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,
+                    id: `tool-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
                     conversation_id: convId,
                     role: 'tool',
                     content: `🔧 Calling: ${payload.name}(${JSON.stringify(payload.args)})`,
                     tool_calls: [{ name: payload.name, args: payload.args, id: payload.id }],
-                    created_at: new Date().toISOString(),
+                    created_at: new Date().toISOString()
                   })
                   break
                 case 'tool_result':
                   this.messages.push({
-                    id: `tool-res-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,
+                    id: `tool-res-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
                     conversation_id: convId,
                     role: 'tool',
                     content: payload.content || '',
-                    created_at: new Date().toISOString(),
+                    created_at: new Date().toISOString()
                   })
                   break
                 case 'error':
@@ -203,7 +210,7 @@ export const useChatStore = defineStore('chat', {
               conversation_id: convId,
               role: 'assistant',
               content: this.streamingContent,
-              created_at: new Date().toISOString(),
+              created_at: new Date().toISOString()
             })
           }
         }
@@ -250,7 +257,8 @@ export const useChatStore = defineStore('chat', {
         const data = unwrap<Conversation>(res)
         if (data && data.id) {
           const conv = this.conversations.find(c => c.id === id)
-          if (conv) conv.title = title
+          if (conv)
+            conv.title = title
         }
       } catch (e) {
         console.error('Failed to update conversation title:', e)
@@ -258,7 +266,8 @@ export const useChatStore = defineStore('chat', {
     },
 
     async loadTools() {
-      if (this.toolsLoaded) return
+      if (this.toolsLoaded)
+        return
       try {
         const res: any = await chatApi.listTools()
         this.tools = unwrap<ToolInfo[]>(res)
@@ -266,6 +275,6 @@ export const useChatStore = defineStore('chat', {
       } catch (e) {
         console.error('Failed to load tools:', e)
       }
-    },
-  },
+    }
+  }
 })

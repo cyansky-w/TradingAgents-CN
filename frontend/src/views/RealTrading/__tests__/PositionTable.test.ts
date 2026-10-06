@@ -4,14 +4,25 @@ import { describe, expect, it } from 'vitest'
 import PositionTable from '../components/PositionTable.vue'
 
 const longAapl = {
-  storage_key: 'US:NASDAQ:AAPL:equity', market: 'US', exchange: 'NASDAQ', symbol: 'AAPL',
-  instrument_type: 'equity', position_side: 'long', quote_asset: 'USD', quantity: '2',
-  average_entry_price: '190', mark_price: '200', market_value: '400',
-  base_market_value: '2800', base_unrealized_pnl: '140', weight_percent: '60', converted: true
+  storage_key: 'US:NASDAQ:AAPL:equity',
+  market: 'US',
+  exchange: 'NASDAQ',
+  symbol: 'AAPL',
+  instrument_type: 'equity',
+  position_side: 'long',
+  quote_asset: 'USD',
+  quantity: '2',
+  average_entry_price: '190',
+  mark_price: '200',
+  market_value: '400',
+  base_market_value: '2800',
+  base_unrealized_pnl: '140',
+  weight_percent: '60',
+  converted: true
 }
 const shortAapl = { ...longAapl, storage_key: 'US:NASDAQ:AAPL:equity:short', position_side: 'short', quantity: '1', weight_percent: '40' }
 
-describe('PositionTable', () => {
+describe('positionTable', () => {
   it('renders long and short rows separately for the same asset', () => {
     const wrapper = mount(PositionTable, { props: { positions: [longAapl, shortAapl], baseCurrency: 'CNY' } })
     expect(wrapper.findAll('[data-testid="position-row"]')).toHaveLength(2)

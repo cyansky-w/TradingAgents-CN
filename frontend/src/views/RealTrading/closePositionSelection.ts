@@ -1,6 +1,6 @@
-import Decimal from 'decimal.js'
-
 import type { Market, PortfolioPosition } from '@/api/realTrades'
+
+import Decimal from 'decimal.js'
 
 export function closePositionKey(position: PortfolioPosition): string {
   return JSON.stringify([
@@ -31,12 +31,15 @@ export function closePositionLabel(position: PortfolioPosition): string {
 }
 
 export function closeQuantityError(quantity: string, available: string): string | null {
-  if (!quantity.trim()) return '请输入平仓数量'
+  if (!quantity.trim())
+    return '请输入平仓数量'
   try {
     const requested = new Decimal(quantity)
     const current = new Decimal(available)
-    if (!requested.isFinite() || requested.lte(0)) return '平仓数量必须大于 0'
-    if (requested.gt(current)) return `平仓数量不能超过当前持仓 ${available}`
+    if (!requested.isFinite() || requested.lte(0))
+      return '平仓数量必须大于 0'
+    if (requested.gt(current))
+      return `平仓数量不能超过当前持仓 ${available}`
     return null
   } catch {
     return '请输入有效的平仓数量'

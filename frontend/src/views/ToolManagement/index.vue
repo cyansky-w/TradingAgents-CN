@@ -1,3 +1,411 @@
+<script setup lang="ts">
+import type { Tool, ToolParameter } from '@/api/tools'
+import type { Workflow } from '@/api/workflows'
+import { Delete, Loading, Plus, Refresh } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { toolsApi } from '@/api/tools'
+import { workflowsApi } from '@/api/workflows'
+
+const tools = ref<Tool[]>([])
+const total = ref(0)
+const currentPage = ref(1)
+const pageSize = 20
+const listLoading = ref(false)
+const listScrollbar = ref()
+const allTags = ref<string[]>([])
+const workflowOptions = ref<Workflow[]>([])
+const selectedTool = ref<Tool | null>(null)
+const editing = ref(false)
+
+// Filters
+const searchText = ref('')
+const filterType = ref('')
+const filterTag = ref('')
+const filterEnabled = ref<boolean | string>('')
+
+// Loading states
+const seedLoading = ref(false)
+const saveLoading = ref(false)
+const healthLoading = ref(false)
+const registerLoading = ref(false)
+
+// Edit form
+const editForm = reactive({
+  name: '',
+  description: '',
+  timeout: 300,
+  tags: [] as string[],
+  endpoint_url: '',
+  endpoint_method: 'POST' as string,
+  auth_type: 'none' as string,
+  auth_config: {} as Record<string, string>,
+  health_check_url: '',
+  output_schema_str: '',
+  params: [] as ToolParameter[]
+})
+
+const displayHeaders = ref<{ key: string, value: string }[]>([])
+
+// Register form
+const registerVisible = ref(false)
+const registerHeaders = ref<{ key: string, value: string }[]>([])
+const registerForm = reactive({
+  type: 'rpc' as 'rpc' | 'remote' | 'workflow',
+  code: '',
+  name: '',
+  description: '',
+  endpoint_url: '',
+  endpoint_method: 'POST' as string,
+  timeout: 300,
+  auth_type: 'none' as string,
+  auth_config: {} as Record<string, string>,
+  tags: [] as string[],
+  health_check_url: '',
+  workflow_id: '',
+  output_format: 'summary' as 'full' | 'summary'
+})
+
+const displayParams = computed(() => {
+  if (editing.value)
+    return editForm.params
+  return selectedTool.value?.parameters ?? []
+})
+
+const displayAuthType = computed(() => {
+  if (editing.value)
+    return editForm.auth_type
+  return selectedTool.value?.auth_type ?? 'none'
+})
+
+function typeTagType(type: string) {
+  if (type === 'builtin')
+    return 'success'
+  if (type === 'rpc')
+    return 'warning'
+  if (type === 'workflow')
+    return 'info'
+  return 'primary'
+}
+
+function healthTagType(status: string) {
+  if (status === 'healthy')
+    return 'success'
+  if (status === 'unhealthy')
+    return 'danger'
+  return 'info'
+}
+
+function healthLabel(status: string) {
+  if (status === 'healthy')
+    return '健康'
+  if (status === 'unhealthy')
+    return '异常'
+  return '未知'
+}
+
+async function loadTools(append = false) {
+  if (listLoading.value)
+    return
+  if (!append)
+    currentPage.value = 1
+  listLoading.value = true
+  try {
+    const params: Record<string, any> = {
+      page: currentPage.value,
+      page_size: pageSize
+    }
+    if (filterType.value)
+      params.type = filterType.value
+    if (filterTag.value)
+      params.tag = filterTag.value
+    params.enabled = filterEnabled.value === undefined || filterEnabled.value === '' ? undefined : Boolean(filterEnabled.value)
+    if (searchText.value)
+      params.search = searchText.value
+    const res = await toolsApi.list(params)
+    if (res.success) {
+      if (append) {
+        tools.value = [...tools.value, ...res.data.items]
+      } else {
+        tools.value = res.data.items
+      }
+      total.value = res.data.total
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || '加载工具列表失败')
+  } finally {
+    listLoading.value = false
+  }
+}
+
+function onListScroll() {
+  if (!listScrollbar.value)
+    return
+  const wrap = listScrollbar.value.wrapRef
+  if (!wrap)
+    return
+  if (listLoading.value)
+    return
+  if (tools.value.length >= total.value)
+    return
+  const distanceToBottom = wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight
+  if (distanceToBottom < 50) {
+    currentPage.value++
+    loadTools(true)
+  }
+}
+
+async function loadTags() {
+  try {
+    const res = await toolsApi.getAllTags()
+    if (res.success)
+      allTags.value = res.data
+  } catch { /* ignore */ }
+}
+
+let searchTimer: ReturnType<typeof setTimeout>
+function handleSearch() {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    currentPage.value = 1
+    loadTools()
+  }, 300)
+}
+
+function selectTool(tool: Tool) {
+  if (editing.value)
+    cancelEdit()
+  selectedTool.value = tool
+}
+
+async function handleToggle(tool: Tool, enabled: boolean) {
+  try {
+    const res = await toolsApi.toggle(tool.id, enabled)
+    if (res.success) {
+      tool.enabled = enabled
+      ElMessage.success('状态更新成功')
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || '操作失败')
+  }
+}
+
+function startEdit() {
+  if (!selectedTool.value)
+    return
+  const t = selectedTool.value
+  editForm.name = t.name
+  editForm.description = t.description
+  editForm.timeout = t.timeout
+  editForm.tags = [...t.tags]
+  editForm.endpoint_url = t.endpoint_url || ''
+  editForm.endpoint_method = t.endpoint_method || 'POST'
+  editForm.auth_type = t.auth_type || 'none'
+  editForm.auth_config = t.auth_config ? { ...t.auth_config } : {}
+  editForm.health_check_url = t.health_check_url || ''
+  editForm.output_schema_str = t.output_schema ? JSON.stringify(t.output_schema, null, 2) : ''
+  editForm.params = t.parameters ? t.parameters.map(p => ({ ...p })) : []
+  displayHeaders.value = t.headers
+    ? Object.entries(t.headers).map(([key, value]) => ({ key, value }))
+    : []
+  editing.value = true
+}
+
+function cancelEdit() {
+  editing.value = false
+}
+
+async function handleSave() {
+  if (!selectedTool.value)
+    return
+  saveLoading.value = true
+  try {
+    const payload: any = {
+      name: editForm.name,
+      description: editForm.description,
+      timeout: editForm.timeout,
+      tags: editForm.tags
+    }
+    if (selectedTool.value.type !== 'builtin') {
+      payload.endpoint_url = editForm.endpoint_url
+      payload.auth_type = editForm.auth_type
+      payload.auth_config = editForm.auth_config
+      payload.health_check_url = editForm.health_check_url
+      payload.parameters = editForm.params
+      if (editForm.output_schema_str) {
+        try { payload.output_schema = JSON.parse(editForm.output_schema_str) } catch { /* ignore */ }
+      }
+      if (selectedTool.value.type === 'remote') {
+        payload.endpoint_method = editForm.endpoint_method
+      }
+      const headers: Record<string, string> = {}
+      for (const h of displayHeaders.value) {
+        if (h.key)
+          headers[h.key] = h.value
+      }
+      payload.headers = headers
+    }
+    const res = await toolsApi.update(selectedTool.value.id, payload)
+    if (res.success) {
+      ElMessage.success('更新成功')
+      editing.value = false
+      await loadTools()
+      // Re-select the updated tool
+      const updated = tools.value.find(t => t.id === selectedTool.value!.id)
+      if (updated)
+        selectedTool.value = updated
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || '更新失败')
+  } finally {
+    saveLoading.value = false
+  }
+}
+
+async function handleDelete(tool: Tool) {
+  try {
+    await ElMessageBox.confirm(`确定删除工具 "${tool.name}" 吗？`, '删除确认', { type: 'warning' })
+    const res = await toolsApi.remove(tool.id)
+    if (res.success) {
+      ElMessage.success('删除成功')
+      if (selectedTool.value?.id === tool.id)
+        selectedTool.value = null
+      await loadTools()
+    }
+  } catch (e: any) {
+    if (e !== 'cancel')
+      ElMessage.error(e?.response?.data?.detail || '删除失败')
+  }
+}
+
+async function handleHealthCheck() {
+  if (!selectedTool.value)
+    return
+  healthLoading.value = true
+  try {
+    const res = await toolsApi.healthCheck(selectedTool.value.id)
+    if (res.success) {
+      selectedTool.value.health_status = res.data.health_status
+      if (res.data.health_status === 'healthy') {
+        ElMessage.success('健康检查通过')
+      } else {
+        ElMessage.warning(res.data.details || '健康检查异常')
+      }
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || '健康检查失败')
+  } finally {
+    healthLoading.value = false
+  }
+}
+
+async function handleSeed() {
+  seedLoading.value = true
+  try {
+    const res = await toolsApi.seed()
+    if (res.success) {
+      ElMessage.success(`初始化完成: 新增${res.data.created} 更新${res.data.updated} 跳过${res.data.skipped}`)
+      await loadTools()
+      await loadTags()
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || '初始化失败')
+  } finally {
+    seedLoading.value = false
+  }
+}
+
+function addParam() {
+  editForm.params.push({ name: '', type: 'string', required: true, description: '' })
+}
+
+function removeParam(index: number) {
+  editForm.params.splice(index, 1)
+}
+
+function showRegisterDialog() {
+  registerForm.type = 'rpc'
+  registerForm.code = ''
+  registerForm.name = ''
+  registerForm.description = ''
+  registerForm.endpoint_url = ''
+  registerForm.endpoint_method = 'POST'
+  registerForm.timeout = 300
+  registerForm.auth_type = 'none'
+  registerForm.auth_config = {}
+  registerForm.tags = []
+  registerForm.health_check_url = ''
+  registerForm.workflow_id = ''
+  registerForm.output_format = 'summary'
+  registerHeaders.value = []
+  registerVisible.value = true
+}
+
+async function handleRegister() {
+  const isWorkflow = registerForm.type === 'workflow'
+  if (!registerForm.code || !registerForm.name || !registerForm.description) {
+    ElMessage.warning('请填写必填字段')
+    return
+  }
+  if (isWorkflow && !registerForm.workflow_id) {
+    ElMessage.warning('请选择绑定的工作流')
+    return
+  }
+  if (!isWorkflow && !registerForm.endpoint_url) {
+    ElMessage.warning('请填写服务地址')
+    return
+  }
+  registerLoading.value = true
+  try {
+    const headers: Record<string, string> = {}
+    for (const h of registerHeaders.value) {
+      if (h.key)
+        headers[h.key] = h.value
+    }
+    const payload: any = {
+      type: registerForm.type,
+      code: registerForm.code,
+      name: registerForm.name,
+      description: registerForm.description,
+      timeout: registerForm.timeout,
+      tags: registerForm.tags,
+      enabled: true
+    }
+    if (isWorkflow) {
+      payload.workflow_id = registerForm.workflow_id
+      payload.output_format = registerForm.output_format
+    } else {
+      payload.endpoint_url = registerForm.endpoint_url
+      payload.endpoint_method = registerForm.type === 'remote' ? registerForm.endpoint_method : undefined
+      payload.auth_type = registerForm.auth_type
+      payload.auth_config = registerForm.auth_type !== 'none' ? registerForm.auth_config : undefined
+      payload.health_check_url = registerForm.health_check_url || undefined
+      payload.headers = Object.keys(headers).length > 0 ? headers : undefined
+    }
+    const res = await toolsApi.create(payload)
+    if (res.success) {
+      ElMessage.success('注册成功')
+      registerVisible.value = false
+      await loadTools()
+      await loadTags()
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || '注册失败')
+  } finally {
+    registerLoading.value = false
+  }
+}
+
+onMounted(() => {
+  loadTools()
+  loadTags()
+  workflowsApi.list({ page: 1, page_size: 100 }).then(res => {
+    if (res.success)
+      workflowOptions.value = res.data.items
+  })
+})
+</script>
+
 <template>
   <div class="tool-management">
     <div class="page-header">
@@ -6,13 +414,13 @@
         <el-button type="primary" @click="showRegisterDialog">
           <el-icon><Plus /></el-icon> 注册工具
         </el-button>
-        <el-button @click="handleSeed" :loading="seedLoading">
+        <el-button :loading="seedLoading" @click="handleSeed">
           <el-icon><Refresh /></el-icon> 初始化工具
         </el-button>
       </div>
     </div>
 
-    <el-row :gutter="20" class="flex-1" >
+    <el-row :gutter="20" class="flex-1">
       <!-- Left: Filter + List -->
       <el-col :span="6">
         <div class="filter-section">
@@ -42,7 +450,7 @@
           </div>
         </div>
 
-        <el-scrollbar class="tool-list" @scroll="onListScroll" ref="listScrollbar">
+        <el-scrollbar ref="listScrollbar" class="tool-list" @scroll="onListScroll">
           <div
             v-for="tool in tools"
             :key="tool.id"
@@ -60,16 +468,24 @@
               />
             </div>
             <div class="tool-item-meta">
-              <el-tag size="small" :type="typeTagType(tool.type)">{{ tool.type }}</el-tag>
-              <el-tag v-if="tool.is_system" size="small" type="info">系统</el-tag>
+              <el-tag size="small" :type="typeTagType(tool.type)">
+                {{ tool.type }}
+              </el-tag>
+              <el-tag v-if="tool.is_system" size="small" type="info">
+                系统
+              </el-tag>
             </div>
             <div class="tool-item-tags">
-              <el-tag v-for="tag in tool.tags.slice(0, 3)" :key="tag" size="small" type="info" class="mini-tag">{{ tag }}</el-tag>
+              <el-tag v-for="tag in tool.tags.slice(0, 3)" :key="tag" size="small" type="info" class="mini-tag">
+                {{ tag }}
+              </el-tag>
             </div>
           </div>
           <el-empty v-if="tools.length === 0 && !listLoading" description="暂无工具" />
           <div v-if="listLoading" class="list-loading">
-            <el-icon class="is-loading"><Loading /></el-icon> 加载中...
+            <el-icon class="is-loading">
+              <Loading />
+            </el-icon> 加载中...
           </div>
           <div v-if="!listLoading && tools.length > 0 && tools.length >= total" class="list-end">
             已加载全部 {{ total }} 个工具
@@ -87,10 +503,16 @@
                 v-model="editForm.name"
                 class="edit-name-input"
               />
-              <h3 v-else>{{ selectedTool.name }}</h3>
+              <h3 v-else>
+                {{ selectedTool.name }}
+              </h3>
               <div class="detail-badges">
-                <el-tag :type="typeTagType(selectedTool.type)">{{ selectedTool.type }}</el-tag>
-                <el-tag v-if="selectedTool.is_system" type="info">系统工具</el-tag>
+                <el-tag :type="typeTagType(selectedTool.type)">
+                  {{ selectedTool.type }}
+                </el-tag>
+                <el-tag v-if="selectedTool.is_system" type="info">
+                  系统工具
+                </el-tag>
                 <el-switch
                   :model-value="selectedTool.enabled"
                   active-text="启用"
@@ -154,7 +576,9 @@
                 </el-select>
               </div>
               <div v-else>
-                <el-tag v-for="tag in selectedTool.tags" :key="tag" class="tag-chip">{{ tag }}</el-tag>
+                <el-tag v-for="tag in selectedTool.tags" :key="tag" class="tag-chip">
+                  {{ tag }}
+                </el-tag>
                 <span v-if="selectedTool.tags.length === 0" class="text-muted">无标签</span>
               </div>
             </div>
@@ -173,20 +597,24 @@
                   </template>
                 </el-table-column>
                 <el-table-column prop="default" label="默认值" width="120">
-                  <template #default="{ row }">{{ row.default ?? '-' }}</template>
+                  <template #default="{ row }">
+                    {{ row.default ?? '-' }}
+                  </template>
                 </el-table-column>
                 <el-table-column prop="description" label="描述" />
                 <el-table-column v-if="editing && selectedTool.type !== 'builtin'" label="操作" width="80">
                   <template #default="{ $index }">
-                    <el-button type="danger" size="small" link @click="removeParam($index)">删除</el-button>
+                    <el-button type="danger" size="small" link @click="removeParam($index)">
+                      删除
+                    </el-button>
                   </template>
                 </el-table-column>
               </el-table>
               <el-button
                 v-if="editing && selectedTool.type !== 'builtin'"
                 size="small"
-                @click="addParam"
                 style="margin-top: 8px"
+                @click="addParam"
               >
                 <el-icon><Plus /></el-icon> 添加参数
               </el-button>
@@ -287,18 +715,28 @@
 
           <!-- Actions -->
           <div class="detail-footer">
-            <el-button @click="handleHealthCheck" :loading="healthLoading">健康检查</el-button>
+            <el-button :loading="healthLoading" @click="handleHealthCheck">
+              健康检查
+            </el-button>
             <template v-if="editing">
-              <el-button type="primary" @click="handleSave" :loading="saveLoading">保存</el-button>
-              <el-button @click="cancelEdit">取消</el-button>
+              <el-button type="primary" :loading="saveLoading" @click="handleSave">
+                保存
+              </el-button>
+              <el-button @click="cancelEdit">
+                取消
+              </el-button>
             </template>
             <template v-else>
-              <el-button type="primary" @click="startEdit">编辑</el-button>
+              <el-button type="primary" @click="startEdit">
+                编辑
+              </el-button>
               <el-button
                 v-if="!selectedTool.is_system"
                 type="danger"
                 @click="handleDelete(selectedTool)"
-              >删除</el-button>
+              >
+                删除
+              </el-button>
             </template>
           </div>
         </div>
@@ -410,390 +848,16 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="registerVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleRegister" :loading="registerLoading">确定</el-button>
+        <el-button @click="registerVisible = false">
+          取消
+        </el-button>
+        <el-button type="primary" :loading="registerLoading" @click="handleRegister">
+          确定
+        </el-button>
       </template>
     </el-dialog>
   </div>
 </template>
-
-<script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Refresh, Delete, Loading } from '@element-plus/icons-vue'
-import { toolsApi } from '@/api/tools'
-import type { Tool, ToolParameter } from '@/api/tools'
-import { workflowsApi, type Workflow } from '@/api/workflows'
-
-const tools = ref<Tool[]>([])
-const total = ref(0)
-const currentPage = ref(1)
-const pageSize = 20
-const listLoading = ref(false)
-const listScrollbar = ref()
-const allTags = ref<string[]>([])
-const workflowOptions = ref<Workflow[]>([])
-const selectedTool = ref<Tool | null>(null)
-const editing = ref(false)
-
-// Filters
-const searchText = ref('')
-const filterType = ref('')
-const filterTag = ref('')
-const filterEnabled = ref<boolean | string>('')
-
-// Loading states
-const seedLoading = ref(false)
-const saveLoading = ref(false)
-const healthLoading = ref(false)
-const registerLoading = ref(false)
-
-// Edit form
-const editForm = reactive({
-  name: '',
-  description: '',
-  timeout: 300,
-  tags: [] as string[],
-  endpoint_url: '',
-  endpoint_method: 'POST' as string,
-  auth_type: 'none' as string,
-  auth_config: {} as Record<string, string>,
-  health_check_url: '',
-  output_schema_str: '',
-  params: [] as ToolParameter[],
-})
-
-const displayHeaders = ref<{ key: string; value: string }[]>([])
-
-// Register form
-const registerVisible = ref(false)
-const registerHeaders = ref<{ key: string; value: string }[]>([])
-const registerForm = reactive({
-  type: 'rpc' as 'rpc' | 'remote' | 'workflow',
-  code: '',
-  name: '',
-  description: '',
-  endpoint_url: '',
-  endpoint_method: 'POST' as string,
-  timeout: 300,
-  auth_type: 'none' as string,
-  auth_config: {} as Record<string, string>,
-  tags: [] as string[],
-  health_check_url: '',
-  workflow_id: '',
-  output_format: 'summary' as 'full' | 'summary',
-})
-
-const displayParams = computed(() => {
-  if (editing.value) return editForm.params
-  return selectedTool.value?.parameters ?? []
-})
-
-const displayAuthType = computed(() => {
-  if (editing.value) return editForm.auth_type
-  return selectedTool.value?.auth_type ?? 'none'
-})
-
-function typeTagType(type: string) {
-  if (type === 'builtin') return 'success'
-  if (type === 'rpc') return 'warning'
-  if (type === 'workflow') return 'info'
-  return 'primary'
-}
-
-function healthTagType(status: string) {
-  if (status === 'healthy') return 'success'
-  if (status === 'unhealthy') return 'danger'
-  return 'info'
-}
-
-function healthLabel(status: string) {
-  if (status === 'healthy') return '健康'
-  if (status === 'unhealthy') return '异常'
-  return '未知'
-}
-
-async function loadTools(append = false) {
-  if (listLoading.value) return
-  if (!append) currentPage.value = 1
-  listLoading.value = true
-  try {
-    const params: Record<string, any> = {
-      page: currentPage.value,
-      page_size: pageSize,
-    }
-    if (filterType.value) params.type = filterType.value
-    if (filterTag.value) params.tag = filterTag.value
-    params.enabled = filterEnabled.value === undefined || filterEnabled.value === '' ? undefined : Boolean(filterEnabled.value)
-    if (searchText.value) params.search = searchText.value
-    const res = await toolsApi.list(params)
-    if (res.success) {
-      if (append) {
-        tools.value = [...tools.value, ...res.data.items]
-      } else {
-        tools.value = res.data.items
-      }
-      total.value = res.data.total
-    }
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || '加载工具列表失败')
-  } finally {
-    listLoading.value = false
-  }
-}
-
-function onListScroll() {
-  if (!listScrollbar.value) return
-  const wrap = listScrollbar.value.wrapRef
-  if (!wrap) return
-  if (listLoading.value) return
-  if (tools.value.length >= total.value) return
-  const distanceToBottom = wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight
-  if (distanceToBottom < 50) {
-    currentPage.value++
-    loadTools(true)
-  }
-}
-
-async function loadTags() {
-  try {
-    const res = await toolsApi.getAllTags()
-    if (res.success) allTags.value = res.data
-  } catch { /* ignore */ }
-}
-
-let searchTimer: ReturnType<typeof setTimeout>
-function handleSearch() {
-  clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => {
-    currentPage.value = 1
-    loadTools()
-  }, 300)
-}
-
-function selectTool(tool: Tool) {
-  if (editing.value) cancelEdit()
-  selectedTool.value = tool
-}
-
-async function handleToggle(tool: Tool, enabled: boolean) {
-  try {
-    const res = await toolsApi.toggle(tool.id, enabled)
-    if (res.success) {
-      tool.enabled = enabled
-      ElMessage.success('状态更新成功')
-    }
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || '操作失败')
-  }
-}
-
-function startEdit() {
-  if (!selectedTool.value) return
-  const t = selectedTool.value
-  editForm.name = t.name
-  editForm.description = t.description
-  editForm.timeout = t.timeout
-  editForm.tags = [...t.tags]
-  editForm.endpoint_url = t.endpoint_url || ''
-  editForm.endpoint_method = t.endpoint_method || 'POST'
-  editForm.auth_type = t.auth_type || 'none'
-  editForm.auth_config = t.auth_config ? { ...t.auth_config } : {}
-  editForm.health_check_url = t.health_check_url || ''
-  editForm.output_schema_str = t.output_schema ? JSON.stringify(t.output_schema, null, 2) : ''
-  editForm.params = t.parameters ? t.parameters.map(p => ({ ...p })) : []
-  displayHeaders.value = t.headers
-    ? Object.entries(t.headers).map(([key, value]) => ({ key, value }))
-    : []
-  editing.value = true
-}
-
-function cancelEdit() {
-  editing.value = false
-}
-
-async function handleSave() {
-  if (!selectedTool.value) return
-  saveLoading.value = true
-  try {
-    const payload: any = {
-      name: editForm.name,
-      description: editForm.description,
-      timeout: editForm.timeout,
-      tags: editForm.tags,
-    }
-    if (selectedTool.value.type !== 'builtin') {
-      payload.endpoint_url = editForm.endpoint_url
-      payload.auth_type = editForm.auth_type
-      payload.auth_config = editForm.auth_config
-      payload.health_check_url = editForm.health_check_url
-      payload.parameters = editForm.params
-      if (editForm.output_schema_str) {
-        try { payload.output_schema = JSON.parse(editForm.output_schema_str) } catch { /* ignore */ }
-      }
-      if (selectedTool.value.type === 'remote') {
-        payload.endpoint_method = editForm.endpoint_method
-      }
-      const headers: Record<string, string> = {}
-      for (const h of displayHeaders.value) {
-        if (h.key) headers[h.key] = h.value
-      }
-      payload.headers = headers
-    }
-    const res = await toolsApi.update(selectedTool.value.id, payload)
-    if (res.success) {
-      ElMessage.success('更新成功')
-      editing.value = false
-      await loadTools()
-      // Re-select the updated tool
-      const updated = tools.value.find(t => t.id === selectedTool.value!.id)
-      if (updated) selectedTool.value = updated
-    }
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || '更新失败')
-  } finally {
-    saveLoading.value = false
-  }
-}
-
-async function handleDelete(tool: Tool) {
-  try {
-    await ElMessageBox.confirm(`确定删除工具 "${tool.name}" 吗？`, '删除确认', { type: 'warning' })
-    const res = await toolsApi.remove(tool.id)
-    if (res.success) {
-      ElMessage.success('删除成功')
-      if (selectedTool.value?.id === tool.id) selectedTool.value = null
-      await loadTools()
-    }
-  } catch (e: any) {
-    if (e !== 'cancel') ElMessage.error(e?.response?.data?.detail || '删除失败')
-  }
-}
-
-async function handleHealthCheck() {
-  if (!selectedTool.value) return
-  healthLoading.value = true
-  try {
-    const res = await toolsApi.healthCheck(selectedTool.value.id)
-    if (res.success) {
-      selectedTool.value.health_status = res.data.health_status
-      if (res.data.health_status === 'healthy') {
-        ElMessage.success('健康检查通过')
-      } else {
-        ElMessage.warning(res.data.details || '健康检查异常')
-      }
-    }
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || '健康检查失败')
-  } finally {
-    healthLoading.value = false
-  }
-}
-
-async function handleSeed() {
-  seedLoading.value = true
-  try {
-    const res = await toolsApi.seed()
-    if (res.success) {
-      ElMessage.success(`初始化完成: 新增${res.data.created} 更新${res.data.updated} 跳过${res.data.skipped}`)
-      await loadTools()
-      await loadTags()
-    }
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || '初始化失败')
-  } finally {
-    seedLoading.value = false
-  }
-}
-
-function addParam() {
-  editForm.params.push({ name: '', type: 'string', required: true, description: '' })
-}
-
-function removeParam(index: number) {
-  editForm.params.splice(index, 1)
-}
-
-function showRegisterDialog() {
-  registerForm.type = 'rpc'
-  registerForm.code = ''
-  registerForm.name = ''
-  registerForm.description = ''
-  registerForm.endpoint_url = ''
-  registerForm.endpoint_method = 'POST'
-  registerForm.timeout = 300
-  registerForm.auth_type = 'none'
-  registerForm.auth_config = {}
-  registerForm.tags = []
-  registerForm.health_check_url = ''
-  registerForm.workflow_id = ''
-  registerForm.output_format = 'summary'
-  registerHeaders.value = []
-  registerVisible.value = true
-}
-
-async function handleRegister() {
-  const isWorkflow = registerForm.type === 'workflow'
-  if (!registerForm.code || !registerForm.name || !registerForm.description) {
-    ElMessage.warning('请填写必填字段')
-    return
-  }
-  if (isWorkflow && !registerForm.workflow_id) {
-    ElMessage.warning('请选择绑定的工作流')
-    return
-  }
-  if (!isWorkflow && !registerForm.endpoint_url) {
-    ElMessage.warning('请填写服务地址')
-    return
-  }
-  registerLoading.value = true
-  try {
-    const headers: Record<string, string> = {}
-    for (const h of registerHeaders.value) {
-      if (h.key) headers[h.key] = h.value
-    }
-    const payload: any = {
-      type: registerForm.type,
-      code: registerForm.code,
-      name: registerForm.name,
-      description: registerForm.description,
-      timeout: registerForm.timeout,
-      tags: registerForm.tags,
-      enabled: true,
-    }
-    if (isWorkflow) {
-      payload.workflow_id = registerForm.workflow_id
-      payload.output_format = registerForm.output_format
-    } else {
-      payload.endpoint_url = registerForm.endpoint_url
-      payload.endpoint_method = registerForm.type === 'remote' ? registerForm.endpoint_method : undefined
-      payload.auth_type = registerForm.auth_type
-      payload.auth_config = registerForm.auth_type !== 'none' ? registerForm.auth_config : undefined
-      payload.health_check_url = registerForm.health_check_url || undefined
-      payload.headers = Object.keys(headers).length > 0 ? headers : undefined
-    }
-    const res = await toolsApi.create(payload)
-    if (res.success) {
-      ElMessage.success('注册成功')
-      registerVisible.value = false
-      await loadTools()
-      await loadTags()
-    }
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || '注册失败')
-  } finally {
-    registerLoading.value = false
-  }
-}
-
-onMounted(() => {
-  loadTools()
-  loadTags()
-  workflowsApi.list({ page: 1, page_size: 100 }).then(res => {
-    if (res.success) workflowOptions.value = res.data.items
-  })
-})
-</script>
 
 <style scoped>
 .tool-management {

@@ -1,727 +1,42 @@
-<template>
-  <div class="single-analysis">
-    <!-- 页面头部 -->
-    <div class="page-header">
-      <div class="header-content">
-        <div class="title-section">
-          <h1 class="page-title">
-            <el-icon class="title-icon"><Document /></el-icon>
-            单股分析
-          </h1>
-          <p class="page-description">
-            AI驱动的智能股票分析，多维度评估投资价值与风险
-          </p>
-        </div>
-      </div>
-    </div>
-
-    <!-- 主要分析表单 -->
-    <div class="analysis-container">
-      <el-row :gutter="24">
-        <!-- 左侧：基础配置 -->
-        <el-col :span="18">
-          <el-card class="main-form-card" shadow="hover">
-            <template #header>
-              <div class="card-header">
-                <h3>分析配置</h3>
-                <el-tag type="info" size="small">必填信息</el-tag>
-              </div>
-            </template>
-
-            <el-form :model="analysisForm" label-width="100px" class="analysis-form">
-              <!-- 股票信息 -->
-              <div class="form-section">
-                <h4 class="section-title">📊 股票信息</h4>
-                <el-row :gutter="16">
-                  <el-col :span="12">
-                    <el-form-item label="股票代码" required>
-                      <el-input
-                        v-model="analysisForm.stockCode"
-                        placeholder="如：000001、AAPL、700、1810"
-                        clearable
-                        size="large"
-                        class="stock-input"
-                        :class="{ 'is-error': stockCodeError }"
-                        @blur="validateStockCodeInput"
-                        @input="onStockCodeInput"
-                      >
-                        <template #prefix>
-                          <el-icon><TrendCharts /></el-icon>
-                        </template>
-                      </el-input>
-                      <div v-if="stockCodeError" class="error-message">
-                        <el-icon><WarningFilled /></el-icon>
-                        {{ stockCodeError }}
-                      </div>
-                      <div v-else-if="stockCodeHelp" class="help-message">
-                        <el-icon><InfoFilled /></el-icon>
-                        {{ stockCodeHelp }}
-                      </div>
-                    </el-form-item>
-                  </el-col>
-                  <el-col :span="12">
-                    <el-form-item label="市场类型">
-                      <el-select
-                        v-model="analysisForm.market"
-                        placeholder="选择市场"
-                        size="large"
-                        style="width: 100%"
-                        @change="onMarketChange"
-                      >
-                        <el-option label="🇨🇳 A股市场" value="A股">
-                          <span>🇨🇳 A股市场</span>
-                          <span style="color: #909399; font-size: 12px; margin-left: 8px;">（6位数字）</span>
-                        </el-option>
-                        <el-option label="🇺🇸 美股市场" value="美股">
-                          <span>🇺🇸 美股市场</span>
-                          <span style="color: #909399; font-size: 12px; margin-left: 8px;">（1-5个字母）</span>
-                        </el-option>
-                        <el-option label="🇭🇰 港股市场" value="港股">
-                          <span>🇭🇰 港股市场</span>
-                          <span style="color: #909399; font-size: 12px; margin-left: 8px;">（1-5位数字）</span>
-                        </el-option>
-                      </el-select>
-                    </el-form-item>
-                  </el-col>
-                </el-row>
-
-                <el-form-item label="分析日期">
-                  <el-date-picker
-                    v-model="analysisForm.analysisDate"
-                    type="date"
-                    placeholder="选择分析基准日期"
-                    size="large"
-                    style="width: 100%"
-                    :disabled-date="disabledDate"
-                  />
-                </el-form-item>
-              </div>
-
-              <!-- 分析深度 -->
-              <div class="form-section">
-                <h4 class="section-title">🎯 分析深度</h4>
-                <div class="depth-selector">
-                  <div
-                    v-for="(depth, index) in depthOptions"
-                    :key="index"
-                    class="depth-option"
-                    :class="{ active: analysisForm.researchDepth === index + 1 }"
-                    @click="analysisForm.researchDepth = index + 1"
-                  >
-                    <div class="depth-icon">{{ depth.icon }}</div>
-                    <div class="depth-info">
-                      <div class="depth-name">{{ depth.name }}</div>
-                      <div class="depth-desc">{{ depth.description }}</div>
-                      <div class="depth-time">{{ depth.time }}</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 分析师团队 -->
-              <div class="form-section">
-                <h4 class="section-title">👥 分析师团队</h4>
-                <div class="analysts-grid">
-                  <div
-                    v-for="analyst in ANALYSTS"
-                    :key="analyst.id"
-                    class="analyst-card"
-                    :class="{ 
-                      active: analysisForm.selectedAnalysts.includes(analyst.name),
-                      disabled: analyst.name === '社媒分析师' && analysisForm.market === 'A股'
-                    }"
-                    @click="toggleAnalyst(analyst.name)"
-                  >
-                    <div class="analyst-avatar">
-                      <el-icon>
-                        <component :is="analyst.icon" />
-                      </el-icon>
-                    </div>
-                    <div class="analyst-content">
-                      <div class="analyst-name">{{ analyst.name }}</div>
-                      <div class="analyst-desc">{{ analyst.description }}</div>
-                    </div>
-                    <div class="analyst-check">
-                      <el-icon v-if="analysisForm.selectedAnalysts.includes(analyst.name)" class="check-icon">
-                        <Check />
-                      </el-icon>
-                    </div>
-                  </div>
-                </div>
-                
-                <!-- A股提示 -->
-                <el-alert
-                  v-if="analysisForm.market === 'A股'"
-                  title="A股市场暂不支持社媒分析（国内数据源限制）"
-                  type="info"
-                  :closable="false"
-                  style="margin-top: 12px"
-                />
-              </div>
-
-
-
-              <!-- 操作按钮 -->
-              <div class="form-section">
-                <div class="action-buttons" style="display: flex; justify-content: center; align-items: center; width: 100%; text-align: center;">
-                  <el-button
-                    v-if="analysisStatus === 'idle'"
-                    type="primary"
-                    size="large"
-                    @click="submitAnalysis"
-                    :loading="submitting"
-                    :disabled="!analysisForm.stockCode.trim()"
-                    class="submit-btn large-analysis-btn"
-                    style="width: 280px; height: 56px; font-size: 18px; font-weight: 700; border-radius: 16px;"
-                  >
-                    <el-icon><TrendCharts /></el-icon>
-                    开始智能分析
-                  </el-button>
-
-                  <el-button
-                    v-else-if="analysisStatus === 'running'"
-                    type="warning"
-                    size="large"
-                    disabled
-                    class="submit-btn large-analysis-btn"
-                    style="width: 280px; height: 56px; font-size: 18px; font-weight: 700; border-radius: 16px;"
-                  >
-                    <el-icon><Loading /></el-icon>
-                    分析进行中...
-                  </el-button>
-
-                  <div v-else-if="analysisStatus === 'completed'" style="display: flex; gap: 12px;">
-                    <el-button
-                      type="success"
-                      size="large"
-                      @click="showResults = !showResults"
-                      class="submit-btn"
-                      style="width: 180px; height: 56px; font-size: 16px; font-weight: 700; border-radius: 16px;"
-                    >
-                      <el-icon><Document /></el-icon>
-                      {{ showResults ? '隐藏结果' : '查看结果' }}
-                    </el-button>
-
-                    <el-button
-                      type="primary"
-                      size="large"
-                      @click="restartAnalysis"
-                      class="submit-btn"
-                      style="width: 180px; height: 56px; font-size: 16px; font-weight: 700; border-radius: 16px;"
-                    >
-                      <el-icon><Refresh /></el-icon>
-                      重新分析
-                    </el-button>
-                  </div>
-
-                  <el-button
-                    v-else-if="analysisStatus === 'failed'"
-                    type="danger"
-                    size="large"
-                    @click="restartAnalysis"
-                    class="submit-btn large-analysis-btn"
-                    style="width: 280px; height: 56px; font-size: 18px; font-weight: 700; border-radius: 16px;"
-                  >
-                    <el-icon><Refresh /></el-icon>
-                    重新分析
-                  </el-button>
-                </div>
-              </div>
-
-              <!-- 分析进度显示 -->
-              <div v-if="analysisStatus === 'running'" class="progress-section">
-                <el-card class="progress-card" shadow="hover">
-                  <template #header>
-                    <div class="progress-header">
-                      <h4>
-                        <el-icon class="rotating-icon">
-                          <Loading />
-                        </el-icon>
-                        分析进行中...
-                      </h4>
-                      <!-- 任务ID已隐藏 -->
-                      <!-- <el-tag type="warning">{{ currentTaskId }}</el-tag> -->
-                    </div>
-                  </template>
-
-                  <div class="progress-content">
-                    <!-- 总体进度信息 -->
-                    <div class="overall-progress-info">
-                      <div class="progress-stats">
-                        <!-- 当前步骤已隐藏 -->
-                        <!--
-                        <div class="stat-item">
-                          <div class="stat-label">当前步骤</div>
-                          <div class="stat-value">{{ progressInfo.currentStep || '初始化中...' }}</div>
-                        </div>
-                        -->
-                        <!-- 整体进度已隐藏 -->
-                        <!--
-                        <div class="stat-item">
-                          <div class="stat-label">整体进度</div>
-                          <div class="stat-value">{{ progressInfo.progress.toFixed(1) }}%</div>
-                        </div>
-                        -->
-                        <div class="stat-item">
-                          <div class="stat-label">已用时间</div>
-                          <div class="stat-value">{{ formatTime(progressInfo.elapsedTime) }}</div>
-                        </div>
-                        <div class="stat-item">
-                          <div class="stat-label">预计剩余</div>
-                          <div class="stat-value">{{ formatTime(progressInfo.remainingTime) }}</div>
-                        </div>
-                        <div class="stat-item">
-                          <div class="stat-label">预计总时长</div>
-                          <div class="stat-value">{{ formatTime(progressInfo.totalTime) }}</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- 进度条 -->
-                    <div class="progress-bar-section">
-                      <el-progress
-                        :percentage="Math.round(progressInfo.progress)"
-                        :stroke-width="12"
-                        :show-text="true"
-                        :status="getProgressStatus()"
-                        class="main-progress-bar"
-                      />
-                    </div>
-
-                    <!-- 当前任务详情 -->
-                    <div class="current-task-info">
-                      <div class="task-title">
-                        <el-icon class="task-icon">
-                          <Loading />
-                        </el-icon>
-                        {{ progressInfo.currentStep || '正在初始化分析引擎...' }}
-                      </div>
-                      <div
-                        class="task-description"
-                        style="white-space: pre-wrap; line-height: 1.6;"
-                      >
-                        {{ progressInfo.currentStepDescription || progressInfo.message || 'AI正在根据您的要求重点分析相关内容' }}
-                      </div>
-                    </div>
-
-                    <!-- 分析步骤显示 - 已隐藏 -->
-                    <!--
-                    <div v-if="analysisSteps.length > 0" class="analysis-steps">
-                      <h5 class="steps-title">📋 分析步骤</h5>
-                      <div class="steps-container">
-                        <div
-                          v-for="(step, index) in analysisSteps"
-                          :key="index"
-                          class="step-item"
-                          :class="{
-                            'step-completed': step.status === 'completed',
-                            'step-current': step.status === 'current',
-                            'step-pending': step.status === 'pending'
-                          }"
-                        >
-                          <div class="step-icon">
-                            <el-icon v-if="step.status === 'completed'" class="completed-icon">
-                              <Check />
-                            </el-icon>
-                            <el-icon v-else-if="step.status === 'current'" class="current-icon rotating-icon">
-                              <Loading />
-                            </el-icon>
-                            <el-icon v-else class="pending-icon">
-                              <Clock />
-                            </el-icon>
-                          </div>
-                          <div class="step-content">
-                            <div class="step-title">{{ step.title }}</div>
-                            <div class="step-description">{{ step.description }}</div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    -->
-                  </div>
-                </el-card>
-              </div>
-            </el-form>
-          </el-card>
-        </el-col>
-
-        <!-- 右侧：高级配置 -->
-        <el-col :span="6">
-          <el-card class="config-card" shadow="hover">
-            <template #header>
-              <div class="card-header">
-                <h3>高级配置</h3>
-                <el-tag type="warning" size="small">可选设置</el-tag>
-              </div>
-            </template>
-
-            <div class="config-content">
-              <!-- AI模型配置 -->
-              <div class="config-section">
-                <h4 class="config-title">🤖 AI模型配置</h4>
-                <div class="model-config">
-                  <div class="model-item">
-                    <div class="model-label">
-                      <span>快速分析模型</span>
-                      <el-tooltip content="用于市场分析、新闻分析、基本面分析等" placement="top">
-                        <el-icon class="help-icon"><InfoFilled /></el-icon>
-                      </el-tooltip>
-                    </div>
-                    <el-select v-model="modelSettings.quickAnalysisModel" size="small" style="width: 100%" filterable>
-                      <el-option
-                        v-for="model in availableModels"
-                        :key="`quick-${model.provider}/${model.model_name}`"
-                        :label="model.model_display_name || model.model_name"
-                        :value="model.model_name"
-                      >
-                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
-                          <span style="flex: 1;">{{ model.model_display_name || model.model_name }}</span>
-                          <div style="display: flex; align-items: center; gap: 4px;">
-                            <!-- 能力等级徽章 -->
-                            <el-tag
-                              v-if="model.capability_level"
-                              :type="getCapabilityTagType(model.capability_level)"
-                              size="small"
-                              effect="plain"
-                            >
-                              {{ getCapabilityText(model.capability_level) }}
-                            </el-tag>
-                            <!-- 角色标签 -->
-                            <el-tag
-                              v-if="isQuickAnalysisRole(model.suitable_roles)"
-                              type="success"
-                              size="small"
-                              effect="plain"
-                            >
-                              ⚡快速
-                            </el-tag>
-                            <span style="font-size: 12px; color: #909399;">{{ model.provider }}</span>
-                          </div>
-                        </div>
-                      </el-option>
-                    </el-select>
-                  </div>
-
-                  <div class="model-item">
-                    <div class="model-label">
-                      <span>深度决策模型</span>
-                      <el-tooltip content="用于研究管理者综合决策、风险管理者最终评估" placement="top">
-                        <el-icon class="help-icon"><InfoFilled /></el-icon>
-                      </el-tooltip>
-                    </div>
-                    <DeepModelSelector v-model="modelSettings.deepAnalysisModel" :available-models="availableModels" type="deep" size="small" width="100%" />
-                  </div>
-                </div>
-
-                <!-- 🆕 模型推荐提示 -->
-                <el-alert
-                  v-if="modelRecommendation"
-                  :title="modelRecommendation.title"
-                  :type="modelRecommendation.type"
-                  :closable="false"
-                  style="margin-top: 12px;"
-                >
-                  <template #default>
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
-                      <div style="font-size: 13px; line-height: 1.8; flex: 1; white-space: pre-line;">
-                        {{ modelRecommendation.message }}
-                      </div>
-                      <el-button
-                        v-if="modelRecommendation.quickModel && modelRecommendation.deepModel"
-                        type="primary"
-                        size="small"
-                        @click="applyRecommendedModels"
-                        style="flex-shrink: 0;"
-                      >
-                        应用推荐
-                      </el-button>
-                    </div>
-                  </template>
-                </el-alert>
-              </div>
-
-              <!-- 分析选项 -->
-              <div class="config-section">
-                <h4 class="config-title">⚙️ 分析选项</h4>
-                <div class="option-list">
-                  <div class="option-item">
-                    <div class="option-info">
-                      <span class="option-name">情绪分析</span>
-                      <span class="option-desc">分析市场情绪和投资者心理</span>
-                    </div>
-                    <el-switch v-model="analysisForm.includeSentiment" />
-                  </div>
-
-                  <div class="option-item">
-                    <div class="option-info">
-                      <span class="option-name">风险评估</span>
-                      <span class="option-desc">包含详细的风险因素分析</span>
-                    </div>
-                    <el-switch v-model="analysisForm.includeRisk" />
-                  </div>
-
-                  <div class="option-item">
-                    <div class="option-info">
-                      <span class="option-name">语言偏好</span>
-                    </div>
-                    <el-select v-model="analysisForm.language" size="small" style="width: 100px">
-                      <el-option label="中文" value="zh-CN" />
-                      <el-option label="English" value="en-US" />
-                    </el-select>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </el-card>
-        </el-col>
-      </el-row>
-
-      <!-- 分析结果显示 -->
-      <div v-if="showResults && analysisResults" class="results-section">
-        <el-row :gutter="24">
-          <el-col :span="24">
-            <el-card class="results-card" shadow="hover">
-              <template #header>
-                <div class="results-header">
-                  <h3>📊 分析结果</h3>
-                  <div class="result-meta">
-                    <el-tag type="success">{{ analysisResults.symbol || analysisResults.stock_symbol || analysisForm.symbol || analysisForm.stockCode }}</el-tag>
-                    <el-tag>{{ analysisResults.analysis_date }}</el-tag>
-                    <el-tag v-if="analysisResults.model_info && analysisResults.model_info !== 'Unknown'" type="info">
-                      <el-icon><Cpu /></el-icon>
-                      {{ analysisResults.model_info }}
-                    </el-tag>
-                  </div>
-                </div>
-              </template>
-
-              <div class="results-content">
-                <!-- 风险提示 -->
-                <div class="risk-disclaimer">
-                  <el-alert
-                    type="warning"
-                    :closable="false"
-                    show-icon
-                  >
-                    <template #title>
-                      <div class="disclaimer-content">
-                        <el-icon class="disclaimer-icon"><WarningFilled /></el-icon>
-                        <div class="disclaimer-text">
-                          <p style="margin: 0 0 8px 0;"><strong>⚠️ 重要风险提示与免责声明</strong></p>
-                          <ul style="margin: 0; padding-left: 20px; line-height: 1.8;">
-                            <li><strong>工具性质：</strong>本系统为股票分析辅助工具，使用AI技术对公开市场数据进行分析，不具备证券投资咨询资质。</li>
-                            <li><strong>非投资建议：</strong>所有分析结果、评分、建议仅为技术分析参考，不构成任何买卖建议或投资决策依据。</li>
-                            <li><strong>数据局限性：</strong>分析基于历史数据和公开信息，可能存在延迟、不完整或不准确的情况，无法预测未来市场走势。</li>
-                            <li><strong>投资风险：</strong>股票投资存在市场风险、流动性风险、政策风险等多种风险，可能导致本金损失。</li>
-                            <li><strong>独立决策：</strong>投资者应基于自身风险承受能力、投资目标和财务状况独立做出投资决策。</li>
-                            <li><strong>专业咨询：</strong>重大投资决策建议咨询具有合法资质的专业投资顾问或金融机构。</li>
-                            <li><strong>责任声明：</strong>使用本工具产生的任何投资决策及其后果由投资者自行承担，本系统不承担任何责任。</li>
-                          </ul>
-                        </div>
-                      </div>
-                    </template>
-                  </el-alert>
-                </div>
-
-                <!-- 最终决策 -->
-                <div v-if="analysisResults.decision" class="decision-section">
-                  <h4>🎯 分析参考</h4>
-                  <div class="decision-card">
-                    <div class="decision-main">
-                      <div class="decision-action">
-                        <span class="label">分析倾向:</span>
-                        <el-tag
-                          :type="getActionTagType(analysisResults.decision.action)"
-                          size="large"
-                        >
-                          {{ analysisResults.decision.action }}
-                        </el-tag>
-                        <el-tag type="info" size="small" style="margin-left: 8px;">仅供参考</el-tag>
-                      </div>
-
-                      <div class="decision-metrics">
-                        <div class="metric-item">
-                          <span class="label">参考价格:</span>
-                          <span class="value">{{ analysisResults.decision.target_price }}</span>
-                        </div>
-                        <div class="metric-item">
-                          <span class="label">模型置信度:</span>
-                          <span class="value">{{ (analysisResults.decision.confidence * 100).toFixed(1) }}%</span>
-                          <el-tooltip content="基于AI模型计算的置信度，不代表实际投资成功率" placement="top">
-                            <el-icon style="margin-left: 4px; cursor: help;"><QuestionFilled /></el-icon>
-                          </el-tooltip>
-                        </div>
-                        <div class="metric-item">
-                          <span class="label">风险评分:</span>
-                          <span class="value">{{ (analysisResults.decision.risk_score * 100).toFixed(1) }}%</span>
-                          <el-tooltip content="基于历史数据的风险评估，实际风险可能更高" placement="top">
-                            <el-icon style="margin-left: 4px; cursor: help;"><QuestionFilled /></el-icon>
-                          </el-tooltip>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div class="decision-reasoning">
-                      <h5>分析依据:</h5>
-                      <p>{{ analysisResults.decision.reasoning }}</p>
-                      <el-alert type="info" :closable="false" style="margin-top: 12px;">
-                        <template #default>
-                          <span style="font-size: 13px;">💡 以上分析基于AI模型对历史数据的处理，不构成投资建议，请结合自身情况独立决策。</span>
-                        </template>
-                      </el-alert>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 分析概览 -->
-                <div v-if="analysisResults" class="overview-section">
-                  <h4>📊 分析概览</h4>
-                  <div class="overview-card">
-  
-                    <div v-if="analysisResults.summary" class="overview-summary">
-                      <h5>分析摘要:</h5>
-                      <p>{{ analysisResults.summary }}</p>
-                    </div>
-
-                    <div v-if="analysisResults.recommendation" class="overview-recommendation">
-                      <h5>投资建议:</h5>
-                      <p>{{ analysisResults.recommendation }}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 详细分析报告 -->
-                <div v-if="analysisResults.state || analysisResults.reports" class="reports-section">
-                  <h4>📋 详细分析报告</h4>
-
-                  <!-- 美观的标签页展示 -->
-                  <div class="analysis-tabs-container">
-                    <el-tabs
-                      v-model="activeReportTab"
-                      type="card"
-                      class="analysis-tabs"
-                      tab-position="top"
-                      :key="analysisResults?.id || 'default'"
-                    >
-                      <el-tab-pane
-                        v-for="(report, key) in getAnalysisReports(analysisResults)"
-                        :key="key"
-                        :name="key.toString()"
-                        :label="report.title"
-                        class="report-tab-pane"
-                      >
-                        <!-- 标签页内容头部 -->
-                        <div class="report-header">
-                          <div class="report-title">
-                            <span class="report-icon">{{ getReportIcon(report.title) }}</span>
-                            <span class="report-name">{{ getReportName(report.title) }}</span>
-                          </div>
-                          <div class="report-description">{{ getReportDescription(report.title) }}</div>
-                        </div>
-
-                        <!-- 报告内容 -->
-                        <div class="report-content-wrapper">
-                          <div
-                            class="report-content"
-                            v-html="formatReportContent(report.content)"
-                            v-if="report.content"
-                          ></div>
-                          <div v-else class="no-content">
-                            <el-empty description="暂无内容" />
-                          </div>
-                        </div>
-                      </el-tab-pane>
-                    </el-tabs>
-                  </div>
-                </div>
-
-                <!-- 操作按钮 -->
-                <div class="result-actions">
-                  <el-button type="success" @click="goSimOrder">
-                    <el-icon><CreditCard /></el-icon>
-                    一键模拟下单
-                  </el-button>
-                  <el-dropdown trigger="click" @command="downloadReport">
-                    <el-button type="primary">
-                      <el-icon><Download /></el-icon>
-                      下载报告
-                      <el-icon class="el-icon--right"><arrow-down /></el-icon>
-                    </el-button>
-                    <template #dropdown>
-                      <el-dropdown-menu>
-                        <el-dropdown-item command="markdown">
-                          <el-icon><document /></el-icon> Markdown
-                        </el-dropdown-item>
-                        <el-dropdown-item command="docx">
-                          <el-icon><document /></el-icon> Word 文档
-                        </el-dropdown-item>
-                        <el-dropdown-item command="pdf">
-                          <el-icon><document /></el-icon> PDF
-                        </el-dropdown-item>
-                        <el-dropdown-item command="json" divided>
-                          <el-icon><document /></el-icon> JSON (原始数据)
-                        </el-dropdown-item>
-                      </el-dropdown-menu>
-                    </template>
-                  </el-dropdown>
-                </div>
-
-                <!-- 风险提示 -->
-                <el-alert
-                  type="warning"
-                  :closable="false"
-                  show-icon
-                  class="risk-disclaimer"
-                >
-                  <template #title>
-                    <span style="font-weight: bold;">报告依据真实交易数据使用AI分析生成，仅供参考，不构成任何投资建议。市场有风险，投资需谨慎。</span>
-                  </template>
-                </el-alert>
-              </div>
-            </el-card>
-          </el-col>
-        </el-row>
-      </div>
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted, computed, h } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import { ElMessage, ElMessageBox, ElInputNumber } from 'element-plus'
+import type { SingleAnalysisRequest } from '@/api/analysis'
 import {
-  Document,
-  TrendCharts,
-  InfoFilled,
-  Check,
-  Loading,
-  Refresh,
-  Download,
-  CreditCard,
-  WarningFilled,
-  Cpu,
-  QuestionFilled,
   ArrowDown,
+  Check,
+  Cpu,
+  CreditCard,
+  Document,
+  Download,
+  InfoFilled,
+  Loading,
+  QuestionFilled,
+  Refresh,
+  TrendCharts,
+  WarningFilled
 } from '@element-plus/icons-vue'
-import { analysisApi, type SingleAnalysisRequest } from '@/api/analysis'
+import { ElInputNumber, ElMessage, ElMessageBox } from 'element-plus'
+import { marked } from 'marked'
+import { computed, h, onMounted, onUnmounted, reactive, ref } from 'vue'
+// 监听分析深度变化
+import { watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { analysisApi } from '@/api/analysis'
+import { configApi } from '@/api/config'
+import { recommendModels } from '@/api/modelCapabilities'
 import { paperApi } from '@/api/paper'
 import { stocksApi } from '@/api/stocks'
-import { useAppStore } from '@/stores/app'
-import { useAuthStore } from '@/stores/auth'
-import { configApi } from '@/api/config'
 import DeepModelSelector from '@/components/DeepModelSelector.vue'
 import { ANALYSTS, convertAnalystNamesToIds } from '@/constants/analysts'
-import { marked } from 'marked'
-import { recommendModels } from '@/api/modelCapabilities'
-import { validateStockCode, getStockCodeFormatHelp } from '@/utils/stockValidator'
-import { normalizeMarketForAnalysis, getMarketByStockCode } from '@/utils/market'
+import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
+import { getMarketByStockCode, normalizeMarketForAnalysis } from '@/utils/market'
+
+import { getStockCodeFormatHelp, validateStockCode } from '@/utils/stockValidator'
 
 // 配置marked选项
 marked.setOptions({
-  breaks: true,        // 支持换行符转换为<br>
-  gfm: true           // 启用GitHub风格的Markdown
+  breaks: true, // 支持换行符转换为<br>
+  gfm: true // 启用GitHub风格的Markdown
 })
 
 // 市场类型定义
@@ -756,11 +71,11 @@ const activeReportTab = ref('') // 当前激活的报告标签页
 const progressInfo = ref({
   progress: 0,
   currentStep: '',
-  currentStepDescription: '',  // 当前步骤描述
+  currentStepDescription: '', // 当前步骤描述
   message: '',
-  elapsedTime: 0,      // 已用时间（秒）
-  remainingTime: 0,    // 预计剩余时间（秒）
-  totalTime: 0         // 预计总时长（秒）
+  elapsedTime: 0, // 已用时间（秒）
+  remainingTime: 0, // 预计剩余时间（秒）
+  totalTime: 0 // 预计总时长（秒）
 })
 const pollingTimer = ref<any>(null)
 
@@ -801,8 +116,8 @@ const modelRecommendation = ref<{
 
 // 分析表单
 const analysisForm = reactive<AnalysisForm>({
-  stockCode: '',  // 保留用于表单绑定
-  symbol: '',     // 标准化后的代码
+  stockCode: '', // 保留用于表单绑定
+  symbol: '', // 标准化后的代码
   market: 'A股',
   analysisDate: new Date(),
   researchDepth: 3, // 默认选中3级标准分析（推荐），将在 onMounted 中从用户偏好加载
@@ -938,7 +253,7 @@ const submitAnalysis = async () => {
 
     const request: SingleAnalysisRequest = {
       symbol: analysisForm.symbol,
-      stock_code: analysisForm.symbol,  // 兼容字段
+      stock_code: analysisForm.symbol, // 兼容字段
       parameters: {
         market_type: analysisForm.market,
         analysis_date: analysisDate.toISOString().split('T')[0],
@@ -1011,7 +326,6 @@ const submitAnalysis = async () => {
         console.error('立即查询状态失败:', error)
       }
     }, 1000) // 1秒后查询
-
   } catch (error: any) {
     ElMessage.error(error.message || '提交分析失败')
   } finally {
@@ -1106,7 +420,6 @@ const startPollingTaskStatus = () => {
         // clearTaskCache() // 不清除，让用户能在30分钟内刷新查看结果
 
         ElMessage.success('分析完成！')
-
       } else if (status.status === 'failed') {
         // 分析失败
         analysisStatus.value = 'failed'
@@ -1132,14 +445,12 @@ const startPollingTaskStatus = () => {
           duration: 10000, // 显示10秒，让用户有时间阅读
           showClose: true
         })
-
       } else if (status.status === 'running') {
         // 分析进行中，更新进度
         console.log('🔄 轮询中设置 analysisStatus 为 running')
         analysisStatus.value = 'running'
         updateProgressInfo(status)
       }
-
     } catch (error) {
       console.error('获取任务状态失败:', error)
       // 继续轮询，不中断
@@ -1229,14 +540,13 @@ const restartAnalysis = () => {
   }
 }
 
-
 // 获取操作标签类型
 const getActionTagType = (action: string): 'primary' | 'success' | 'warning' | 'info' | 'danger' => {
   const actionTypes: Record<string, 'primary' | 'success' | 'warning' | 'info' | 'danger'> = {
-    '买入': 'success',
-    '持有': 'warning',
-    '卖出': 'danger',
-    '观望': 'info'
+    买入: 'success',
+    持有: 'warning',
+    卖出: 'danger',
+    观望: 'info'
   }
   return actionTypes[action] || 'info'
 }
@@ -1244,7 +554,7 @@ const getActionTagType = (action: string): 'primary' | 'success' | 'warning' | '
 // 获取分析报告
 const getAnalysisReports = (data: any) => {
   console.log('📊 getAnalysisReports 输入数据:', data)
-  const reports: Array<{title: string, content: any}> = []
+  const reports: Array<{ title: string, content: any }> = []
 
   // 优先从 reports 字段获取数据（新的API格式）
   let reportsData = data
@@ -1297,7 +607,7 @@ const getAnalysisReports = (data: any) => {
       console.log(`📊 找到报告: ${mapping.key} -> ${mapping.title}`)
       reports.push({
         title: mapping.title,
-        content: content
+        content
       })
     }
   })
@@ -1330,7 +640,7 @@ const getReportIcon = (title: string) => {
 
 // 获取报告名称（去掉图标）
 const getReportName = (title: string) => {
-  return title.replace(/^[^\s]+\s/, '')
+  return title.replace(/^\S+\s/, '')
 }
 
 // 获取报告描述
@@ -1352,7 +662,7 @@ const getReportDescription = (title: string) => {
 // 格式化报告内容
 const formatReportContent = (content: any) => {
   console.log('🎨 [DEBUG] formatReportContent 被调用:', {
-    content: content,
+    content,
     type: typeof content,
     length: typeof content === 'string' ? content.length : 'N/A'
   })
@@ -1415,7 +725,7 @@ const downloadReport = async (format: string = 'markdown') => {
     const reportId = (analysisResults.value?.id as any) || currentTaskId.value
     const res = await fetch(`/api/reports/${reportId}/download?format=${format}`, {
       headers: {
-        'Authorization': `Bearer ${authStore.token}`
+        Authorization: `Bearer ${authStore.token}`
       }
     })
 
@@ -1430,11 +740,11 @@ const downloadReport = async (format: string = 'markdown') => {
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    const code =
-      analysisResults.value?.stock_code ||
-      analysisResults.value?.stock_symbol ||
-      analysisResults.value?.symbol ||
-      'stock'
+    const code
+      = analysisResults.value?.stock_code
+        || analysisResults.value?.stock_symbol
+        || analysisResults.value?.symbol
+        || 'stock'
     const dateStr = analysisResults.value?.analysis_date || new Date().toISOString().slice(0, 10)
 
     // 根据格式设置文件扩展名
@@ -1465,10 +775,10 @@ const downloadReport = async (format: string = 'markdown') => {
 // 辅助函数：获取格式名称
 const getFormatName = (format: string): string => {
   const names: Record<string, string> = {
-    'markdown': 'Markdown',
-    'docx': 'Word',
-    'pdf': 'PDF',
-    'json': 'JSON'
+    markdown: 'Markdown',
+    docx: 'Word',
+    pdf: 'PDF',
+    json: 'JSON'
   }
   return names[format] || format
 }
@@ -1476,22 +786,23 @@ const getFormatName = (format: string): string => {
 // 辅助函数：获取文件扩展名
 const getFileExtension = (format: string): string => {
   const extensions: Record<string, string> = {
-    'markdown': 'md',
-    'docx': 'docx',
-    'pdf': 'pdf',
-    'json': 'json'
+    markdown: 'md',
+    docx: 'docx',
+    pdf: 'pdf',
+    json: 'json'
   }
   return extensions[format] || 'txt'
 }
 
 // 解析投资建议
 const parseRecommendation = () => {
-  if (!analysisResults.value) return null
+  if (!analysisResults.value)
+    return null
 
   // 从多个可能的字段中提取投资建议
-  const rec = analysisResults.value.recommendation ||
-              analysisResults.value.summary ||
-              analysisResults.value.decision?.action || ''
+  const rec = analysisResults.value.recommendation
+    || analysisResults.value.summary
+    || analysisResults.value.decision?.action || ''
 
   const traderPlan = analysisResults.value.reports?.trader_investment_plan || ''
   const allReports = Object.values(analysisResults.value.reports || {}).join(' ')
@@ -1499,7 +810,7 @@ const parseRecommendation = () => {
   // 解析操作类型
   let action: 'buy' | 'sell' | null = null
   const recStr = String(rec).toLowerCase()
-  const allText = (recStr + ' ' + String(traderPlan).toLowerCase() + ' ' + allReports.toLowerCase())
+  const allText = (`${recStr} ${String(traderPlan).toLowerCase()} ${allReports.toLowerCase()}`)
 
   if (allText.includes('买入') || allText.includes('buy') || allText.includes('增持')) {
     action = 'buy'
@@ -1507,25 +818,26 @@ const parseRecommendation = () => {
     action = 'sell'
   }
 
-  if (!action) return null
+  if (!action)
+    return null
 
   // 解析目标价格
   let targetPrice: number | null = null
-  const priceMatch = allText.match(/目标价[格]?[：:]\s*([0-9.]+)/) ||
-                     allText.match(/价格[：:]\s*([0-9.]+)/)
+  const priceMatch = allText.match(/目标价格?[：:]\s*([0-9.]+)/)
+    || allText.match(/价格[：:]\s*([0-9.]+)/)
   if (priceMatch) {
-    targetPrice = parseFloat(priceMatch[1])
+    targetPrice = Number.parseFloat(priceMatch[1])
   }
 
   // 解析置信度
-  const confidence = analysisResults.value.decision?.confidence ||
-                    analysisResults.value.confidence_score ||
-                    0
+  const confidence = analysisResults.value.decision?.confidence
+    || analysisResults.value.confidence_score
+    || 0
 
   // 解析风险等级
-  const riskLevel = analysisResults.value.risk_level ||
-                   analysisResults.value.decision?.risk_level ||
-                   '中等'
+  const riskLevel = analysisResults.value.risk_level
+    || analysisResults.value.decision?.risk_level
+    || '中等'
 
   return {
     action,
@@ -1544,11 +856,11 @@ const goSimOrder = async () => {
     }
 
     // 获取股票代码（兼容新旧字段）
-    const code = analysisResults.value.symbol ||
-                 analysisResults.value.stock_symbol ||
-                 analysisResults.value.stock_code ||
-                 analysisForm.symbol ||
-                 analysisForm.stockCode
+    const code = analysisResults.value.symbol
+      || analysisResults.value.stock_symbol
+      || analysisResults.value.stock_code
+      || analysisForm.symbol
+      || analysisForm.stockCode
     if (!code) {
       ElMessage.warning('未识别到股票代码')
       return
@@ -1644,14 +956,14 @@ const goSimOrder = async () => {
               h('span', { style: 'color: #909399; font-size: 12px; margin-left: 8px;' }, '(可修改)')
             ]),
             h(ElInputNumber, {
-              modelValue: tradeForm.price,
+              'modelValue': tradeForm.price,
               'onUpdate:modelValue': (val: number | undefined) => { tradeForm.price = val ?? 0 },
-              min: 0.01,
-              max: 9999,
-              precision: 2,
-              step: 0.01,
-              style: 'width: 200px;',
-              controls: true
+              'min': 0.01,
+              'max': 9999,
+              'precision': 2,
+              'step': 0.01,
+              'style': 'width: 200px;',
+              'controls': true
             })
           ]),
           h('div', { style: 'margin: 16px 0;' }, [
@@ -1660,13 +972,13 @@ const goSimOrder = async () => {
               h('span', { style: 'color: #909399; font-size: 12px; margin-left: 8px;' }, '(可修改，100股为单位)')
             ]),
             h(ElInputNumber, {
-              modelValue: tradeForm.quantity,
+              'modelValue': tradeForm.quantity,
               'onUpdate:modelValue': (val: number | undefined) => { tradeForm.quantity = val ?? 0 },
-              min: 100,
-              max: maxQuantity,
-              step: 100,
-              style: 'width: 200px;',
-              controls: true
+              'min': 100,
+              'max': maxQuantity,
+              'step': 100,
+              'style': 'width: 200px;',
+              'controls': true
             })
           ]),
           h('p', [
@@ -1681,12 +993,12 @@ const goSimOrder = async () => {
             h('strong', '风险等级：'),
             h('span', recommendation.riskLevel)
           ]),
-          recommendation.action === 'buy' ? h('p', { style: 'color: #909399; font-size: 12px; margin-top: 12px;' },
-            `可用资金：${typeof account.cash === 'number' ? account.cash.toFixed(2) : account.cash}元，最大可买：${maxQuantity}股`
-          ) : null,
-          recommendation.action === 'sell' ? h('p', { style: 'color: #909399; font-size: 12px; margin-top: 12px;' },
-            `当前持仓：${maxQuantity}股`
-          ) : null
+          recommendation.action === 'buy'
+            ? h('p', { style: 'color: #909399; font-size: 12px; margin-top: 12px;' }, `可用资金：${typeof account.cash === 'number' ? account.cash.toFixed(2) : account.cash}元，最大可买：${maxQuantity}股`)
+            : null,
+          recommendation.action === 'sell'
+            ? h('p', { style: 'color: #909399; font-size: 12px; margin-top: 12px;' }, `当前持仓：${maxQuantity}股`)
+            : null
         ])
       }
     }
@@ -1729,7 +1041,7 @@ const goSimOrder = async () => {
     // 执行交易
     const analysisId = analysisResults.value.id || currentTaskId.value
     const orderRes = await paperApi.placeOrder({
-      code: code,
+      code,
       side: recommendation.action,
       quantity: tradeForm.quantity,
       analysis_id: analysisId ? String(analysisId) : undefined
@@ -1744,7 +1056,6 @@ const goSimOrder = async () => {
     } else {
       ElMessage.error(orderRes.message || '下单失败')
     }
-
   } catch (error: any) {
     if (error !== 'cancel') {
       console.error('一键模拟下单失败:', error)
@@ -1935,7 +1246,8 @@ const saveTaskToCache = (taskId: string, taskData: any) => {
 const getTaskFromCache = () => {
   try {
     const cached = localStorage.getItem(TASK_CACHE_KEY)
-    if (!cached) return null
+    if (!cached)
+      return null
 
     const cacheData = JSON.parse(cached)
     const now = Date.now()
@@ -1965,7 +1277,8 @@ const clearTaskCache = () => {
 // 恢复任务状态
 const restoreTaskFromCache = async () => {
   const cached = getTaskFromCache()
-  if (!cached) return false
+  if (!cached)
+    return false
 
   try {
     console.log('🔄 尝试恢复任务状态:', cached.taskId)
@@ -1993,7 +1306,6 @@ const restoreTaskFromCache = async () => {
 
       console.log('✅ 任务已完成，显示结果')
       return true
-
     } else if (status.status === 'running') {
       // 任务仍在运行，恢复进度显示
       currentTaskId.value = cached.taskId
@@ -2011,7 +1323,6 @@ const restoreTaskFromCache = async () => {
 
       console.log('🔄 任务仍在运行，恢复进度显示')
       return true
-
     } else if (status.status === 'failed') {
       // 任务失败
       analysisStatus.value = 'failed'
@@ -2023,14 +1334,12 @@ const restoreTaskFromCache = async () => {
 
       console.log('❌ 任务失败')
       return true
-
     } else {
       // 其他状态，清除缓存
       clearTaskCache()
       console.log('🤔 未知任务状态，清除缓存')
       return false
     }
-
   } catch (error) {
     console.error('❌ 恢复任务状态失败:', error)
     // 如果查询失败，可能是任务不存在了，清除缓存
@@ -2059,9 +1368,12 @@ const getCapabilityText = (level: number): string => {
  * 获取能力等级标签类型
  */
 const getCapabilityTagType = (level: number): 'success' | 'info' | 'warning' | 'danger' => {
-  if (level >= 4) return 'danger'
-  if (level >= 3) return 'warning'
-  if (level >= 2) return 'success'
+  if (level >= 4)
+    return 'danger'
+  if (level >= 3)
+    return 'warning'
+  if (level >= 2)
+    return 'success'
   return 'info'
 }
 
@@ -2069,7 +1381,8 @@ const getCapabilityTagType = (level: number): 'success' | 'info' | 'warning' | '
  * 判断是否适合快速分析
  */
 const isQuickAnalysisRole = (roles: string[] | undefined): boolean => {
-  if (!roles || !Array.isArray(roles)) return false
+  if (!roles || !Array.isArray(roles))
+    return false
   return roles.includes('quick_analysis') || roles.includes('both')
 }
 
@@ -2173,9 +1486,6 @@ const applyRecommendedModels = () => {
     ElMessage.success('已应用推荐的模型配置')
   }
 }
-
-// 监听分析深度变化
-import { watch } from 'vue'
 watch(() => analysisForm.researchDepth, () => {
   checkModelSuitability()
 })
@@ -2203,7 +1513,7 @@ onMounted(async () => {
 
     // 加载默认分析深度（转换为数字）
     if (userPrefs.default_depth) {
-      analysisForm.researchDepth = parseInt(userPrefs.default_depth)
+      analysisForm.researchDepth = Number.parseInt(userPrefs.default_depth)
     }
 
     // 加载默认分析师
@@ -2222,7 +1532,7 @@ onMounted(async () => {
       analysisForm.market = appStore.preferences.defaultMarket as MarketType
     }
     if (appStore.preferences.defaultDepth) {
-      analysisForm.researchDepth = parseInt(appStore.preferences.defaultDepth)
+      analysisForm.researchDepth = Number.parseInt(appStore.preferences.defaultDepth)
     }
     console.log('✅ 已加载应用偏好设置（降级）')
   }
@@ -2243,7 +1553,8 @@ onMounted(async () => {
       console.log('🔍 自动识别市场类型:', analysisForm.stockCode, '->', detectedMarket)
     }
   }
-  if (q?.market) analysisForm.market = normalizeMarketForAnalysis(q.market) as MarketType
+  if (q?.market)
+    analysisForm.market = normalizeMarketForAnalysis(q.market) as MarketType
 
   // 尝试恢复任务状态（仅当没有新股票代码时）
   if (!hasNewStock) {
@@ -2254,6 +1565,751 @@ onMounted(async () => {
   await checkModelSuitability()
 })
 </script>
+
+<template>
+  <div class="single-analysis">
+    <!-- 页面头部 -->
+    <div class="page-header">
+      <div class="header-content">
+        <div class="title-section">
+          <h1 class="page-title">
+            <el-icon class="title-icon">
+              <Document />
+            </el-icon>
+            单股分析
+          </h1>
+          <p class="page-description">
+            AI驱动的智能股票分析，多维度评估投资价值与风险
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 主要分析表单 -->
+    <div class="analysis-container">
+      <el-row :gutter="24">
+        <!-- 左侧：基础配置 -->
+        <el-col :span="18">
+          <el-card class="main-form-card" shadow="hover">
+            <template #header>
+              <div class="card-header">
+                <h3>分析配置</h3>
+                <el-tag type="info" size="small">
+                  必填信息
+                </el-tag>
+              </div>
+            </template>
+
+            <el-form :model="analysisForm" label-width="100px" class="analysis-form">
+              <!-- 股票信息 -->
+              <div class="form-section">
+                <h4 class="section-title">
+                  📊 股票信息
+                </h4>
+                <el-row :gutter="16">
+                  <el-col :span="12">
+                    <el-form-item label="股票代码" required>
+                      <el-input
+                        v-model="analysisForm.stockCode"
+                        placeholder="如：000001、AAPL、700、1810"
+                        clearable
+                        size="large"
+                        class="stock-input"
+                        :class="{ 'is-error': stockCodeError }"
+                        @blur="validateStockCodeInput"
+                        @input="onStockCodeInput"
+                      >
+                        <template #prefix>
+                          <el-icon><TrendCharts /></el-icon>
+                        </template>
+                      </el-input>
+                      <div v-if="stockCodeError" class="error-message">
+                        <el-icon><WarningFilled /></el-icon>
+                        {{ stockCodeError }}
+                      </div>
+                      <div v-else-if="stockCodeHelp" class="help-message">
+                        <el-icon><InfoFilled /></el-icon>
+                        {{ stockCodeHelp }}
+                      </div>
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="12">
+                    <el-form-item label="市场类型">
+                      <el-select
+                        v-model="analysisForm.market"
+                        placeholder="选择市场"
+                        size="large"
+                        style="width: 100%"
+                        @change="onMarketChange"
+                      >
+                        <el-option label="🇨🇳 A股市场" value="A股">
+                          <span>🇨🇳 A股市场</span>
+                          <span style="color: #909399; font-size: 12px; margin-left: 8px;">（6位数字）</span>
+                        </el-option>
+                        <el-option label="🇺🇸 美股市场" value="美股">
+                          <span>🇺🇸 美股市场</span>
+                          <span style="color: #909399; font-size: 12px; margin-left: 8px;">（1-5个字母）</span>
+                        </el-option>
+                        <el-option label="🇭🇰 港股市场" value="港股">
+                          <span>🇭🇰 港股市场</span>
+                          <span style="color: #909399; font-size: 12px; margin-left: 8px;">（1-5位数字）</span>
+                        </el-option>
+                      </el-select>
+                    </el-form-item>
+                  </el-col>
+                </el-row>
+
+                <el-form-item label="分析日期">
+                  <el-date-picker
+                    v-model="analysisForm.analysisDate"
+                    type="date"
+                    placeholder="选择分析基准日期"
+                    size="large"
+                    style="width: 100%"
+                    :disabled-date="disabledDate"
+                  />
+                </el-form-item>
+              </div>
+
+              <!-- 分析深度 -->
+              <div class="form-section">
+                <h4 class="section-title">
+                  🎯 分析深度
+                </h4>
+                <div class="depth-selector">
+                  <div
+                    v-for="(depth, index) in depthOptions"
+                    :key="index"
+                    class="depth-option"
+                    :class="{ active: analysisForm.researchDepth === index + 1 }"
+                    @click="analysisForm.researchDepth = index + 1"
+                  >
+                    <div class="depth-icon">
+                      {{ depth.icon }}
+                    </div>
+                    <div class="depth-info">
+                      <div class="depth-name">
+                        {{ depth.name }}
+                      </div>
+                      <div class="depth-desc">
+                        {{ depth.description }}
+                      </div>
+                      <div class="depth-time">
+                        {{ depth.time }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 分析师团队 -->
+              <div class="form-section">
+                <h4 class="section-title">
+                  👥 分析师团队
+                </h4>
+                <div class="analysts-grid">
+                  <div
+                    v-for="analyst in ANALYSTS"
+                    :key="analyst.id"
+                    class="analyst-card"
+                    :class="{
+                      active: analysisForm.selectedAnalysts.includes(analyst.name),
+                      disabled: analyst.name === '社媒分析师' && analysisForm.market === 'A股',
+                    }"
+                    @click="toggleAnalyst(analyst.name)"
+                  >
+                    <div class="analyst-avatar">
+                      <el-icon>
+                        <component :is="analyst.icon" />
+                      </el-icon>
+                    </div>
+                    <div class="analyst-content">
+                      <div class="analyst-name">
+                        {{ analyst.name }}
+                      </div>
+                      <div class="analyst-desc">
+                        {{ analyst.description }}
+                      </div>
+                    </div>
+                    <div class="analyst-check">
+                      <el-icon v-if="analysisForm.selectedAnalysts.includes(analyst.name)" class="check-icon">
+                        <Check />
+                      </el-icon>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- A股提示 -->
+                <el-alert
+                  v-if="analysisForm.market === 'A股'"
+                  title="A股市场暂不支持社媒分析（国内数据源限制）"
+                  type="info"
+                  :closable="false"
+                  style="margin-top: 12px"
+                />
+              </div>
+
+              <!-- 操作按钮 -->
+              <div class="form-section">
+                <div class="action-buttons" style="display: flex; justify-content: center; align-items: center; width: 100%; text-align: center;">
+                  <el-button
+                    v-if="analysisStatus === 'idle'"
+                    type="primary"
+                    size="large"
+                    :loading="submitting"
+                    :disabled="!analysisForm.stockCode.trim()"
+                    class="submit-btn large-analysis-btn"
+                    style="width: 280px; height: 56px; font-size: 18px; font-weight: 700; border-radius: 16px;"
+                    @click="submitAnalysis"
+                  >
+                    <el-icon><TrendCharts /></el-icon>
+                    开始智能分析
+                  </el-button>
+
+                  <el-button
+                    v-else-if="analysisStatus === 'running'"
+                    type="warning"
+                    size="large"
+                    disabled
+                    class="submit-btn large-analysis-btn"
+                    style="width: 280px; height: 56px; font-size: 18px; font-weight: 700; border-radius: 16px;"
+                  >
+                    <el-icon><Loading /></el-icon>
+                    分析进行中...
+                  </el-button>
+
+                  <div v-else-if="analysisStatus === 'completed'" style="display: flex; gap: 12px;">
+                    <el-button
+                      type="success"
+                      size="large"
+                      class="submit-btn"
+                      style="width: 180px; height: 56px; font-size: 16px; font-weight: 700; border-radius: 16px;"
+                      @click="showResults = !showResults"
+                    >
+                      <el-icon><Document /></el-icon>
+                      {{ showResults ? '隐藏结果' : '查看结果' }}
+                    </el-button>
+
+                    <el-button
+                      type="primary"
+                      size="large"
+                      class="submit-btn"
+                      style="width: 180px; height: 56px; font-size: 16px; font-weight: 700; border-radius: 16px;"
+                      @click="restartAnalysis"
+                    >
+                      <el-icon><Refresh /></el-icon>
+                      重新分析
+                    </el-button>
+                  </div>
+
+                  <el-button
+                    v-else-if="analysisStatus === 'failed'"
+                    type="danger"
+                    size="large"
+                    class="submit-btn large-analysis-btn"
+                    style="width: 280px; height: 56px; font-size: 18px; font-weight: 700; border-radius: 16px;"
+                    @click="restartAnalysis"
+                  >
+                    <el-icon><Refresh /></el-icon>
+                    重新分析
+                  </el-button>
+                </div>
+              </div>
+
+              <!-- 分析进度显示 -->
+              <div v-if="analysisStatus === 'running'" class="progress-section">
+                <el-card class="progress-card" shadow="hover">
+                  <template #header>
+                    <div class="progress-header">
+                      <h4>
+                        <el-icon class="rotating-icon">
+                          <Loading />
+                        </el-icon>
+                        分析进行中...
+                      </h4>
+                      <!-- 任务ID已隐藏 -->
+                      <!-- <el-tag type="warning">{{ currentTaskId }}</el-tag> -->
+                    </div>
+                  </template>
+
+                  <div class="progress-content">
+                    <!-- 总体进度信息 -->
+                    <div class="overall-progress-info">
+                      <div class="progress-stats">
+                        <!-- 当前步骤已隐藏 -->
+                        <!--
+                        <div class="stat-item">
+                          <div class="stat-label">当前步骤</div>
+                          <div class="stat-value">{{ progressInfo.currentStep || '初始化中...' }}</div>
+                        </div>
+                        -->
+                        <!-- 整体进度已隐藏 -->
+                        <!--
+                        <div class="stat-item">
+                          <div class="stat-label">整体进度</div>
+                          <div class="stat-value">{{ progressInfo.progress.toFixed(1) }}%</div>
+                        </div>
+                        -->
+                        <div class="stat-item">
+                          <div class="stat-label">
+                            已用时间
+                          </div>
+                          <div class="stat-value">
+                            {{ formatTime(progressInfo.elapsedTime) }}
+                          </div>
+                        </div>
+                        <div class="stat-item">
+                          <div class="stat-label">
+                            预计剩余
+                          </div>
+                          <div class="stat-value">
+                            {{ formatTime(progressInfo.remainingTime) }}
+                          </div>
+                        </div>
+                        <div class="stat-item">
+                          <div class="stat-label">
+                            预计总时长
+                          </div>
+                          <div class="stat-value">
+                            {{ formatTime(progressInfo.totalTime) }}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- 进度条 -->
+                    <div class="progress-bar-section">
+                      <el-progress
+                        :percentage="Math.round(progressInfo.progress)"
+                        :stroke-width="12"
+                        :show-text="true"
+                        :status="getProgressStatus()"
+                        class="main-progress-bar"
+                      />
+                    </div>
+
+                    <!-- 当前任务详情 -->
+                    <div class="current-task-info">
+                      <div class="task-title">
+                        <el-icon class="task-icon">
+                          <Loading />
+                        </el-icon>
+                        {{ progressInfo.currentStep || '正在初始化分析引擎...' }}
+                      </div>
+                      <div
+                        class="task-description"
+                        style="white-space: pre-wrap; line-height: 1.6;"
+                      >
+                        {{ progressInfo.currentStepDescription || progressInfo.message || 'AI正在根据您的要求重点分析相关内容' }}
+                      </div>
+                    </div>
+
+                    <!-- 分析步骤显示 - 已隐藏 -->
+                    <!--
+                    <div v-if="analysisSteps.length > 0" class="analysis-steps">
+                      <h5 class="steps-title">📋 分析步骤</h5>
+                      <div class="steps-container">
+                        <div
+                          v-for="(step, index) in analysisSteps"
+                          :key="index"
+                          class="step-item"
+                          :class="{
+                            'step-completed': step.status === 'completed',
+                            'step-current': step.status === 'current',
+                            'step-pending': step.status === 'pending'
+                          }"
+                        >
+                          <div class="step-icon">
+                            <el-icon v-if="step.status === 'completed'" class="completed-icon">
+                              <Check />
+                            </el-icon>
+                            <el-icon v-else-if="step.status === 'current'" class="current-icon rotating-icon">
+                              <Loading />
+                            </el-icon>
+                            <el-icon v-else class="pending-icon">
+                              <Clock />
+                            </el-icon>
+                          </div>
+                          <div class="step-content">
+                            <div class="step-title">{{ step.title }}</div>
+                            <div class="step-description">{{ step.description }}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    -->
+                  </div>
+                </el-card>
+              </div>
+            </el-form>
+          </el-card>
+        </el-col>
+
+        <!-- 右侧：高级配置 -->
+        <el-col :span="6">
+          <el-card class="config-card" shadow="hover">
+            <template #header>
+              <div class="card-header">
+                <h3>高级配置</h3>
+                <el-tag type="warning" size="small">
+                  可选设置
+                </el-tag>
+              </div>
+            </template>
+
+            <div class="config-content">
+              <!-- AI模型配置 -->
+              <div class="config-section">
+                <h4 class="config-title">
+                  🤖 AI模型配置
+                </h4>
+                <div class="model-config">
+                  <div class="model-item">
+                    <div class="model-label">
+                      <span>快速分析模型</span>
+                      <el-tooltip content="用于市场分析、新闻分析、基本面分析等" placement="top">
+                        <el-icon class="help-icon">
+                          <InfoFilled />
+                        </el-icon>
+                      </el-tooltip>
+                    </div>
+                    <el-select v-model="modelSettings.quickAnalysisModel" size="small" style="width: 100%" filterable>
+                      <el-option
+                        v-for="model in availableModels"
+                        :key="`quick-${model.provider}/${model.model_name}`"
+                        :label="model.model_display_name || model.model_name"
+                        :value="model.model_name"
+                      >
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                          <span style="flex: 1;">{{ model.model_display_name || model.model_name }}</span>
+                          <div style="display: flex; align-items: center; gap: 4px;">
+                            <!-- 能力等级徽章 -->
+                            <el-tag
+                              v-if="model.capability_level"
+                              :type="getCapabilityTagType(model.capability_level)"
+                              size="small"
+                              effect="plain"
+                            >
+                              {{ getCapabilityText(model.capability_level) }}
+                            </el-tag>
+                            <!-- 角色标签 -->
+                            <el-tag
+                              v-if="isQuickAnalysisRole(model.suitable_roles)"
+                              type="success"
+                              size="small"
+                              effect="plain"
+                            >
+                              ⚡快速
+                            </el-tag>
+                            <span style="font-size: 12px; color: #909399;">{{ model.provider }}</span>
+                          </div>
+                        </div>
+                      </el-option>
+                    </el-select>
+                  </div>
+
+                  <div class="model-item">
+                    <div class="model-label">
+                      <span>深度决策模型</span>
+                      <el-tooltip content="用于研究管理者综合决策、风险管理者最终评估" placement="top">
+                        <el-icon class="help-icon">
+                          <InfoFilled />
+                        </el-icon>
+                      </el-tooltip>
+                    </div>
+                    <DeepModelSelector v-model="modelSettings.deepAnalysisModel" :available-models="availableModels" type="deep" size="small" width="100%" />
+                  </div>
+                </div>
+
+                <!-- 🆕 模型推荐提示 -->
+                <el-alert
+                  v-if="modelRecommendation"
+                  :title="modelRecommendation.title"
+                  :type="modelRecommendation.type"
+                  :closable="false"
+                  style="margin-top: 12px;"
+                >
+                  <template #default>
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
+                      <div style="font-size: 13px; line-height: 1.8; flex: 1; white-space: pre-line;">
+                        {{ modelRecommendation.message }}
+                      </div>
+                      <el-button
+                        v-if="modelRecommendation.quickModel && modelRecommendation.deepModel"
+                        type="primary"
+                        size="small"
+                        style="flex-shrink: 0;"
+                        @click="applyRecommendedModels"
+                      >
+                        应用推荐
+                      </el-button>
+                    </div>
+                  </template>
+                </el-alert>
+              </div>
+
+              <!-- 分析选项 -->
+              <div class="config-section">
+                <h4 class="config-title">
+                  ⚙️ 分析选项
+                </h4>
+                <div class="option-list">
+                  <div class="option-item">
+                    <div class="option-info">
+                      <span class="option-name">情绪分析</span>
+                      <span class="option-desc">分析市场情绪和投资者心理</span>
+                    </div>
+                    <el-switch v-model="analysisForm.includeSentiment" />
+                  </div>
+
+                  <div class="option-item">
+                    <div class="option-info">
+                      <span class="option-name">风险评估</span>
+                      <span class="option-desc">包含详细的风险因素分析</span>
+                    </div>
+                    <el-switch v-model="analysisForm.includeRisk" />
+                  </div>
+
+                  <div class="option-item">
+                    <div class="option-info">
+                      <span class="option-name">语言偏好</span>
+                    </div>
+                    <el-select v-model="analysisForm.language" size="small" style="width: 100px">
+                      <el-option label="中文" value="zh-CN" />
+                      <el-option label="English" value="en-US" />
+                    </el-select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </el-card>
+        </el-col>
+      </el-row>
+
+      <!-- 分析结果显示 -->
+      <div v-if="showResults && analysisResults" class="results-section">
+        <el-row :gutter="24">
+          <el-col :span="24">
+            <el-card class="results-card" shadow="hover">
+              <template #header>
+                <div class="results-header">
+                  <h3>📊 分析结果</h3>
+                  <div class="result-meta">
+                    <el-tag type="success">
+                      {{ analysisResults.symbol || analysisResults.stock_symbol || analysisForm.symbol || analysisForm.stockCode }}
+                    </el-tag>
+                    <el-tag>{{ analysisResults.analysis_date }}</el-tag>
+                    <el-tag v-if="analysisResults.model_info && analysisResults.model_info !== 'Unknown'" type="info">
+                      <el-icon><Cpu /></el-icon>
+                      {{ analysisResults.model_info }}
+                    </el-tag>
+                  </div>
+                </div>
+              </template>
+
+              <div class="results-content">
+                <!-- 风险提示 -->
+                <div class="risk-disclaimer">
+                  <el-alert
+                    type="warning"
+                    :closable="false"
+                    show-icon
+                  >
+                    <template #title>
+                      <div class="disclaimer-content">
+                        <el-icon class="disclaimer-icon">
+                          <WarningFilled />
+                        </el-icon>
+                        <div class="disclaimer-text">
+                          <p style="margin: 0 0 8px 0;">
+                            <strong>⚠️ 重要风险提示与免责声明</strong>
+                          </p>
+                          <ul style="margin: 0; padding-left: 20px; line-height: 1.8;">
+                            <li><strong>工具性质：</strong>本系统为股票分析辅助工具，使用AI技术对公开市场数据进行分析，不具备证券投资咨询资质。</li>
+                            <li><strong>非投资建议：</strong>所有分析结果、评分、建议仅为技术分析参考，不构成任何买卖建议或投资决策依据。</li>
+                            <li><strong>数据局限性：</strong>分析基于历史数据和公开信息，可能存在延迟、不完整或不准确的情况，无法预测未来市场走势。</li>
+                            <li><strong>投资风险：</strong>股票投资存在市场风险、流动性风险、政策风险等多种风险，可能导致本金损失。</li>
+                            <li><strong>独立决策：</strong>投资者应基于自身风险承受能力、投资目标和财务状况独立做出投资决策。</li>
+                            <li><strong>专业咨询：</strong>重大投资决策建议咨询具有合法资质的专业投资顾问或金融机构。</li>
+                            <li><strong>责任声明：</strong>使用本工具产生的任何投资决策及其后果由投资者自行承担，本系统不承担任何责任。</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </template>
+                  </el-alert>
+                </div>
+
+                <!-- 最终决策 -->
+                <div v-if="analysisResults.decision" class="decision-section">
+                  <h4>🎯 分析参考</h4>
+                  <div class="decision-card">
+                    <div class="decision-main">
+                      <div class="decision-action">
+                        <span class="label">分析倾向:</span>
+                        <el-tag
+                          :type="getActionTagType(analysisResults.decision.action)"
+                          size="large"
+                        >
+                          {{ analysisResults.decision.action }}
+                        </el-tag>
+                        <el-tag type="info" size="small" style="margin-left: 8px;">
+                          仅供参考
+                        </el-tag>
+                      </div>
+
+                      <div class="decision-metrics">
+                        <div class="metric-item">
+                          <span class="label">参考价格:</span>
+                          <span class="value">{{ analysisResults.decision.target_price }}</span>
+                        </div>
+                        <div class="metric-item">
+                          <span class="label">模型置信度:</span>
+                          <span class="value">{{ (analysisResults.decision.confidence * 100).toFixed(1) }}%</span>
+                          <el-tooltip content="基于AI模型计算的置信度，不代表实际投资成功率" placement="top">
+                            <el-icon style="margin-left: 4px; cursor: help;">
+                              <QuestionFilled />
+                            </el-icon>
+                          </el-tooltip>
+                        </div>
+                        <div class="metric-item">
+                          <span class="label">风险评分:</span>
+                          <span class="value">{{ (analysisResults.decision.risk_score * 100).toFixed(1) }}%</span>
+                          <el-tooltip content="基于历史数据的风险评估，实际风险可能更高" placement="top">
+                            <el-icon style="margin-left: 4px; cursor: help;">
+                              <QuestionFilled />
+                            </el-icon>
+                          </el-tooltip>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="decision-reasoning">
+                      <h5>分析依据:</h5>
+                      <p>{{ analysisResults.decision.reasoning }}</p>
+                      <el-alert type="info" :closable="false" style="margin-top: 12px;">
+                        <template #default>
+                          <span style="font-size: 13px;">💡 以上分析基于AI模型对历史数据的处理，不构成投资建议，请结合自身情况独立决策。</span>
+                        </template>
+                      </el-alert>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 分析概览 -->
+                <div v-if="analysisResults" class="overview-section">
+                  <h4>📊 分析概览</h4>
+                  <div class="overview-card">
+                    <div v-if="analysisResults.summary" class="overview-summary">
+                      <h5>分析摘要:</h5>
+                      <p>{{ analysisResults.summary }}</p>
+                    </div>
+
+                    <div v-if="analysisResults.recommendation" class="overview-recommendation">
+                      <h5>投资建议:</h5>
+                      <p>{{ analysisResults.recommendation }}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 详细分析报告 -->
+                <div v-if="analysisResults.state || analysisResults.reports" class="reports-section">
+                  <h4>📋 详细分析报告</h4>
+
+                  <!-- 美观的标签页展示 -->
+                  <div class="analysis-tabs-container">
+                    <el-tabs
+                      :key="analysisResults?.id || 'default'"
+                      v-model="activeReportTab"
+                      type="card"
+                      class="analysis-tabs"
+                      tab-position="top"
+                    >
+                      <el-tab-pane
+                        v-for="(report, key) in getAnalysisReports(analysisResults)"
+                        :key="key"
+                        :name="key.toString()"
+                        :label="report.title"
+                        class="report-tab-pane"
+                      >
+                        <!-- 标签页内容头部 -->
+                        <div class="report-header">
+                          <div class="report-title">
+                            <span class="report-icon">{{ getReportIcon(report.title) }}</span>
+                            <span class="report-name">{{ getReportName(report.title) }}</span>
+                          </div>
+                          <div class="report-description">
+                            {{ getReportDescription(report.title) }}
+                          </div>
+                        </div>
+
+                        <!-- 报告内容 -->
+                        <div class="report-content-wrapper">
+                          <div
+                            v-if="report.content"
+                            class="report-content"
+                            v-html="formatReportContent(report.content)"
+                          />
+                          <div v-else class="no-content">
+                            <el-empty description="暂无内容" />
+                          </div>
+                        </div>
+                      </el-tab-pane>
+                    </el-tabs>
+                  </div>
+                </div>
+
+                <!-- 操作按钮 -->
+                <div class="result-actions">
+                  <el-button type="success" @click="goSimOrder">
+                    <el-icon><CreditCard /></el-icon>
+                    一键模拟下单
+                  </el-button>
+                  <el-dropdown trigger="click" @command="downloadReport">
+                    <el-button type="primary">
+                      <el-icon><Download /></el-icon>
+                      下载报告
+                      <el-icon class="el-icon--right">
+                        <ArrowDown />
+                      </el-icon>
+                    </el-button>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item command="markdown">
+                          <el-icon><Document /></el-icon> Markdown
+                        </el-dropdown-item>
+                        <el-dropdown-item command="docx">
+                          <el-icon><Document /></el-icon> Word 文档
+                        </el-dropdown-item>
+                        <el-dropdown-item command="pdf">
+                          <el-icon><Document /></el-icon> PDF
+                        </el-dropdown-item>
+                        <el-dropdown-item command="json" divided>
+                          <el-icon><Document /></el-icon> JSON (原始数据)
+                        </el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
+                </div>
+
+                <!-- 风险提示 -->
+                <el-alert
+                  type="warning"
+                  :closable="false"
+                  show-icon
+                  class="risk-disclaimer"
+                >
+                  <template #title>
+                    <span style="font-weight: bold;">报告依据真实交易数据使用AI分析生成，仅供参考，不构成任何投资建议。市场有风险，投资需谨慎。</span>
+                  </template>
+                </el-alert>
+              </div>
+            </el-card>
+          </el-col>
+        </el-row>
+      </div>
+    </div>
+  </div>
+</template>
 
 <style lang="scss" scoped>
 .single-analysis {

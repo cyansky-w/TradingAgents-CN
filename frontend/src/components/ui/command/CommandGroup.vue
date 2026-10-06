@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 import { provideCommandGroupContext, useCommand } from '.'
 
 const props = defineProps<ListboxGroupProps & {
-  class?: HTMLAttributes["class"]
+  class?: HTMLAttributes['class']
   heading?: string
 }>()
 

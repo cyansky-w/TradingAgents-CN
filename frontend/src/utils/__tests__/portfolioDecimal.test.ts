@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 
 import { formatDecimal, multiplyDecimal, quantityStep } from '../portfolioDecimal'
 
-
 describe('portfolio decimal helpers', () => {
   it('multiplies crypto values without Number rounding', () => {
     expect(multiplyDecimal('65000.1234', '0.00125')).toBe('81.25015425')

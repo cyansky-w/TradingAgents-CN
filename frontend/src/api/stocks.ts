@@ -1,9 +1,9 @@
 import { ApiClient } from './request'
 
 export interface QuoteResponse {
-  symbol: string  // 主字段：6位股票代码
-  code?: string   // 兼容字段（已废弃）
-  full_symbol?: string  // 完整代码（如 000001.SZ）
+  symbol: string // 主字段：6位股票代码
+  code?: string // 兼容字段（已废弃）
+  full_symbol?: string // 完整代码（如 000001.SZ）
   name?: string
   market?: string
   price?: number
@@ -11,34 +11,34 @@ export interface QuoteResponse {
   amount?: number
   prev_close?: number
   turnover_rate?: number
-  amplitude?: number  // 振幅（替代量比）
+  amplitude?: number // 振幅（替代量比）
   trade_date?: string
   updated_at?: string
 }
 
 export interface FundamentalsResponse {
-  symbol: string  // 主字段：6位股票代码
-  code?: string   // 兼容字段（已废弃）
-  full_symbol?: string  // 完整代码（如 000001.SZ）
+  symbol: string // 主字段：6位股票代码
+  code?: string // 兼容字段（已废弃）
+  full_symbol?: string // 完整代码（如 000001.SZ）
   name?: string
   industry?: string
   market?: string
-  sector?: string  // 板块
+  sector?: string // 板块
   pe?: number
   pb?: number
-  ps?: number      // 🔥 新增：市销率
+  ps?: number // 🔥 新增：市销率
   pe_ttm?: number
   pb_mrq?: number
-  ps_ttm?: number  // 🔥 新增：市销率（TTM）
+  ps_ttm?: number // 🔥 新增：市销率（TTM）
   roe?: number
-  debt_ratio?: number  // 🔥 新增：负债率
+  debt_ratio?: number // 🔥 新增：负债率
   total_mv?: number
   circ_mv?: number
   turnover_rate?: number
   volume_ratio?: number
-  pe_is_realtime?: boolean  // PE是否为实时数据
-  pe_source?: string        // PE数据来源
-  pe_updated_at?: string    // PE更新时间
+  pe_is_realtime?: boolean // PE是否为实时数据
+  pe_source?: string // PE数据来源
+  pe_updated_at?: string // PE更新时间
   updated_at?: string
 }
 
@@ -53,11 +53,11 @@ export interface KlineBar {
 }
 
 export interface KlineResponse {
-  symbol: string  // 主字段：6位股票代码
-  code?: string   // 兼容字段（已废弃）
-  period: 'day'|'week'|'month'|'5m'|'15m'|'30m'|'60m'
+  symbol: string // 主字段：6位股票代码
+  code?: string // 兼容字段（已废弃）
+  period: 'day' | 'week' | 'month' | '5m' | '15m' | '30m' | '60m'
   limit: number
-  adj: 'none'|'qfq'|'hfq'
+  adj: 'none' | 'qfq' | 'hfq'
   source?: string
   items: KlineBar[]
 }
@@ -71,8 +71,8 @@ export interface NewsItem {
 }
 
 export interface NewsResponse {
-  symbol: string  // 主字段：6位股票代码
-  code?: string   // 兼容字段（已废弃）
+  symbol: string // 主字段：6位股票代码
+  code?: string // 兼容字段（已废弃）
   days: number
   limit: number
   include_announcements: boolean
@@ -119,4 +119,3 @@ export const stocksApi = {
     return ApiClient.get<NewsResponse>(`/api/stocks/${symbol}/news`, { days, limit, include_announcements: includeAnnouncements })
   }
 }
-

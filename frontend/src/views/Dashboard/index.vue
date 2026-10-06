@@ -1,324 +1,27 @@
-<template>
-  <div class="dashboard">
-    <!-- 欢迎区域 -->
-    <div class="welcome-section">
-      <div class="welcome-content">
-        <h1 class="welcome-title">
-          欢迎使用 TradingAgents-CN
-          <span class="version-badge">v1.0.1</span>
-        </h1>
-        <p class="welcome-subtitle">
-          现代化的多智能体股票分析学习平台，辅助你掌握更全面的市场视角分析股票
-        </p>
-      </div>
-      <div class="welcome-actions">
-        <el-button type="primary" size="large" @click="quickAnalysis">
-          <el-icon><TrendCharts /></el-icon>
-          快速分析
-        </el-button>
-        <el-button size="large" @click="goToScreening">
-          <el-icon><Search /></el-icon>
-          股票筛选
-        </el-button>
-      </div>
-    </div>
-
-
-    <!-- 学习中心推荐卡片 -->
-    <el-card class="learning-highlight-card">
-      <div class="learning-highlight">
-        <div class="learning-icon">
-          <el-icon size="48"><Reading /></el-icon>
-        </div>
-        <div class="learning-content">
-          <h2>📚 AI股票分析学习中心</h2>
-          <p>从零开始学习AI、大语言模型和智能股票分析。了解多智能体系统如何协作分析股票，掌握提示词工程技巧，选择合适的大模型，理解AI的能力与局限性。</p>
-          <div class="learning-features">
-            <span class="feature-tag">🤖 AI基础知识</span>
-            <span class="feature-tag">✍️ 提示词工程</span>
-            <span class="feature-tag">🎯 模型选择</span>
-            <span class="feature-tag">📊 分析原理</span>
-            <span class="feature-tag">⚠️ 风险认知</span>
-            <span class="feature-tag">🎓 实战教程</span>
-          </div>
-        </div>
-        <div class="learning-action">
-          <el-button type="primary" size="large" @click="goToLearning">
-            <el-icon><Reading /></el-icon>
-            开始学习
-          </el-button>
-        </div>
-      </div>
-    </el-card>
-
-    <!-- 主要功能区域 -->
-    <el-row :gutter="24" class="main-content">
-      <!-- 左侧：快速操作 -->
-      <el-col :span="16">
-        <el-card class="quick-actions-card" header="快速操作">
-          <div class="quick-actions">
-            <div class="action-item" @click="goToSingleAnalysis">
-              <div class="action-icon">
-                <el-icon><Document /></el-icon>
-              </div>
-              <div class="action-content">
-                <h3>单股分析</h3>
-                <p>深度分析单只股票的投资价值</p>
-              </div>
-              <el-icon class="action-arrow"><ArrowRight /></el-icon>
-            </div>
-
-            <div class="action-item" @click="goToBatchAnalysis">
-              <div class="action-icon">
-                <el-icon><Files /></el-icon>
-              </div>
-              <div class="action-content">
-                <h3>批量分析</h3>
-                <p>同时分析多只股票，提高效率</p>
-              </div>
-              <el-icon class="action-arrow"><ArrowRight /></el-icon>
-            </div>
-
-            <div class="action-item" @click="goToScreening">
-              <div class="action-icon">
-                <el-icon><Search /></el-icon>
-              </div>
-              <div class="action-content">
-                <h3>股票筛选</h3>
-                <p>通过多维度条件筛选优质股票</p>
-              </div>
-              <el-icon class="action-arrow"><ArrowRight /></el-icon>
-            </div>
-
-            <div class="action-item" @click="goToQueue">
-              <div class="action-icon">
-                <el-icon><List /></el-icon>
-              </div>
-              <div class="action-content">
-                <h3>任务中心</h3>
-                <p>查看和管理分析任务列表</p>
-              </div>
-              <el-icon class="action-arrow"><ArrowRight /></el-icon>
-            </div>
-          </div>
-        </el-card>
-
-        <!-- 最近分析 -->
-        <el-card class="recent-analyses-card" header="最近分析" style="margin-top: 24px;">
-          <el-table :data="recentAnalyses" style="width: 100%">
-            <el-table-column prop="stock_code" label="股票代码" width="120" />
-            <el-table-column prop="stock_name" label="股票名称" width="150" />
-            <el-table-column prop="status" label="状态" width="100">
-              <template #default="{ row }">
-                <el-tag :type="getStatusType(row.status)">
-                  {{ getStatusText(row.status) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="start_time" label="创建时间" width="180">
-              <template #default="{ row }">
-                {{ formatTime(row.start_time) }}
-              </template>
-            </el-table-column>
-            <el-table-column label="操作">
-              <template #default="{ row }">
-                <el-button type="text" size="small" @click="viewAnalysis(row)">
-                  查看
-                </el-button>
-                <el-button
-                  v-if="row.status === 'completed'"
-                  type="text"
-                  size="small"
-                  @click="downloadReport(row)"
-                >
-                  下载
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-
-          <div class="table-footer">
-            <el-button type="text" @click="goToHistory">
-              查看全部历史 <el-icon><ArrowRight /></el-icon>
-            </el-button>
-          </div>
-        </el-card>
-
-        <!-- 市场快讯 -->
-        <el-card class="market-news-card" style="margin-top: 24px;">
-          <template #header>
-            <span>市场快讯</span>
-          </template>
-          <div v-if="marketNews.length > 0" class="news-list">
-            <div
-              v-for="news in marketNews"
-              :key="news.id"
-              class="news-item"
-              @click="openNewsUrl(news.url)"
-            >
-              <div class="news-title">{{ news.title }}</div>
-              <div class="news-time">{{ formatTime(news.time) }}</div>
-            </div>
-          </div>
-          <div v-else class="empty-state">
-            <el-icon class="empty-icon"><InfoFilled /></el-icon>
-            <p>暂无市场快讯</p>
-          </div>
-        </el-card>
-      </el-col>
-
-      <!-- 右侧：自选股和快讯 -->
-      <el-col :span="8">
-        <!-- 我的自选股 -->
-        <el-card class="favorites-card">
-          <template #header>
-            <div class="card-header">
-              <span>我的自选股</span>
-              <el-button type="text" size="small" @click="goToFavorites">
-                查看全部 <el-icon><ArrowRight /></el-icon>
-              </el-button>
-            </div>
-          </template>
-
-          <div v-if="favoriteStocks.length === 0" class="empty-favorites">
-            <el-empty description="暂无自选股" :image-size="60">
-              <el-button type="primary" size="small" @click="goToFavorites">
-                添加自选股
-              </el-button>
-            </el-empty>
-          </div>
-
-          <div v-else class="favorites-list">
-            <div
-              v-for="stock in favoriteStocks.slice(0, 5)"
-              :key="stock.stock_code"
-              class="favorite-item"
-              @click="viewStockDetail(stock)"
-            >
-              <div class="stock-info">
-                <div class="stock-code">{{ stock.stock_code }}</div>
-                <div class="stock-name">{{ stock.stock_name }}</div>
-              </div>
-              <div class="stock-price">
-                <div class="current-price">¥{{ stock.current_price }}</div>
-                <div
-                  class="change-percent"
-                  :class="getPriceChangeClass(stock.change_percent)"
-                >
-                  {{ stock.change_percent > 0 ? '+' : '' }}{{ Number(stock.change_percent).toFixed(2) }}%
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div v-if="favoriteStocks.length > 5" class="favorites-footer">
-            <el-button type="text" size="small" @click="goToFavorites">
-              查看全部 {{ favoriteStocks.length }} 只自选股
-            </el-button>
-          </div>
-        </el-card>
-
-        <!-- 模拟交易账户 -->
-        <el-card class="paper-trading-card" style="margin-top: 24px;">
-          <template #header>
-            <div class="card-header">
-              <span>模拟交易账户</span>
-              <el-button type="text" size="small" @click="goToPaperTrading">
-                查看详情 <el-icon><ArrowRight /></el-icon>
-              </el-button>
-            </div>
-          </template>
-
-          <div v-if="paperAccount" class="paper-account-info">
-            <!-- A股账户 -->
-            <div class="account-section">
-              <div class="account-section-title">🇨🇳 A股账户</div>
-              <div class="account-item">
-                <div class="account-label">现金</div>
-                <div class="account-value">¥{{ formatMoney(getCurrencyAmount(paperAccount.cash, 'CNY')) }}</div>
-              </div>
-              <div class="account-item">
-                <div class="account-label">持仓市值</div>
-                <div class="account-value">¥{{ formatMoney(getCurrencyAmount(paperAccount.positions_value, 'CNY')) }}</div>
-              </div>
-              <div class="account-item">
-                <div class="account-label">总资产</div>
-                <div class="account-value primary">¥{{ formatMoney(getCurrencyAmount(paperAccount.equity, 'CNY')) }}</div>
-              </div>
-            </div>
-
-            <!-- 港股账户 -->
-            <div class="account-section" v-if="typeof paperAccount.cash !== 'number' && paperAccount.cash?.HKD !== undefined">
-              <div class="account-section-title">🇭🇰 港股账户</div>
-              <div class="account-item">
-                <div class="account-label">现金</div>
-                <div class="account-value">HK${{ formatMoney(getCurrencyAmount(paperAccount.cash, 'HKD')) }}</div>
-              </div>
-              <div class="account-item">
-                <div class="account-label">持仓市值</div>
-                <div class="account-value">HK${{ formatMoney(getCurrencyAmount(paperAccount.positions_value, 'HKD')) }}</div>
-              </div>
-              <div class="account-item">
-                <div class="account-label">总资产</div>
-                <div class="account-value primary">HK${{ formatMoney(getCurrencyAmount(paperAccount.equity, 'HKD')) }}</div>
-              </div>
-            </div>
-
-            <!-- 美股账户 -->
-            <div class="account-section" v-if="typeof paperAccount.cash !== 'number' && paperAccount.cash?.USD !== undefined">
-              <div class="account-section-title">🇺🇸 美股账户</div>
-              <div class="account-item">
-                <div class="account-label">现金</div>
-                <div class="account-value">${{ formatMoney(getCurrencyAmount(paperAccount.cash, 'USD')) }}</div>
-              </div>
-              <div class="account-item">
-                <div class="account-label">持仓市值</div>
-                <div class="account-value">${{ formatMoney(getCurrencyAmount(paperAccount.positions_value, 'USD')) }}</div>
-              </div>
-              <div class="account-item">
-                <div class="account-label">总资产</div>
-                <div class="account-value primary">${{ formatMoney(getCurrencyAmount(paperAccount.equity, 'USD')) }}</div>
-              </div>
-            </div>
-          </div>
-
-          <div v-else class="empty-state">
-            <el-icon class="empty-icon"><InfoFilled /></el-icon>
-            <p>暂无账户信息</p>
-            <el-button type="primary" size="small" @click="goToPaperTrading">
-              查看模拟交易
-            </el-button>
-          </div>
-        </el-card>
-
-        <!-- 多数据源同步 -->
-        <MultiSourceSyncCard style="margin-top: 24px;" />
-      </el-col>
-    </el-row>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
+import type { PaperAccountSummary } from '@/api/paper'
+import type { AnalysisStatus, AnalysisTask } from '@/types/analysis'
 import {
-  TrendCharts,
-  Search,
+  ArrowRight,
   Document,
   Files,
-  List,
-  ArrowRight,
   InfoFilled,
-  Reading
+  List,
+  Reading,
+  Search,
+  TrendCharts
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import type { AnalysisTask, AnalysisStatus } from '@/types/analysis'
-import MultiSourceSyncCard from '@/components/Dashboard/MultiSourceSyncCard.vue'
-import { favoritesApi } from '@/api/favorites'
+import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { analysisApi } from '@/api/analysis'
+import { favoritesApi } from '@/api/favorites'
 import { newsApi } from '@/api/news'
-import { paperApi, type PaperAccountSummary } from '@/api/paper'
+import { paperApi } from '@/api/paper'
+import MultiSourceSyncCard from '@/components/Dashboard/MultiSourceSyncCard.vue'
+import { useAuthStore } from '@/stores/auth'
+
+import { formatDateTime } from '@/utils/datetime'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -344,15 +47,14 @@ const marketNews = ref<any[]>([])
 const paperAccount = ref<PaperAccountSummary | null>(null)
 
 const getCurrencyAmount = (
-  amount: number | { CNY: number; HKD: number; USD: number } | undefined,
+  amount: number | { CNY: number, HKD: number, USD: number } | undefined,
   currency: 'CNY' | 'HKD' | 'USD',
   fallback = 0
 ): number => {
-  if (typeof amount === 'number') return amount
+  if (typeof amount === 'number')
+    return amount
   return amount?.[currency] ?? fallback
 }
-
-
 
 // 方法
 const quickAnalysis = () => {
@@ -398,7 +100,7 @@ const downloadReport = async (analysis: AnalysisTask) => {
     const reportId = analysis.task_id
     const res = await fetch(`/api/reports/${reportId}/download?format=markdown`, {
       headers: {
-        'Authorization': `Bearer ${authStore.token}`
+        Authorization: `Bearer ${authStore.token}`
       }
     })
     if (!res.ok) {
@@ -414,7 +116,7 @@ const downloadReport = async (analysis: AnalysisTask) => {
     const code = (analysis as any).stock_code || (analysis as any).stock_symbol || 'stock'
     const dateStr = (analysis as any).analysis_date || (analysis as any).start_time || ''
     // 🔥 统一文件名格式：{code}_分析报告_{date}.md
-    a.download = `${code}_分析报告_${String(dateStr).slice(0,10)}.md`
+    a.download = `${code}_分析报告_${String(dateStr).slice(0, 10)}.md`
     document.body.appendChild(a)
     a.click()
     window.URL.revokeObjectURL(url)
@@ -458,8 +160,6 @@ const getStatusText = (status: string | AnalysisStatus) => {
   return statusMap[status] || String(status)
 }
 
-import { formatDateTime } from '@/utils/datetime'
-
 const formatTime = (time: string) => {
   return formatDateTime(time)
 }
@@ -475,8 +175,10 @@ const viewStockDetail = (stock: any) => {
 }
 
 const getPriceChangeClass = (changePercent: number) => {
-  if (changePercent > 0) return 'price-up'
-  if (changePercent < 0) return 'price-down'
+  if (changePercent > 0)
+    return 'price-up'
+  if (changePercent < 0)
+    return 'price-down'
   return 'price-neutral'
 }
 
@@ -581,6 +283,371 @@ onMounted(async () => {
   await loadPaperAccount()
 })
 </script>
+
+<template>
+  <div class="dashboard">
+    <!-- 欢迎区域 -->
+    <div class="welcome-section">
+      <div class="welcome-content">
+        <h1 class="welcome-title">
+          欢迎使用 TradingAgents-CN
+          <span class="version-badge">v1.0.1</span>
+        </h1>
+        <p class="welcome-subtitle">
+          现代化的多智能体股票分析学习平台，辅助你掌握更全面的市场视角分析股票
+        </p>
+      </div>
+      <div class="welcome-actions">
+        <el-button type="primary" size="large" @click="quickAnalysis">
+          <el-icon><TrendCharts /></el-icon>
+          快速分析
+        </el-button>
+        <el-button size="large" @click="goToScreening">
+          <el-icon><Search /></el-icon>
+          股票筛选
+        </el-button>
+      </div>
+    </div>
+
+    <!-- 学习中心推荐卡片 -->
+    <el-card class="learning-highlight-card">
+      <div class="learning-highlight">
+        <div class="learning-icon">
+          <el-icon size="48">
+            <Reading />
+          </el-icon>
+        </div>
+        <div class="learning-content">
+          <h2>📚 AI股票分析学习中心</h2>
+          <p>从零开始学习AI、大语言模型和智能股票分析。了解多智能体系统如何协作分析股票，掌握提示词工程技巧，选择合适的大模型，理解AI的能力与局限性。</p>
+          <div class="learning-features">
+            <span class="feature-tag">🤖 AI基础知识</span>
+            <span class="feature-tag">✍️ 提示词工程</span>
+            <span class="feature-tag">🎯 模型选择</span>
+            <span class="feature-tag">📊 分析原理</span>
+            <span class="feature-tag">⚠️ 风险认知</span>
+            <span class="feature-tag">🎓 实战教程</span>
+          </div>
+        </div>
+        <div class="learning-action">
+          <el-button type="primary" size="large" @click="goToLearning">
+            <el-icon><Reading /></el-icon>
+            开始学习
+          </el-button>
+        </div>
+      </div>
+    </el-card>
+
+    <!-- 主要功能区域 -->
+    <el-row :gutter="24" class="main-content">
+      <!-- 左侧：快速操作 -->
+      <el-col :span="16">
+        <el-card class="quick-actions-card" header="快速操作">
+          <div class="quick-actions">
+            <div class="action-item" @click="goToSingleAnalysis">
+              <div class="action-icon">
+                <el-icon><Document /></el-icon>
+              </div>
+              <div class="action-content">
+                <h3>单股分析</h3>
+                <p>深度分析单只股票的投资价值</p>
+              </div>
+              <el-icon class="action-arrow">
+                <ArrowRight />
+              </el-icon>
+            </div>
+
+            <div class="action-item" @click="goToBatchAnalysis">
+              <div class="action-icon">
+                <el-icon><Files /></el-icon>
+              </div>
+              <div class="action-content">
+                <h3>批量分析</h3>
+                <p>同时分析多只股票，提高效率</p>
+              </div>
+              <el-icon class="action-arrow">
+                <ArrowRight />
+              </el-icon>
+            </div>
+
+            <div class="action-item" @click="goToScreening">
+              <div class="action-icon">
+                <el-icon><Search /></el-icon>
+              </div>
+              <div class="action-content">
+                <h3>股票筛选</h3>
+                <p>通过多维度条件筛选优质股票</p>
+              </div>
+              <el-icon class="action-arrow">
+                <ArrowRight />
+              </el-icon>
+            </div>
+
+            <div class="action-item" @click="goToQueue">
+              <div class="action-icon">
+                <el-icon><List /></el-icon>
+              </div>
+              <div class="action-content">
+                <h3>任务中心</h3>
+                <p>查看和管理分析任务列表</p>
+              </div>
+              <el-icon class="action-arrow">
+                <ArrowRight />
+              </el-icon>
+            </div>
+          </div>
+        </el-card>
+
+        <!-- 最近分析 -->
+        <el-card class="recent-analyses-card" header="最近分析" style="margin-top: 24px;">
+          <el-table :data="recentAnalyses" style="width: 100%">
+            <el-table-column prop="stock_code" label="股票代码" width="120" />
+            <el-table-column prop="stock_name" label="股票名称" width="150" />
+            <el-table-column prop="status" label="状态" width="100">
+              <template #default="{ row }">
+                <el-tag :type="getStatusType(row.status)">
+                  {{ getStatusText(row.status) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="start_time" label="创建时间" width="180">
+              <template #default="{ row }">
+                {{ formatTime(row.start_time) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="操作">
+              <template #default="{ row }">
+                <el-button type="text" size="small" @click="viewAnalysis(row)">
+                  查看
+                </el-button>
+                <el-button
+                  v-if="row.status === 'completed'"
+                  type="text"
+                  size="small"
+                  @click="downloadReport(row)"
+                >
+                  下载
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <div class="table-footer">
+            <el-button type="text" @click="goToHistory">
+              查看全部历史 <el-icon><ArrowRight /></el-icon>
+            </el-button>
+          </div>
+        </el-card>
+
+        <!-- 市场快讯 -->
+        <el-card class="market-news-card" style="margin-top: 24px;">
+          <template #header>
+            <span>市场快讯</span>
+          </template>
+          <div v-if="marketNews.length > 0" class="news-list">
+            <div
+              v-for="news in marketNews"
+              :key="news.id"
+              class="news-item"
+              @click="openNewsUrl(news.url)"
+            >
+              <div class="news-title">
+                {{ news.title }}
+              </div>
+              <div class="news-time">
+                {{ formatTime(news.time) }}
+              </div>
+            </div>
+          </div>
+          <div v-else class="empty-state">
+            <el-icon class="empty-icon">
+              <InfoFilled />
+            </el-icon>
+            <p>暂无市场快讯</p>
+          </div>
+        </el-card>
+      </el-col>
+
+      <!-- 右侧：自选股和快讯 -->
+      <el-col :span="8">
+        <!-- 我的自选股 -->
+        <el-card class="favorites-card">
+          <template #header>
+            <div class="card-header">
+              <span>我的自选股</span>
+              <el-button type="text" size="small" @click="goToFavorites">
+                查看全部 <el-icon><ArrowRight /></el-icon>
+              </el-button>
+            </div>
+          </template>
+
+          <div v-if="favoriteStocks.length === 0" class="empty-favorites">
+            <el-empty description="暂无自选股" :image-size="60">
+              <el-button type="primary" size="small" @click="goToFavorites">
+                添加自选股
+              </el-button>
+            </el-empty>
+          </div>
+
+          <div v-else class="favorites-list">
+            <div
+              v-for="stock in favoriteStocks.slice(0, 5)"
+              :key="stock.stock_code"
+              class="favorite-item"
+              @click="viewStockDetail(stock)"
+            >
+              <div class="stock-info">
+                <div class="stock-code">
+                  {{ stock.stock_code }}
+                </div>
+                <div class="stock-name">
+                  {{ stock.stock_name }}
+                </div>
+              </div>
+              <div class="stock-price">
+                <div class="current-price">
+                  ¥{{ stock.current_price }}
+                </div>
+                <div
+                  class="change-percent"
+                  :class="getPriceChangeClass(stock.change_percent)"
+                >
+                  {{ stock.change_percent > 0 ? '+' : '' }}{{ Number(stock.change_percent).toFixed(2) }}%
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="favoriteStocks.length > 5" class="favorites-footer">
+            <el-button type="text" size="small" @click="goToFavorites">
+              查看全部 {{ favoriteStocks.length }} 只自选股
+            </el-button>
+          </div>
+        </el-card>
+
+        <!-- 模拟交易账户 -->
+        <el-card class="paper-trading-card" style="margin-top: 24px;">
+          <template #header>
+            <div class="card-header">
+              <span>模拟交易账户</span>
+              <el-button type="text" size="small" @click="goToPaperTrading">
+                查看详情 <el-icon><ArrowRight /></el-icon>
+              </el-button>
+            </div>
+          </template>
+
+          <div v-if="paperAccount" class="paper-account-info">
+            <!-- A股账户 -->
+            <div class="account-section">
+              <div class="account-section-title">
+                🇨🇳 A股账户
+              </div>
+              <div class="account-item">
+                <div class="account-label">
+                  现金
+                </div>
+                <div class="account-value">
+                  ¥{{ formatMoney(getCurrencyAmount(paperAccount.cash, 'CNY')) }}
+                </div>
+              </div>
+              <div class="account-item">
+                <div class="account-label">
+                  持仓市值
+                </div>
+                <div class="account-value">
+                  ¥{{ formatMoney(getCurrencyAmount(paperAccount.positions_value, 'CNY')) }}
+                </div>
+              </div>
+              <div class="account-item">
+                <div class="account-label">
+                  总资产
+                </div>
+                <div class="account-value primary">
+                  ¥{{ formatMoney(getCurrencyAmount(paperAccount.equity, 'CNY')) }}
+                </div>
+              </div>
+            </div>
+
+            <!-- 港股账户 -->
+            <div v-if="typeof paperAccount.cash !== 'number' && paperAccount.cash?.HKD !== undefined" class="account-section">
+              <div class="account-section-title">
+                🇭🇰 港股账户
+              </div>
+              <div class="account-item">
+                <div class="account-label">
+                  现金
+                </div>
+                <div class="account-value">
+                  HK${{ formatMoney(getCurrencyAmount(paperAccount.cash, 'HKD')) }}
+                </div>
+              </div>
+              <div class="account-item">
+                <div class="account-label">
+                  持仓市值
+                </div>
+                <div class="account-value">
+                  HK${{ formatMoney(getCurrencyAmount(paperAccount.positions_value, 'HKD')) }}
+                </div>
+              </div>
+              <div class="account-item">
+                <div class="account-label">
+                  总资产
+                </div>
+                <div class="account-value primary">
+                  HK${{ formatMoney(getCurrencyAmount(paperAccount.equity, 'HKD')) }}
+                </div>
+              </div>
+            </div>
+
+            <!-- 美股账户 -->
+            <div v-if="typeof paperAccount.cash !== 'number' && paperAccount.cash?.USD !== undefined" class="account-section">
+              <div class="account-section-title">
+                🇺🇸 美股账户
+              </div>
+              <div class="account-item">
+                <div class="account-label">
+                  现金
+                </div>
+                <div class="account-value">
+                  ${{ formatMoney(getCurrencyAmount(paperAccount.cash, 'USD')) }}
+                </div>
+              </div>
+              <div class="account-item">
+                <div class="account-label">
+                  持仓市值
+                </div>
+                <div class="account-value">
+                  ${{ formatMoney(getCurrencyAmount(paperAccount.positions_value, 'USD')) }}
+                </div>
+              </div>
+              <div class="account-item">
+                <div class="account-label">
+                  总资产
+                </div>
+                <div class="account-value primary">
+                  ${{ formatMoney(getCurrencyAmount(paperAccount.equity, 'USD')) }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-else class="empty-state">
+            <el-icon class="empty-icon">
+              <InfoFilled />
+            </el-icon>
+            <p>暂无账户信息</p>
+            <el-button type="primary" size="small" @click="goToPaperTrading">
+              查看模拟交易
+            </el-button>
+          </div>
+        </el-card>
+
+        <!-- 多数据源同步 -->
+        <MultiSourceSyncCard style="margin-top: 24px;" />
+      </el-col>
+    </el-row>
+  </div>
+</template>
 
 <style lang="scss" scoped>
 .dashboard {

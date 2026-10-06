@@ -20,7 +20,8 @@ export function formatDateTime(
   dateStr: string | number | null | undefined,
   options?: Intl.DateTimeFormatOptions
 ): string {
-  if (!dateStr) return '-'
+  if (!dateStr)
+    return '-'
 
   try {
     let timeStr: string
@@ -35,9 +36,9 @@ export function formatDateTime(
     }
 
     // 检查时间字符串是否包含时区信息
-    const hasTimezone = timeStr.endsWith('Z') ||
-                       timeStr.includes('+') ||
-                       timeStr.includes('-', 10) // 日期后面的 - 才是时区标识
+    const hasTimezone = timeStr.endsWith('Z')
+      || timeStr.includes('+')
+      || timeStr.includes('-', 10) // 日期后面的 - 才是时区标识
 
     // 🔥 如果没有时区标识，假定为 UTC+8 时间（后端已经入库为 UTC+8），添加 +08:00 后缀
     // 注意：如果后端已经返回了带时区的时间（如 +08:00 或 Z），这里不会修改
@@ -86,11 +87,12 @@ export function formatDateTime(
  * @returns 格式化后的时间字符串 + 相对时间
  */
 export function formatDateTimeWithRelative(dateStr: string | number | null | undefined): string {
-  if (!dateStr) return '-'
-  
+  if (!dateStr)
+    return '-'
+
   try {
     let timeStr: string
-    
+
     // 处理时间戳
     if (typeof dateStr === 'number') {
       const timestamp = dateStr < 10000000000 ? dateStr * 1000 : dateStr
@@ -98,28 +100,28 @@ export function formatDateTimeWithRelative(dateStr: string | number | null | und
     } else {
       timeStr = String(dateStr).trim()
     }
-    
+
     // 🔥 如果时间字符串没有时区标识，假定为 UTC+8 时间（后端已经入库为 UTC+8），添加 +08:00 后缀
     if (timeStr.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/) && !timeStr.endsWith('Z') && !timeStr.includes('+') && !timeStr.includes('-', 10)) {
       timeStr += '+08:00'
     }
-    
+
     const utcDate = new Date(timeStr)
-    
+
     if (isNaN(utcDate.getTime())) {
       console.warn('无效的时间格式:', dateStr)
       return String(dateStr)
     }
-    
+
     // 获取当前时间
     const now = new Date()
-    
+
     // 计算时间差
     const diff = now.getTime() - utcDate.getTime()
     const days = Math.floor(diff / (1000 * 60 * 60 * 24))
     const hours = Math.floor(diff / (1000 * 60 * 60))
     const minutes = Math.floor(diff / (1000 * 60))
-    
+
     // 格式化为中国本地时间
     const formatted = utcDate.toLocaleString('zh-CN', {
       timeZone: 'Asia/Shanghai',
@@ -131,7 +133,7 @@ export function formatDateTimeWithRelative(dateStr: string | number | null | und
       second: '2-digit',
       hour12: false
     })
-    
+
     // 添加相对时间
     let relative = ''
     if (days > 0) {
@@ -143,8 +145,8 @@ export function formatDateTimeWithRelative(dateStr: string | number | null | und
     } else {
       relative = '（刚刚）'
     }
-    
-    return formatted + ' ' + relative
+
+    return `${formatted} ${relative}`
   } catch (e) {
     console.error('时间格式化错误:', e, dateStr)
     return String(dateStr)
@@ -186,7 +188,8 @@ export function formatTime(dateStr: string | number | null | undefined): string 
  * @returns 相对时间描述
  */
 export function formatRelativeTime(dateStr: string | number | null | undefined): string {
-  if (!dateStr) return '-'
+  if (!dateStr)
+    return '-'
 
   try {
     let timeStr: string

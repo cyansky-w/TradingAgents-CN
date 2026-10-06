@@ -1,3 +1,26 @@
+<script setup lang="ts">
+import { computed } from 'vue'
+
+const props = defineProps<{
+  settings: { timeout?: number, on_failure?: string, retry_count?: number }
+  editing: boolean
+}>()
+
+const emit = defineEmits<{
+  update: [key: string, value: any]
+}>()
+
+const onFailureLabel = computed(() => {
+  const val = props.settings.on_failure || 'notify'
+  const map: Record<string, string> = { notify: '通知', stop: '停止', continue: '继续' }
+  return map[val] || val
+})
+
+function update(key: string, value: any) {
+  emit('update', key, value)
+}
+</script>
+
 <template>
   <div class="config-panel">
     <h4>执行设置</h4>
@@ -21,29 +44,6 @@
     </el-form>
   </div>
 </template>
-
-<script setup lang="ts">
-import { computed } from 'vue'
-
-const props = defineProps<{
-  settings: { timeout?: number; on_failure?: string; retry_count?: number }
-  editing: boolean
-}>()
-
-const emit = defineEmits<{
-  update: [key: string, value: any]
-}>()
-
-const onFailureLabel = computed(() => {
-  const val = props.settings.on_failure || 'notify'
-  const map: Record<string, string> = { notify: '通知', stop: '停止', continue: '继续' }
-  return map[val] || val
-})
-
-function update(key: string, value: any) {
-  emit('update', key, value)
-}
-</script>
 
 <style scoped>
 .config-panel { margin-bottom: 20px; }

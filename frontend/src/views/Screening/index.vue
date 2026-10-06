@@ -1,3 +1,428 @@
+<script setup lang="ts">
+import type { FieldConfigResponse } from '@/api/screening'
+import type { StockInfo } from '@/types/analysis'
+import { Connection, Download, Refresh, Search, Star, TrendCharts, Warning } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { favoritesApi } from '@/api/favorites'
+import { screeningApi } from '@/api/screening'
+import { getCurrentDataSource } from '@/api/sync'
+import { exchangeCodeToMarket, getMarketByStockCode, normalizeMarketForAnalysis } from '@/utils/market'
+
+// 响应式数据
+const screeningLoading = ref(false)
+const hasSearched = ref(false)
+const screeningResults = ref<StockInfo[]>([])
+const selectedStocks = ref<StockInfo[]>([])
+const currentPage = ref(1)
+const pageSize = ref(20)
+
+// 路由 & 自选集
+const router = useRouter()
+const favoriteSet = ref<Set<string>>(new Set())
+
+// 当前数据源
+const currentDataSource = ref<{
+  name: string
+  priority: number
+  description: string
+  token_source?: 'database' | 'env'
+  token_source_display?: string
+} | null>(null)
+
+// 字段配置
+const fieldConfig = ref<FieldConfigResponse | null>(null)
+const fieldsLoading = ref(false)
+
+// 筛选条件
+const filters = reactive({
+  market: 'A股',
+  industry: [] as string[],
+  marketCapRange: '',
+  peRatio: { min: null, max: null },
+  pbRatio: { min: null, max: null },
+  roe: { min: null, max: null },
+  changePercent: { min: null, max: null },
+  volumeLevel: '',
+  technicalPattern: [] as string[]
+})
+
+// 行业选项（动态加载）
+const industryOptions = ref<Array<{ label: string, value: string, count?: number }>>([])
+
+// 计算属性
+const paginatedResults = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return screeningResults.value.slice(start, end)
+})
+
+// 方法
+const performScreening = async () => {
+  screeningLoading.value = true
+  hasSearched.value = true
+
+  try {
+    // 基于用户真实选择构建 conditions（只拼选中的项，不注入默认技术条件）
+    const children: any[] = []
+
+    // 市场类型（仅作为演示，实际后端暂用CN）
+    if (filters.market) {
+      // 可作为 universe 选择；当未实现时可忽略
+    }
+
+    // 行业分类（如果用户选择了行业）
+    if (filters.industry && filters.industry.length > 0) {
+      // 直接使用数据库中的行业名称，无需映射
+      children.push({ field: 'industry', op: 'in', value: filters.industry })
+    }
+
+    // 市值范围映射为区间（单位：亿元 → 转换为万元以匹配后端 market_cap 单位）
+    const capRangeMap: Record<string, [number, number] | null> = {
+      small: [0, 100 * 10000], // <100亿 → < 100*1e4 万元
+      medium: [100 * 10000, 500 * 10000],
+      large: [500 * 10000, Number.MAX_SAFE_INTEGER]
+    }
+    const cap = filters.marketCapRange ? capRangeMap[filters.marketCapRange] : null
+    if (cap) {
+      children.push({ field: 'market_cap', op: 'between', value: cap })
+    }
+    // 市盈率/市净率/ROE 条件（仅当填写任一端时才拼接）
+    if (filters.peRatio.min != null || filters.peRatio.max != null) {
+      const lo = filters.peRatio.min ?? 0
+      const hi = filters.peRatio.max ?? Number.MAX_SAFE_INTEGER
+      children.push({ field: 'pe', op: 'between', value: [lo, hi] })
+    }
+    if (filters.pbRatio.min != null || filters.pbRatio.max != null) {
+      const lo = filters.pbRatio.min ?? 0
+      const hi = filters.pbRatio.max ?? Number.MAX_SAFE_INTEGER
+      children.push({ field: 'pb', op: 'between', value: [lo, hi] })
+    }
+    if (filters.roe.min != null || filters.roe.max != null) {
+      const lo = filters.roe.min ?? 0
+      const hi = filters.roe.max ?? 100
+      children.push({ field: 'roe', op: 'between', value: [lo, hi] })
+    }
+
+    // 涨跌幅条件
+    if (filters.changePercent.min != null || filters.changePercent.max != null) {
+      const lo = filters.changePercent.min ?? -100
+      const hi = filters.changePercent.max ?? 100
+      children.push({ field: 'pct_chg', op: 'between', value: [lo, hi] })
+    }
+
+    // 成交量条件（映射为成交额范围，单位：元）
+    if (filters.volumeLevel) {
+      const volumeRangeMap: Record<string, [number, number]> = {
+        high: [1000000000, Number.MAX_SAFE_INTEGER], // 高成交量：>10亿元
+        medium: [300000000, 1000000000], // 中等成交量：3亿-10亿元
+        low: [0, 300000000] // 低成交量：<3亿元
+      }
+      const volumeRange = volumeRangeMap[filters.volumeLevel]
+      if (volumeRange) {
+        children.push({ field: 'amount', op: 'between', value: volumeRange })
+      }
+    }
+
+    // 明确指定：不加任何技术指标相关条件
+
+    const payload = {
+      market: 'CN' as const,
+      date: undefined,
+      adj: 'qfq' as const,
+      conditions: { logic: 'AND', children },
+      order_by: [{ field: 'market_cap', direction: 'desc' as const }],
+      limit: 500,
+      offset: 0
+    }
+
+    // 调试日志：打印请求payload
+    console.log('🔍 筛选请求 payload:', JSON.stringify(payload, null, 2))
+    console.log('🔍 筛选条件 children:', children)
+
+    const res = await screeningApi.run(payload, { timeout: 120000 })
+    const data = (res as any)?.data || res // ApiClient封装会返回 {success,data} 格式
+    const items = data?.items || []
+
+    // 直接使用后端返回的数据，字段名已统一
+    screeningResults.value = items.map((it: any) => ({
+      symbol: it.symbol || it.code, // 主字段
+      code: it.symbol || it.code, // 兼容字段
+      name: it.name || it.symbol || it.code, // 使用股票名称，如果没有则用代码
+      market: it.market || 'A股',
+      industry: it.industry,
+      area: it.area,
+      board: it.board, // 板块（主板、创业板、科创板等）
+      exchange: it.exchange, // 交易所（上海证券交易所、深圳证券交易所等）
+
+      // 市值信息
+      total_mv: it.total_mv,
+      circ_mv: it.circ_mv,
+
+      // 财务指标
+      pe: it.pe,
+      pb: it.pb,
+      pe_ttm: it.pe_ttm,
+      pb_mrq: it.pb_mrq,
+      roe: it.roe,
+
+      // 交易数据
+      close: it.close,
+      pct_chg: it.pct_chg,
+      amount: it.amount,
+      turnover_rate: it.turnover_rate,
+      volume_ratio: it.volume_ratio,
+
+      // 技术指标
+      ma20: it.ma20,
+      rsi14: it.rsi14,
+      kdj_k: it.kdj_k,
+      kdj_d: it.kdj_d,
+      kdj_j: it.kdj_j,
+      dif: it.dif,
+      dea: it.dea,
+      macd_hist: it.macd_hist
+    }))
+
+    ElMessage.success(`筛选完成，找到 ${screeningResults.value.length} 只股票`)
+  } catch (error) {
+    ElMessage.error('筛选失败，请重试')
+  } finally {
+    screeningLoading.value = false
+  }
+}
+
+const resetFilters = () => {
+  Object.assign(filters, {
+    market: 'A股',
+    industry: [],
+    marketCapRange: '',
+    peRatio: { min: null, max: null },
+    pbRatio: { min: null, max: null },
+    roe: { min: null, max: null },
+    changePercent: { min: null, max: null },
+    volumeLevel: '',
+    technicalPattern: []
+  })
+
+  screeningResults.value = []
+  selectedStocks.value = []
+  hasSearched.value = false
+  currentPage.value = 1
+}
+
+const handleSelectionChange = (selection: StockInfo[]) => {
+  selectedStocks.value = selection
+}
+
+const batchAnalyze = async () => {
+  if (selectedStocks.value.length === 0) {
+    ElMessage.warning('请先选择要分析的股票')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确定要对选中的 ${selectedStocks.value.length} 只股票进行批量分析吗？`,
+      '确认批量分析',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'info'
+      }
+    )
+
+    // 跳转到批量分析页面（携带统一市场参数）
+    router.push({
+      name: 'BatchAnalysis',
+      query: {
+        stocks: selectedStocks.value.map(s => s.code || s.symbol || '').filter(Boolean).join(','),
+        market: normalizeMarketForAnalysis(filters.market)
+      }
+    })
+  } catch {
+    // 用户取消
+  }
+}
+
+const analyzeSingle = (stock: StockInfo) => {
+  const stockCode = stock.code || stock.symbol || ''
+  if (!stockCode)
+    return
+  router.push({
+    name: 'SingleAnalysis',
+    query: {
+      stock: stockCode,
+      market: normalizeMarketForAnalysis((stock as any).market || filters.market)
+    }
+  })
+}
+
+const viewStockDetail = (stock: StockInfo) => {
+  const stockCode = stock.code || stock.symbol || ''
+  if (!stockCode)
+    return
+  // 跳转到股票详情页面
+  router.push({
+    name: 'StockDetail',
+    params: { code: stockCode }
+  })
+}
+
+const isFavorited = (code: string) => favoriteSet.value.has(code)
+
+const toggleFavorite = async (stock: StockInfo) => {
+  try {
+    const code = stock.code || stock.symbol || ''
+    if (!code) {
+      ElMessage.error('股票代码缺失，无法加入自选')
+      return
+    }
+    if (favoriteSet.value.has(code)) {
+      // 取消自选
+      const res = await favoritesApi.remove(code)
+      if ((res as any)?.success === false)
+        throw new Error((res as any)?.message || '取消失败')
+      favoriteSet.value.delete(code)
+      ElMessage.success(`已取消自选：${stock.name || code}`)
+    } else {
+      // 加入自选
+      // 根据股票代码判断市场类型
+      let marketType = 'A股'
+      if ((stock as any).market) {
+        // 如果有 market 字段，尝试转换（可能是交易所代码如 "sz", "sh"）
+        marketType = exchangeCodeToMarket((stock as any).market)
+      } else {
+        // 否则根据股票代码判断
+        marketType = getMarketByStockCode(code)
+      }
+
+      const payload = {
+        symbol: code,
+        stock_code: code, // 兼容字段
+        stock_name: stock.name || code,
+        market: marketType
+      }
+      const res = await favoritesApi.add(payload)
+      if ((res as any)?.success === false)
+        throw new Error((res as any)?.message || '添加失败')
+      favoriteSet.value.add(code)
+      ElMessage.success(`已加入自选：${stock.name || code}`)
+    }
+  } catch (error: any) {
+    ElMessage.error(error?.message || '自选操作失败')
+  }
+}
+
+const exportResults = () => {
+  // 导出筛选结果
+  ElMessage.info('导出功能开发中...')
+}
+
+const getChangeClass = (changePercent: number) => {
+  if (changePercent > 0)
+    return 'text-red'
+  if (changePercent < 0)
+    return 'text-green'
+  return ''
+}
+
+const formatMarketCap = (marketCap: number) => {
+  if (marketCap >= 10000) {
+    return `${(marketCap / 10000).toFixed(2)}万亿`
+  } else {
+    return `${marketCap.toFixed(2)}亿`
+  }
+}
+
+const handleSizeChange = (size: number) => {
+  pageSize.value = size
+  currentPage.value = 1
+}
+
+const handleCurrentChange = (page: number) => {
+  currentPage.value = page
+}
+
+// 获取字段配置
+const loadFieldConfig = async () => {
+  fieldsLoading.value = true
+  try {
+    const response = await screeningApi.getFields()
+    fieldConfig.value = response.data || response
+    console.log('字段配置加载成功:', fieldConfig.value)
+  } catch (error) {
+    console.error('加载字段配置失败:', error)
+    ElMessage.error('加载字段配置失败')
+  } finally {
+    fieldsLoading.value = false
+  }
+}
+
+// 加载行业列表
+const loadIndustries = async () => {
+  try {
+    const response = await screeningApi.getIndustries()
+    const data = response.data || response
+    industryOptions.value = data.industries || []
+    console.log('行业列表加载成功:', industryOptions.value.length, '个行业')
+  } catch (error) {
+    console.error('加载行业列表失败:', error)
+    ElMessage.error('加载行业列表失败')
+    // 如果加载失败，使用默认的行业列表
+    industryOptions.value = [
+      { label: '银行', value: '银行' },
+      { label: '证券', value: '证券' },
+      { label: '保险', value: '保险' },
+      { label: '房地产', value: '房地产' },
+      { label: '医药生物', value: '医药生物' }
+    ]
+  }
+}
+
+// 加载自选列表，初始化 favoriteSet
+const loadFavorites = async () => {
+  try {
+    const resp = await favoritesApi.list()
+    const list = (resp as any)?.data || resp
+    const set = new Set<string>()
+    ;(list || []).forEach((item: any) => {
+      // 兼容新旧字段
+      const code = item.symbol || item.stock_code || item.code
+      if (code)
+        set.add(code)
+    })
+    favoriteSet.value = set
+  } catch (e) {
+    console.warn('加载自选列表失败，可能未登录或接口不可用。', e)
+  }
+}
+
+// 获取当前数据源
+const loadCurrentDataSource = async () => {
+  try {
+    const response = await getCurrentDataSource()
+    if (response.success && response.data) {
+      currentDataSource.value = response.data
+    }
+  } catch (e) {
+    console.warn('获取当前数据源失败', e)
+  }
+}
+
+// 生命周期
+onMounted(() => {
+  // 加载字段配置和行业列表
+  loadFieldConfig()
+  loadIndustries()
+  // 初始化自选状态
+  loadFavorites()
+  // 加载当前数据源
+  loadCurrentDataSource()
+})
+</script>
+
 <template>
   <div class="stock-screening">
     <!-- 页面标题 -->
@@ -18,14 +443,18 @@
           <div style="display: flex; align-items: center; gap: 12px;">
             <span>筛选条件</span>
             <el-tag v-if="currentDataSource" type="info" size="small" effect="plain">
-              <el-icon style="vertical-align: middle; margin-right: 4px;"><Connection /></el-icon>
+              <el-icon style="vertical-align: middle; margin-right: 4px;">
+                <Connection />
+              </el-icon>
               当前数据源: {{ currentDataSource.name }}
               <span v-if="currentDataSource.token_source_display" style="margin-left: 4px; opacity: 0.8;">
                 ({{ currentDataSource.token_source_display }})
               </span>
             </el-tag>
             <el-tag v-else type="warning" size="small">
-              <el-icon style="vertical-align: middle; margin-right: 4px;"><Warning /></el-icon>
+              <el-icon style="vertical-align: middle; margin-right: 4px;">
+                <Warning />
+              </el-icon>
               无可用数据源
             </el-tag>
           </div>
@@ -175,7 +604,7 @@
           </el-col>
 
           <!-- 技术形态暂不实现，先隐藏 -->
-          <el-col :span="8" v-if="false">
+          <el-col v-if="false" :span="8">
             <el-form-item label="技术形态">
               <el-select
                 v-model="filters.technicalPattern"
@@ -198,14 +627,14 @@
             <div class="filter-actions">
               <el-button
                 type="primary"
-                @click="performScreening"
                 :loading="screeningLoading"
                 size="large"
+                @click="performScreening"
               >
                 <el-icon><Search /></el-icon>
                 开始筛选
               </el-button>
-              <el-button @click="resetFilters" size="large">
+              <el-button size="large" @click="resetFilters">
                 重置条件
               </el-button>
             </div>
@@ -222,8 +651,8 @@
           <div class="header-actions">
             <el-button
               type="primary"
-              @click="batchAnalyze"
               :disabled="selectedStocks.length === 0"
+              @click="batchAnalyze"
             >
               <el-icon><TrendCharts /></el-icon>
               批量分析 ({{ selectedStocks.length }})
@@ -239,9 +668,9 @@
       <!-- 结果表格 -->
       <el-table
         :data="paginatedResults"
-        @selection-change="handleSelectionChange"
         stripe
         style="width: 100%"
+        @selection-change="handleSelectionChange"
       >
         <el-table-column type="selection" width="55" />
 
@@ -356,424 +785,6 @@
     </el-empty>
   </div>
 </template>
-
-<script setup lang="ts">
-import { ref, computed, reactive, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, TrendCharts, Download, Star, Connection, Warning } from '@element-plus/icons-vue'
-import type { StockInfo } from '@/types/analysis'
-import { screeningApi, type FieldConfigResponse } from '@/api/screening'
-import { favoritesApi } from '@/api/favorites'
-import { getCurrentDataSource } from '@/api/sync'
-import { normalizeMarketForAnalysis, exchangeCodeToMarket, getMarketByStockCode } from '@/utils/market'
-
-// 响应式数据
-const screeningLoading = ref(false)
-const hasSearched = ref(false)
-const screeningResults = ref<StockInfo[]>([])
-const selectedStocks = ref<StockInfo[]>([])
-const currentPage = ref(1)
-const pageSize = ref(20)
-
-// 路由 & 自选集
-const router = useRouter()
-const favoriteSet = ref<Set<string>>(new Set())
-
-// 当前数据源
-const currentDataSource = ref<{
-  name: string
-  priority: number
-  description: string
-  token_source?: 'database' | 'env'
-  token_source_display?: string
-} | null>(null)
-
-// 字段配置
-const fieldConfig = ref<FieldConfigResponse | null>(null)
-const fieldsLoading = ref(false)
-
-// 筛选条件
-const filters = reactive({
-  market: 'A股',
-  industry: [] as string[],
-  marketCapRange: '',
-  peRatio: { min: null, max: null },
-  pbRatio: { min: null, max: null },
-  roe: { min: null, max: null },
-  changePercent: { min: null, max: null },
-  volumeLevel: '',
-  technicalPattern: [] as string[]
-})
-
-// 行业选项（动态加载）
-const industryOptions = ref<Array<{label: string, value: string, count?: number}>>([])
-
-// 计算属性
-const paginatedResults = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  const end = start + pageSize.value
-  return screeningResults.value.slice(start, end)
-})
-
-// 方法
-const performScreening = async () => {
-  screeningLoading.value = true
-  hasSearched.value = true
-
-  try {
-    // 基于用户真实选择构建 conditions（只拼选中的项，不注入默认技术条件）
-    const children: any[] = []
-
-    // 市场类型（仅作为演示，实际后端暂用CN）
-    if (filters.market) {
-      // 可作为 universe 选择；当未实现时可忽略
-    }
-
-    // 行业分类（如果用户选择了行业）
-    if (filters.industry && filters.industry.length > 0) {
-      // 直接使用数据库中的行业名称，无需映射
-      children.push({ field: 'industry', op: 'in', value: filters.industry })
-    }
-
-    // 市值范围映射为区间（单位：亿元 → 转换为万元以匹配后端 market_cap 单位）
-    const capRangeMap: Record<string, [number, number] | null> = {
-      small: [0, 100 * 10000], // <100亿 → < 100*1e4 万元
-      medium: [100 * 10000, 500 * 10000],
-      large: [500 * 10000, Number.MAX_SAFE_INTEGER],
-    }
-    const cap = filters.marketCapRange ? capRangeMap[filters.marketCapRange] : null
-    if (cap) {
-      children.push({ field: 'market_cap', op: 'between', value: cap })
-    }
-    // 市盈率/市净率/ROE 条件（仅当填写任一端时才拼接）
-    if (filters.peRatio.min != null || filters.peRatio.max != null) {
-      const lo = filters.peRatio.min ?? 0
-      const hi = filters.peRatio.max ?? Number.MAX_SAFE_INTEGER
-      children.push({ field: 'pe', op: 'between', value: [lo, hi] })
-    }
-    if (filters.pbRatio.min != null || filters.pbRatio.max != null) {
-      const lo = filters.pbRatio.min ?? 0
-      const hi = filters.pbRatio.max ?? Number.MAX_SAFE_INTEGER
-      children.push({ field: 'pb', op: 'between', value: [lo, hi] })
-    }
-    if (filters.roe.min != null || filters.roe.max != null) {
-      const lo = filters.roe.min ?? 0
-      const hi = filters.roe.max ?? 100
-      children.push({ field: 'roe', op: 'between', value: [lo, hi] })
-    }
-
-    // 涨跌幅条件
-    if (filters.changePercent.min != null || filters.changePercent.max != null) {
-      const lo = filters.changePercent.min ?? -100
-      const hi = filters.changePercent.max ?? 100
-      children.push({ field: 'pct_chg', op: 'between', value: [lo, hi] })
-    }
-
-    // 成交量条件（映射为成交额范围，单位：元）
-    if (filters.volumeLevel) {
-      const volumeRangeMap: Record<string, [number, number]> = {
-        high: [1000000000, Number.MAX_SAFE_INTEGER],    // 高成交量：>10亿元
-        medium: [300000000, 1000000000],                 // 中等成交量：3亿-10亿元
-        low: [0, 300000000]                              // 低成交量：<3亿元
-      }
-      const volumeRange = volumeRangeMap[filters.volumeLevel]
-      if (volumeRange) {
-        children.push({ field: 'amount', op: 'between', value: volumeRange })
-      }
-    }
-
-    // 明确指定：不加任何技术指标相关条件
-
-    const payload = {
-      market: 'CN' as const,
-      date: undefined,
-      adj: 'qfq' as const,
-      conditions: { logic: 'AND', children },
-      order_by: [{ field: 'market_cap', direction: 'desc' as const }],
-      limit: 500,
-      offset: 0,
-    }
-
-    // 调试日志：打印请求payload
-    console.log('🔍 筛选请求 payload:', JSON.stringify(payload, null, 2))
-    console.log('🔍 筛选条件 children:', children)
-
-    const res = await screeningApi.run(payload, { timeout: 120000 })
-    const data = (res as any)?.data || res // ApiClient封装会返回 {success,data} 格式
-    const items = data?.items || []
-
-    // 直接使用后端返回的数据，字段名已统一
-    screeningResults.value = items.map((it: any) => ({
-      symbol: it.symbol || it.code,  // 主字段
-      code: it.symbol || it.code,    // 兼容字段
-      name: it.name || it.symbol || it.code,  // 使用股票名称，如果没有则用代码
-      market: it.market || 'A股',
-      industry: it.industry,
-      area: it.area,
-      board: it.board,  // 板块（主板、创业板、科创板等）
-      exchange: it.exchange,  // 交易所（上海证券交易所、深圳证券交易所等）
-
-      // 市值信息
-      total_mv: it.total_mv,
-      circ_mv: it.circ_mv,
-
-      // 财务指标
-      pe: it.pe,
-      pb: it.pb,
-      pe_ttm: it.pe_ttm,
-      pb_mrq: it.pb_mrq,
-      roe: it.roe,
-
-      // 交易数据
-      close: it.close,
-      pct_chg: it.pct_chg,
-      amount: it.amount,
-      turnover_rate: it.turnover_rate,
-      volume_ratio: it.volume_ratio,
-
-      // 技术指标
-      ma20: it.ma20,
-      rsi14: it.rsi14,
-      kdj_k: it.kdj_k,
-      kdj_d: it.kdj_d,
-      kdj_j: it.kdj_j,
-      dif: it.dif,
-      dea: it.dea,
-      macd_hist: it.macd_hist,
-    }))
-
-    ElMessage.success(`筛选完成，找到 ${screeningResults.value.length} 只股票`)
-  } catch (error) {
-    ElMessage.error('筛选失败，请重试')
-  } finally {
-    screeningLoading.value = false
-  }
-}
-
-const resetFilters = () => {
-  Object.assign(filters, {
-    market: 'A股',
-    industry: [],
-    marketCapRange: '',
-    peRatio: { min: null, max: null },
-    pbRatio: { min: null, max: null },
-    roe: { min: null, max: null },
-    changePercent: { min: null, max: null },
-    volumeLevel: '',
-    technicalPattern: []
-  })
-
-  screeningResults.value = []
-  selectedStocks.value = []
-  hasSearched.value = false
-  currentPage.value = 1
-}
-
-const handleSelectionChange = (selection: StockInfo[]) => {
-  selectedStocks.value = selection
-}
-
-const batchAnalyze = async () => {
-  if (selectedStocks.value.length === 0) {
-    ElMessage.warning('请先选择要分析的股票')
-    return
-  }
-
-  try {
-    await ElMessageBox.confirm(
-      `确定要对选中的 ${selectedStocks.value.length} 只股票进行批量分析吗？`,
-      '确认批量分析',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'info'
-      }
-    )
-
-    // 跳转到批量分析页面（携带统一市场参数）
-    router.push({
-      name: 'BatchAnalysis',
-      query: {
-        stocks: selectedStocks.value.map(s => s.code || s.symbol || '').filter(Boolean).join(','),
-        market: normalizeMarketForAnalysis(filters.market)
-      }
-    })
-  } catch {
-    // 用户取消
-  }
-}
-
-
-const analyzeSingle = (stock: StockInfo) => {
-  const stockCode = stock.code || stock.symbol || ''
-  if (!stockCode) return
-  router.push({
-    name: 'SingleAnalysis',
-    query: {
-      stock: stockCode,
-      market: normalizeMarketForAnalysis((stock as any).market || filters.market)
-    }
-  })
-}
-
-const viewStockDetail = (stock: StockInfo) => {
-  const stockCode = stock.code || stock.symbol || ''
-  if (!stockCode) return
-  // 跳转到股票详情页面
-  router.push({
-    name: 'StockDetail',
-    params: { code: stockCode }
-  })
-}
-
-const isFavorited = (code: string) => favoriteSet.value.has(code)
-
-const toggleFavorite = async (stock: StockInfo) => {
-  try {
-    const code = stock.code || stock.symbol || ''
-    if (!code) {
-      ElMessage.error('股票代码缺失，无法加入自选')
-      return
-    }
-    if (favoriteSet.value.has(code)) {
-      // 取消自选
-      const res = await favoritesApi.remove(code)
-      if ((res as any)?.success === false) throw new Error((res as any)?.message || '取消失败')
-      favoriteSet.value.delete(code)
-      ElMessage.success(`已取消自选：${stock.name || code}`)
-    } else {
-      // 加入自选
-      // 根据股票代码判断市场类型
-      let marketType = 'A股'
-      if ((stock as any).market) {
-        // 如果有 market 字段，尝试转换（可能是交易所代码如 "sz", "sh"）
-        marketType = exchangeCodeToMarket((stock as any).market)
-      } else {
-        // 否则根据股票代码判断
-        marketType = getMarketByStockCode(code)
-      }
-
-      const payload = {
-        symbol: code,
-        stock_code: code,  // 兼容字段
-        stock_name: stock.name || code,
-        market: marketType
-      }
-      const res = await favoritesApi.add(payload)
-      if ((res as any)?.success === false) throw new Error((res as any)?.message || '添加失败')
-      favoriteSet.value.add(code)
-      ElMessage.success(`已加入自选：${stock.name || code}`)
-    }
-  } catch (error: any) {
-    ElMessage.error(error?.message || '自选操作失败')
-  }
-}
-
-const exportResults = () => {
-  // 导出筛选结果
-  ElMessage.info('导出功能开发中...')
-}
-
-const getChangeClass = (changePercent: number) => {
-  if (changePercent > 0) return 'text-red'
-  if (changePercent < 0) return 'text-green'
-  return ''
-}
-
-const formatMarketCap = (marketCap: number) => {
-  if (marketCap >= 10000) {
-    return `${(marketCap / 10000).toFixed(2)}万亿`
-  } else {
-    return `${marketCap.toFixed(2)}亿`
-  }
-}
-
-const handleSizeChange = (size: number) => {
-  pageSize.value = size
-  currentPage.value = 1
-}
-
-const handleCurrentChange = (page: number) => {
-  currentPage.value = page
-}
-
-// 获取字段配置
-const loadFieldConfig = async () => {
-  fieldsLoading.value = true
-  try {
-    const response = await screeningApi.getFields()
-    fieldConfig.value = response.data || response
-    console.log('字段配置加载成功:', fieldConfig.value)
-  } catch (error) {
-    console.error('加载字段配置失败:', error)
-    ElMessage.error('加载字段配置失败')
-  } finally {
-    fieldsLoading.value = false
-  }
-}
-
-// 加载行业列表
-const loadIndustries = async () => {
-  try {
-    const response = await screeningApi.getIndustries()
-    const data = response.data || response
-    industryOptions.value = data.industries || []
-    console.log('行业列表加载成功:', industryOptions.value.length, '个行业')
-  } catch (error) {
-    console.error('加载行业列表失败:', error)
-    ElMessage.error('加载行业列表失败')
-    // 如果加载失败，使用默认的行业列表
-    industryOptions.value = [
-      { label: '银行', value: '银行' },
-      { label: '证券', value: '证券' },
-      { label: '保险', value: '保险' },
-      { label: '房地产', value: '房地产' },
-      { label: '医药生物', value: '医药生物' }
-    ]
-  }
-}
-
-// 加载自选列表，初始化 favoriteSet
-const loadFavorites = async () => {
-  try {
-    const resp = await favoritesApi.list()
-    const list = (resp as any)?.data || resp
-    const set = new Set<string>()
-    ;(list || []).forEach((item: any) => {
-      // 兼容新旧字段
-      const code = item.symbol || item.stock_code || item.code
-      if (code) set.add(code)
-    })
-    favoriteSet.value = set
-  } catch (e) {
-    console.warn('加载自选列表失败，可能未登录或接口不可用。', e)
-  }
-}
-
-// 获取当前数据源
-const loadCurrentDataSource = async () => {
-  try {
-    const response = await getCurrentDataSource()
-    if (response.success && response.data) {
-      currentDataSource.value = response.data
-    }
-  } catch (e) {
-    console.warn('获取当前数据源失败', e)
-  }
-}
-
-// 生命周期
-onMounted(() => {
-  // 加载字段配置和行业列表
-  loadFieldConfig()
-  loadIndustries()
-  // 初始化自选状态
-  loadFavorites()
-  // 加载当前数据源
-  loadCurrentDataSource()
-})
-</script>
 
 <style lang="scss" scoped>
 .stock-screening {

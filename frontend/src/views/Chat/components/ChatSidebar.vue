@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { ElMessage, ElButton, ElPopconfirm } from 'element-plus'
-import { useChatStore } from '@/stores/chat'
-import { agentsApi } from '@/api/agents'
 import type { Agent } from '@/api/agents'
-import { Plus, Delete } from '@element-plus/icons-vue'
+import { Delete, Plus } from '@element-plus/icons-vue'
+import { ElButton, ElMessage, ElPopconfirm } from 'element-plus'
+import { computed, onMounted, ref } from 'vue'
+import { agentsApi } from '@/api/agents'
+import { useChatStore } from '@/stores/chat'
 
 const chatStore = useChatStore()
 
@@ -35,7 +35,7 @@ async function loadChatAgents() {
 
 async function handleNewChat() {
   await chatStore.createConversation({
-    agent_id: selectedAgentId.value || undefined,
+    agent_id: selectedAgentId.value || undefined
   })
 }
 
@@ -53,7 +53,9 @@ async function handleDelete(id: string) {
     <!-- Header -->
     <div class="p-4 border-b border-border space-y-3">
       <div class="flex items-center justify-between">
-        <h2 class="font-semibold text-sm">对话列表</h2>
+        <h2 class="font-semibold text-sm">
+          对话列表
+        </h2>
         <ElButton :icon="Plus" size="small" type="primary" circle @click="handleNewChat" />
       </div>
       <el-select
@@ -78,11 +80,10 @@ async function handleDelete(id: string) {
       <div
         v-for="conv in conversations"
         :key="conv.id"
-        :class="[
-          'group flex items-center gap-2 px-3 py-2.5 rounded-md cursor-pointer text-sm transition-colors',
+        class="group flex items-center gap-2 px-3 py-2.5 rounded-md cursor-pointer text-sm transition-colors" :class="[
           conv.id === activeId
             ? 'bg-accent text-accent-foreground'
-            : 'hover:bg-muted text-foreground'
+            : 'hover:bg-muted text-foreground',
         ]"
         @click="handleSelect(conv.id)"
       >

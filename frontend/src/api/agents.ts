@@ -1,5 +1,5 @@
-import { ApiClient } from './request'
 import type { ApiResponse } from './request'
+import { ApiClient } from './request'
 
 export interface AgentModelConfig {
   provider?: string | null
@@ -110,8 +110,8 @@ export const agentsApi = {
     return await ApiClient.delete<{ id: string }>(`/api/agents/${id}`)
   },
 
-  async toggle(id: string, enabled: boolean): Promise<ApiResponse<{ id: string; enabled: boolean }>> {
-    return await ApiClient.put<{ id: string; enabled: boolean }>(`/api/agents/${id}/toggle`, { enabled })
+  async toggle(id: string, enabled: boolean): Promise<ApiResponse<{ id: string, enabled: boolean }>> {
+    return await ApiClient.put<{ id: string, enabled: boolean }>(`/api/agents/${id}/toggle`, { enabled })
   },
 
   async getTags(): Promise<ApiResponse<string[]>> {

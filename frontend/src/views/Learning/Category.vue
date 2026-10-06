@@ -1,45 +1,7 @@
-<template>
-  <div class="learning-category">
-    <el-page-header @back="goBack" :content="categoryInfo.title">
-      <template #icon>
-        <span class="category-icon">{{ categoryInfo.icon }}</span>
-      </template>
-    </el-page-header>
-
-    <div class="category-content">
-      <div class="category-description">
-        <p>{{ categoryInfo.description }}</p>
-      </div>
-
-      <el-row :gutter="20">
-        <el-col :xs="24" :sm="12" :md="8" v-for="article in articles" :key="article.id">
-          <el-card class="article-card" shadow="hover" @click="openArticle(article.id)">
-            <div class="article-header">
-              <h3>{{ article.title }}</h3>
-              <el-tag :type="article.difficulty" size="small">{{ article.difficultyText }}</el-tag>
-            </div>
-            <p class="article-desc">{{ article.description }}</p>
-            <div class="article-footer">
-              <span class="read-time">
-                <el-icon><Clock /></el-icon>
-                {{ article.readTime }}
-              </span>
-              <span class="views">
-                <el-icon><View /></el-icon>
-                {{ article.views }}
-              </span>
-            </div>
-          </el-card>
-        </el-col>
-      </el-row>
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
+import { Clock, View } from '@element-plus/icons-vue'
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Clock, View } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -241,6 +203,48 @@ const openArticle = (articleId: string) => {
 }
 </script>
 
+<template>
+  <div class="learning-category">
+    <el-page-header :content="categoryInfo.title" @back="goBack">
+      <template #icon>
+        <span class="category-icon">{{ categoryInfo.icon }}</span>
+      </template>
+    </el-page-header>
+
+    <div class="category-content">
+      <div class="category-description">
+        <p>{{ categoryInfo.description }}</p>
+      </div>
+
+      <el-row :gutter="20">
+        <el-col v-for="article in articles" :key="article.id" :xs="24" :sm="12" :md="8">
+          <el-card class="article-card" shadow="hover" @click="openArticle(article.id)">
+            <div class="article-header">
+              <h3>{{ article.title }}</h3>
+              <el-tag :type="article.difficulty" size="small">
+                {{ article.difficultyText }}
+              </el-tag>
+            </div>
+            <p class="article-desc">
+              {{ article.description }}
+            </p>
+            <div class="article-footer">
+              <span class="read-time">
+                <el-icon><Clock /></el-icon>
+                {{ article.readTime }}
+              </span>
+              <span class="views">
+                <el-icon><View /></el-icon>
+                {{ article.views }}
+              </span>
+            </div>
+          </el-card>
+        </el-col>
+      </el-row>
+    </div>
+  </div>
+</template>
+
 <style scoped lang="scss">
 .learning-category {
   padding: 24px;
@@ -368,4 +372,3 @@ const openArticle = (articleId: string) => {
   }
 }
 </style>
-

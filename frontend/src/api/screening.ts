@@ -1,6 +1,6 @@
 import { ApiClient } from './request'
 
-export interface ScreeningOrderBy { field: string; direction: 'asc' | 'desc' }
+export interface ScreeningOrderBy { field: string, direction: 'asc' | 'desc' }
 export interface ScreeningRunReq {
   market?: 'CN'
   date?: string | null
@@ -26,7 +26,7 @@ export interface ScreeningRunItem {
   macd_hist?: number
 }
 
-export interface ScreeningRunResp { total: number; items: ScreeningRunItem[] }
+export interface ScreeningRunResp { total: number, items: ScreeningRunItem[] }
 
 // 筛选字段配置
 export interface FieldInfo {
@@ -61,4 +61,3 @@ export const screeningApi = {
   getFields: () => ApiClient.get<FieldConfigResponse>('/api/screening/fields'),
   getIndustries: () => ApiClient.get<IndustriesResponse>('/api/screening/industries')
 }
-

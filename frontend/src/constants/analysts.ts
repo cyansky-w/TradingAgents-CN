@@ -60,10 +60,10 @@ export const isValidAnalyst = (name: string): boolean => {
 
 // 中文名称到英文ID的映射
 export const ANALYST_NAME_TO_ID_MAP: Record<string, string> = {
-  '市场分析师': 'market',
-  '基本面分析师': 'fundamentals',
-  '新闻分析师': 'news',
-  '社媒分析师': 'social'
+  市场分析师: 'market',
+  基本面分析师: 'fundamentals',
+  新闻分析师: 'news',
+  社媒分析师: 'social'
 }
 
 // 将中文分析师名称转换为英文ID

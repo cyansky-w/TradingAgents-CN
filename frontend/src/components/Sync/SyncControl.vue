@@ -1,196 +1,15 @@
-<template>
-  <div class="sync-control">
-    <el-card class="control-card" shadow="hover">
-      <template #header>
-        <div class="card-header">
-          <el-icon class="header-icon"><Refresh /></el-icon>
-          <span class="header-title">同步控制</span>
-        </div>
-      </template>
-
-      <div class="control-content">
-        <!-- 当前同步状态 -->
-        <div class="sync-status-section">
-          <h4 class="section-title">当前状态</h4>
-          <div class="status-display">
-            <el-tag 
-              :type="getStatusType(syncStatus?.status)"
-              size="large"
-              class="status-tag"
-            >
-              {{ getStatusText(syncStatus?.status) }}
-            </el-tag>
-            <div v-if="syncStatus?.status === 'running'" class="progress-info">
-              <el-progress 
-                :percentage="getProgress()"
-                :status="syncStatus.errors > 0 ? 'warning' : 'success'"
-                :stroke-width="8"
-              />
-              <div class="progress-text">
-                正在同步中... {{ syncStatus.total > 0 ? `${syncStatus.updated + syncStatus.inserted}/${syncStatus.total}` : '' }}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 同步统计 -->
-        <div v-if="syncStatus && syncStatus.status !== 'never_run'" class="sync-stats-section">
-          <h4 class="section-title">同步统计</h4>
-          <div class="stats-grid">
-            <div class="stat-item">
-              <div class="stat-value">{{ syncStatus.total }}</div>
-              <div class="stat-label">总数</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-value success">{{ syncStatus.inserted }}</div>
-              <div class="stat-label">新增</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-value primary">{{ syncStatus.updated }}</div>
-              <div class="stat-label">更新</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-value danger">{{ syncStatus.errors }}</div>
-              <div class="stat-label">错误</div>
-            </div>
-          </div>
-          
-          <!-- 使用的数据源 -->
-          <div v-if="syncStatus.data_sources_used?.length" class="sources-used">
-            <div class="sources-label">使用的数据源:</div>
-            <div class="sources-tags">
-              <el-tag
-                v-for="source in syncStatus.data_sources_used"
-                :key="source"
-                size="small"
-                type="info"
-              >
-                {{ source }}
-              </el-tag>
-            </div>
-          </div>
-
-          <!-- 最后同步时间 -->
-          <div v-if="syncStatus.finished_at" class="sync-time">
-            <div class="time-label">完成时间:</div>
-            <div class="time-value">{{ formatTime(syncStatus.finished_at) }}</div>
-          </div>
-        </div>
-
-        <!-- 同步控制 -->
-        <div class="sync-controls-section">
-          <h4 class="section-title">同步操作</h4>
-          
-          <!-- 数据源选择 -->
-          <div class="source-selection">
-            <el-form :model="syncForm" label-width="120px" size="default">
-              <el-form-item label="优先数据源:">
-                <el-select
-                  v-model="syncForm.preferred_sources"
-                  multiple
-                  placeholder="选择优先使用的数据源（可选）"
-                  style="width: 100%"
-                  clearable
-                >
-                  <el-option
-                    v-for="source in availableSources"
-                    :key="source.name"
-                    :label="source.name.toUpperCase()"
-                    :value="source.name"
-                    :disabled="!source.available"
-                  >
-                    <span>{{ source.name.toUpperCase() }}</span>
-                    <span style="float: right; color: var(--el-text-color-secondary);">
-                      优先级: {{ source.priority }}
-                    </span>
-                  </el-option>
-                </el-select>
-              </el-form-item>
-              
-              <el-form-item label="强制同步:">
-                <el-switch
-                  v-model="syncForm.force"
-                  active-text="是"
-                  inactive-text="否"
-                />
-                <div class="form-help">
-                  强制同步将忽略正在运行的同步任务
-                </div>
-              </el-form-item>
-            </el-form>
-          </div>
-
-          <!-- 操作按钮 -->
-          <div class="action-buttons">
-            <el-button
-              type="primary"
-              size="large"
-              :loading="syncing || syncStatus?.status === 'running'"
-              :disabled="syncStatus?.status === 'running' && !syncForm.force"
-              @click="startSync"
-            >
-              <el-icon><Refresh /></el-icon>
-              {{ getSyncButtonText() }}
-            </el-button>
-            
-            <el-button
-              size="large"
-              :loading="refreshing"
-              @click="refreshStatus"
-            >
-              <el-icon><RefreshRight /></el-icon>
-              刷新状态
-            </el-button>
-            
-            <el-button
-              size="large"
-              type="warning"
-              :loading="clearingCache"
-              @click="clearCache"
-            >
-              <el-icon><Delete /></el-icon>
-              清空缓存
-            </el-button>
-
-            <!-- 临时测试按钮 -->
-
-
-            <el-button
-              size="large"
-              type="success"
-              :loading="syncing"
-              @click="forceSync"
-            >
-              🔄 强制重新同步
-            </el-button>
-          </div>
-        </div>
-
-        <!-- 错误信息 -->
-        <div v-if="syncStatus?.message && syncStatus.status === 'failed'" class="error-section">
-          <el-alert
-            :title="syncStatus.message"
-            type="error"
-            :closable="false"
-            show-icon
-          />
-        </div>
-      </div>
-    </el-card>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import type { DataSourceStatus, SyncStatus } from '@/api/sync'
+import { Delete, Refresh, RefreshRight } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Refresh, RefreshRight, Delete } from '@element-plus/icons-vue'
-import { 
-  getSyncStatus, 
-  runStockBasicsSync, 
+import { onMounted, onUnmounted, reactive, ref } from 'vue'
+import {
   clearSyncCache,
+
   getDataSourcesStatus,
-  type SyncStatus, 
-  type DataSourceStatus 
+  getSyncStatus,
+  runStockBasicsSync
+
 } from '@/api/sync'
 
 type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
@@ -253,14 +72,14 @@ const fetchDataSources = async () => {
 const startSync = async () => {
   try {
     syncing.value = true
-    
+
     const params = {
       force: syncForm.force,
-      preferred_sources: syncForm.preferred_sources.length > 0 
-        ? syncForm.preferred_sources.join(',') 
+      preferred_sources: syncForm.preferred_sources.length > 0
+        ? syncForm.preferred_sources.join(',')
         : undefined
     }
-    
+
     const response = await runStockBasicsSync(params)
     if (response.success) {
       const responseStatus = response.data.status
@@ -312,7 +131,7 @@ const clearCache = async () => {
         type: 'warning'
       }
     )
-    
+
     clearingCache.value = true
     const response = await clearSyncCache()
     if (response.success) {
@@ -473,13 +292,15 @@ const getStatusText = (status?: string) => {
 
 // 获取进度百分比
 const getProgress = () => {
-  if (!syncStatus.value || syncStatus.value.total === 0) return 0
+  if (!syncStatus.value || syncStatus.value.total === 0)
+    return 0
   return Math.round(((syncStatus.value.inserted + syncStatus.value.updated) / syncStatus.value.total) * 100)
 }
 
 // 获取同步按钮文本
 const getSyncButtonText = () => {
-  if (syncing.value) return '启动中...'
+  if (syncing.value)
+    return '启动中...'
 
   const status = syncStatus.value?.status
   if (status === 'running') {
@@ -510,8 +331,6 @@ const formatTime = (isoString: string) => {
   }
 }
 
-
-
 // 强制重新同步
 const forceSync = async () => {
   console.log('🔄 强制重新同步')
@@ -537,7 +356,7 @@ onMounted(async () => {
     fetchSyncStatus(),
     fetchDataSources()
   ])
-  
+
   // 如果正在同步，开始轮询
   if (syncStatus.value?.status === 'running') {
     startStatusPolling()
@@ -550,18 +369,229 @@ onUnmounted(() => {
 })
 </script>
 
+<template>
+  <div class="sync-control">
+    <el-card class="control-card" shadow="hover">
+      <template #header>
+        <div class="card-header">
+          <el-icon class="header-icon">
+            <Refresh />
+          </el-icon>
+          <span class="header-title">同步控制</span>
+        </div>
+      </template>
+
+      <div class="control-content">
+        <!-- 当前同步状态 -->
+        <div class="sync-status-section">
+          <h4 class="section-title">
+            当前状态
+          </h4>
+          <div class="status-display">
+            <el-tag
+              :type="getStatusType(syncStatus?.status)"
+              size="large"
+              class="status-tag"
+            >
+              {{ getStatusText(syncStatus?.status) }}
+            </el-tag>
+            <div v-if="syncStatus?.status === 'running'" class="progress-info">
+              <el-progress
+                :percentage="getProgress()"
+                :status="syncStatus.errors > 0 ? 'warning' : 'success'"
+                :stroke-width="8"
+              />
+              <div class="progress-text">
+                正在同步中... {{ syncStatus.total > 0 ? `${syncStatus.updated + syncStatus.inserted}/${syncStatus.total}` : '' }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 同步统计 -->
+        <div v-if="syncStatus && syncStatus.status !== 'never_run'" class="sync-stats-section">
+          <h4 class="section-title">
+            同步统计
+          </h4>
+          <div class="stats-grid">
+            <div class="stat-item">
+              <div class="stat-value">
+                {{ syncStatus.total }}
+              </div>
+              <div class="stat-label">
+                总数
+              </div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value success">
+                {{ syncStatus.inserted }}
+              </div>
+              <div class="stat-label">
+                新增
+              </div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value primary">
+                {{ syncStatus.updated }}
+              </div>
+              <div class="stat-label">
+                更新
+              </div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value danger">
+                {{ syncStatus.errors }}
+              </div>
+              <div class="stat-label">
+                错误
+              </div>
+            </div>
+          </div>
+
+          <!-- 使用的数据源 -->
+          <div v-if="syncStatus.data_sources_used?.length" class="sources-used">
+            <div class="sources-label">
+              使用的数据源:
+            </div>
+            <div class="sources-tags">
+              <el-tag
+                v-for="source in syncStatus.data_sources_used"
+                :key="source"
+                size="small"
+                type="info"
+              >
+                {{ source }}
+              </el-tag>
+            </div>
+          </div>
+
+          <!-- 最后同步时间 -->
+          <div v-if="syncStatus.finished_at" class="sync-time">
+            <div class="time-label">
+              完成时间:
+            </div>
+            <div class="time-value">
+              {{ formatTime(syncStatus.finished_at) }}
+            </div>
+          </div>
+        </div>
+
+        <!-- 同步控制 -->
+        <div class="sync-controls-section">
+          <h4 class="section-title">
+            同步操作
+          </h4>
+
+          <!-- 数据源选择 -->
+          <div class="source-selection">
+            <el-form :model="syncForm" label-width="120px" size="default">
+              <el-form-item label="优先数据源:">
+                <el-select
+                  v-model="syncForm.preferred_sources"
+                  multiple
+                  placeholder="选择优先使用的数据源（可选）"
+                  style="width: 100%"
+                  clearable
+                >
+                  <el-option
+                    v-for="source in availableSources"
+                    :key="source.name"
+                    :label="source.name.toUpperCase()"
+                    :value="source.name"
+                    :disabled="!source.available"
+                  >
+                    <span>{{ source.name.toUpperCase() }}</span>
+                    <span style="float: right; color: var(--el-text-color-secondary);">
+                      优先级: {{ source.priority }}
+                    </span>
+                  </el-option>
+                </el-select>
+              </el-form-item>
+
+              <el-form-item label="强制同步:">
+                <el-switch
+                  v-model="syncForm.force"
+                  active-text="是"
+                  inactive-text="否"
+                />
+                <div class="form-help">
+                  强制同步将忽略正在运行的同步任务
+                </div>
+              </el-form-item>
+            </el-form>
+          </div>
+
+          <!-- 操作按钮 -->
+          <div class="action-buttons">
+            <el-button
+              type="primary"
+              size="large"
+              :loading="syncing || syncStatus?.status === 'running'"
+              :disabled="syncStatus?.status === 'running' && !syncForm.force"
+              @click="startSync"
+            >
+              <el-icon><Refresh /></el-icon>
+              {{ getSyncButtonText() }}
+            </el-button>
+
+            <el-button
+              size="large"
+              :loading="refreshing"
+              @click="refreshStatus"
+            >
+              <el-icon><RefreshRight /></el-icon>
+              刷新状态
+            </el-button>
+
+            <el-button
+              size="large"
+              type="warning"
+              :loading="clearingCache"
+              @click="clearCache"
+            >
+              <el-icon><Delete /></el-icon>
+              清空缓存
+            </el-button>
+
+            <!-- 临时测试按钮 -->
+
+            <el-button
+              size="large"
+              type="success"
+              :loading="syncing"
+              @click="forceSync"
+            >
+              🔄 强制重新同步
+            </el-button>
+          </div>
+        </div>
+
+        <!-- 错误信息 -->
+        <div v-if="syncStatus?.message && syncStatus.status === 'failed'" class="error-section">
+          <el-alert
+            :title="syncStatus.message"
+            type="error"
+            :closable="false"
+            show-icon
+          />
+        </div>
+      </div>
+    </el-card>
+  </div>
+</template>
+
 <style scoped lang="scss">
 .sync-control {
   .control-card {
     .card-header {
       display: flex;
       align-items: center;
-      
+
       .header-icon {
         margin-right: 8px;
         color: var(--el-color-primary);
       }
-      
+
       .header-title {
         font-weight: 600;
       }
@@ -578,12 +608,12 @@ onUnmounted(() => {
 
     .sync-status-section {
       margin-bottom: 24px;
-      
+
       .status-display {
         .status-tag {
           margin-bottom: 12px;
         }
-        
+
         .progress-info {
           .progress-text {
             margin-top: 8px;
@@ -596,36 +626,36 @@ onUnmounted(() => {
 
     .sync-stats-section {
       margin-bottom: 24px;
-      
+
       .stats-grid {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
         gap: 16px;
         margin-bottom: 16px;
-        
+
         .stat-item {
           text-align: center;
           padding: 16px;
           border: 1px solid var(--el-border-color-light);
           border-radius: 8px;
-          
+
           .stat-value {
             font-size: 24px;
             font-weight: 600;
             margin-bottom: 4px;
-            
+
             &.success { color: var(--el-color-success); }
             &.primary { color: var(--el-color-primary); }
             &.danger { color: var(--el-color-danger); }
           }
-          
+
           .stat-label {
             font-size: 14px;
             color: var(--el-text-color-secondary);
           }
         }
       }
-      
+
       .sources-used {
         display: flex;
         align-items: center;
@@ -659,17 +689,17 @@ onUnmounted(() => {
 
     .sync-controls-section {
       margin-bottom: 24px;
-      
+
       .source-selection {
         margin-bottom: 20px;
-        
+
         .form-help {
           font-size: 12px;
           color: var(--el-text-color-secondary);
           margin-top: 4px;
         }
       }
-      
+
       .action-buttons {
         display: flex;
         gap: 12px;
@@ -691,11 +721,11 @@ onUnmounted(() => {
           grid-template-columns: repeat(2, 1fr);
         }
       }
-      
+
       .sync-controls-section {
         .action-buttons {
           flex-direction: column;
-          
+
           .el-button {
             width: 100%;
           }

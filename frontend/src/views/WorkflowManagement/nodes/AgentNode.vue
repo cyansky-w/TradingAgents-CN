@@ -1,27 +1,35 @@
+<script setup lang="ts">
+import { UserFilled } from '@element-plus/icons-vue'
+import { Handle, Position } from '@vue-flow/core'
+
+defineProps<{ data: Record<string, any> }>()
+</script>
+
 <template>
   <div class="custom-node agent-node">
     <div class="node-header">
-      <el-icon size="14"><UserFilled /></el-icon>
+      <el-icon size="14">
+        <UserFilled />
+      </el-icon>
       <span class="node-title">{{ data.label || 'Agent' }}</span>
     </div>
     <div class="node-body">
-      <div v-if="data.agentName" class="node-meta">{{ data.agentName }}</div>
-      <div v-else class="node-meta node-meta--empty">未绑定 Agent</div>
+      <div v-if="data.agentName" class="node-meta">
+        {{ data.agentName }}
+      </div>
+      <div v-else class="node-meta node-meta--empty">
+        未绑定 Agent
+      </div>
       <div v-if="data.loop_over" class="node-badge">
-        <el-tag size="small" type="warning">循环</el-tag>
+        <el-tag size="small" type="warning">
+          循环
+        </el-tag>
       </div>
     </div>
     <Handle type="target" :position="Position.Left" />
     <Handle type="source" :position="Position.Right" />
   </div>
 </template>
-
-<script setup lang="ts">
-import { Handle, Position } from '@vue-flow/core'
-import { UserFilled } from '@element-plus/icons-vue'
-
-defineProps<{ data: Record<string, any> }>()
-</script>
 
 <style scoped>
 .custom-node {

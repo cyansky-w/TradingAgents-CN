@@ -8,11 +8,11 @@ import { cn } from '@/lib/utils'
 import { useCommand } from '.'
 
 defineOptions({
-  inheritAttrs: false,
+  inheritAttrs: false
 })
 
 const props = defineProps<ListboxFilterProps & {
-  class?: HTMLAttributes["class"]
+  class?: HTMLAttributes['class']
 }>()
 
 const delegatedProps = reactiveOmit(props, 'class')

@@ -1,42 +1,5 @@
-<template>
-  <div class="network-status" v-if="showStatus">
-    <el-alert
-      v-if="!appStore.isOnline"
-      title="网络连接已断开"
-      type="warning"
-      :closable="false"
-      show-icon
-    >
-      <template #default>
-        <span>请检查您的网络连接</span>
-      </template>
-    </el-alert>
-    
-    <el-alert
-      v-else-if="!appStore.apiConnected"
-      title="后端服务连接失败"
-      type="error"
-      :closable="false"
-      show-icon
-    >
-      <template #default>
-        <span>无法连接到后端服务，请检查服务是否正常运行</span>
-        <el-button 
-          type="primary" 
-          size="small" 
-          @click="retryConnection"
-          :loading="retrying"
-          style="margin-left: 10px;"
-        >
-          重试连接
-        </el-button>
-      </template>
-    </el-alert>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useAppStore } from '@/stores/app'
 
 const appStore = useAppStore()
@@ -80,6 +43,43 @@ onUnmounted(() => {
   }
 })
 </script>
+
+<template>
+  <div v-if="showStatus" class="network-status">
+    <el-alert
+      v-if="!appStore.isOnline"
+      title="网络连接已断开"
+      type="warning"
+      :closable="false"
+      show-icon
+    >
+      <template #default>
+        <span>请检查您的网络连接</span>
+      </template>
+    </el-alert>
+
+    <el-alert
+      v-else-if="!appStore.apiConnected"
+      title="后端服务连接失败"
+      type="error"
+      :closable="false"
+      show-icon
+    >
+      <template #default>
+        <span>无法连接到后端服务，请检查服务是否正常运行</span>
+        <el-button
+          type="primary"
+          size="small"
+          :loading="retrying"
+          style="margin-left: 10px;"
+          @click="retryConnection"
+        >
+          重试连接
+        </el-button>
+      </template>
+    </el-alert>
+  </div>
+</template>
 
 <style scoped>
 .network-status {
